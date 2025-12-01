@@ -87,20 +87,42 @@ function getShell() {
 async function detectInstalledIDEs() {
   const ides = [];
   
+  // Windows app paths helper
+  const getWindowsAppPaths = (appName) => {
+    const programFiles = process.env['ProgramFiles'] || 'C:\\Program Files';
+    const programFilesX86 = process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)';
+    const localAppData = process.env['LOCALAPPDATA'] || '';
+    const appData = process.env['APPDATA'] || '';
+    
+    return {
+      programFiles,
+      programFilesX86,
+      localAppData,
+      appData
+    };
+  };
+  
   const ideList = [
     {
       name: 'Visual Studio Code',
       command: 'code',
       icon: '💻',
       testCommands: isWindows ? ['code.cmd', 'code'] : ['code'],
-      macAppPath: '/Applications/Visual Studio Code.app'
+      macAppPath: '/Applications/Visual Studio Code.app',
+      winPaths: isWindows ? [
+        `${process.env['LOCALAPPDATA']}\\Programs\\Microsoft VS Code\\Code.exe`,
+        `${process.env['ProgramFiles']}\\Microsoft VS Code\\Code.exe`
+      ] : []
     },
     {
       name: 'VS Code Insiders',
       command: 'code-insiders',
       icon: '💻',
       testCommands: isWindows ? ['code-insiders.cmd', 'code-insiders'] : ['code-insiders'],
-      macAppPath: '/Applications/Visual Studio Code - Insiders.app'
+      macAppPath: '/Applications/Visual Studio Code - Insiders.app',
+      winPaths: isWindows ? [
+        `${process.env['LOCALAPPDATA']}\\Programs\\Microsoft VS Code Insiders\\Code - Insiders.exe`
+      ] : []
     },
     {
       name: 'WebStorm',
@@ -109,7 +131,11 @@ async function detectInstalledIDEs() {
       testCommands: isWindows 
         ? ['webstorm.cmd', 'webstorm']
         : ['webstorm'],
-      macAppPath: '/Applications/WebStorm.app'
+      macAppPath: '/Applications/WebStorm.app',
+      winPaths: isWindows ? [
+        `${process.env['LOCALAPPDATA']}\\JetBrains\\Toolbox\\scripts\\webstorm.cmd`,
+        `${process.env['ProgramFiles']}\\JetBrains\\WebStorm\\bin\\webstorm64.exe`
+      ] : []
     },
     {
       name: 'IntelliJ IDEA',
@@ -118,7 +144,11 @@ async function detectInstalledIDEs() {
       testCommands: isWindows 
         ? ['idea.cmd', 'idea']
         : ['idea'],
-      macAppPath: '/Applications/IntelliJ IDEA.app'
+      macAppPath: '/Applications/IntelliJ IDEA.app',
+      winPaths: isWindows ? [
+        `${process.env['LOCALAPPDATA']}\\JetBrains\\Toolbox\\scripts\\idea.cmd`,
+        `${process.env['ProgramFiles']}\\JetBrains\\IntelliJ IDEA\\bin\\idea64.exe`
+      ] : []
     },
     {
       name: 'PyCharm',
@@ -127,7 +157,11 @@ async function detectInstalledIDEs() {
       testCommands: isWindows 
         ? ['pycharm.cmd', 'pycharm']
         : ['pycharm'],
-      macAppPath: '/Applications/PyCharm.app'
+      macAppPath: '/Applications/PyCharm.app',
+      winPaths: isWindows ? [
+        `${process.env['LOCALAPPDATA']}\\JetBrains\\Toolbox\\scripts\\pycharm.cmd`,
+        `${process.env['ProgramFiles']}\\JetBrains\\PyCharm\\bin\\pycharm64.exe`
+      ] : []
     },
     {
       name: 'PhpStorm',
@@ -136,7 +170,11 @@ async function detectInstalledIDEs() {
       testCommands: isWindows 
         ? ['phpstorm.cmd', 'phpstorm']
         : ['phpstorm'],
-      macAppPath: '/Applications/PhpStorm.app'
+      macAppPath: '/Applications/PhpStorm.app',
+      winPaths: isWindows ? [
+        `${process.env['LOCALAPPDATA']}\\JetBrains\\Toolbox\\scripts\\phpstorm.cmd`,
+        `${process.env['ProgramFiles']}\\JetBrains\\PhpStorm\\bin\\phpstorm64.exe`
+      ] : []
     },
     {
       name: 'RubyMine',
@@ -145,7 +183,10 @@ async function detectInstalledIDEs() {
       testCommands: isWindows 
         ? ['rubymine.cmd', 'rubymine']
         : ['rubymine'],
-      macAppPath: '/Applications/RubyMine.app'
+      macAppPath: '/Applications/RubyMine.app',
+      winPaths: isWindows ? [
+        `${process.env['LOCALAPPDATA']}\\JetBrains\\Toolbox\\scripts\\rubymine.cmd`
+      ] : []
     },
     {
       name: 'CLion',
@@ -154,7 +195,10 @@ async function detectInstalledIDEs() {
       testCommands: isWindows 
         ? ['clion.cmd', 'clion']
         : ['clion'],
-      macAppPath: '/Applications/CLion.app'
+      macAppPath: '/Applications/CLion.app',
+      winPaths: isWindows ? [
+        `${process.env['LOCALAPPDATA']}\\JetBrains\\Toolbox\\scripts\\clion.cmd`
+      ] : []
     },
     {
       name: 'Sublime Text',
@@ -163,7 +207,11 @@ async function detectInstalledIDEs() {
       testCommands: isWindows 
         ? ['subl.exe']
         : ['subl'],
-      macAppPath: '/Applications/Sublime Text.app'
+      macAppPath: '/Applications/Sublime Text.app',
+      winPaths: isWindows ? [
+        `${process.env['ProgramFiles']}\\Sublime Text\\subl.exe`,
+        `${process.env['ProgramFiles']}\\Sublime Text 3\\subl.exe`
+      ] : []
     },
     {
       name: 'Atom',
@@ -172,7 +220,10 @@ async function detectInstalledIDEs() {
       testCommands: isWindows 
         ? ['atom.cmd', 'atom']
         : ['atom'],
-      macAppPath: '/Applications/Atom.app'
+      macAppPath: '/Applications/Atom.app',
+      winPaths: isWindows ? [
+        `${process.env['LOCALAPPDATA']}\\atom\\atom.exe`
+      ] : []
     },
     {
       name: 'Vim',
@@ -197,7 +248,11 @@ async function detectInstalledIDEs() {
       command: 'cursor',
       icon: '🎯',
       testCommands: isWindows ? ['cursor.cmd', 'cursor'] : ['cursor'],
-      macAppPath: '/Applications/Cursor.app'
+      macAppPath: '/Applications/Cursor.app',
+      winPaths: isWindows ? [
+        `${process.env['LOCALAPPDATA']}\\Programs\\cursor\\Cursor.exe`,
+        `${process.env['LOCALAPPDATA']}\\cursor\\Cursor.exe`
+      ] : []
     },
     {
       name: 'Zed',
@@ -218,7 +273,21 @@ async function detectInstalledIDEs() {
       command: 'fleet',
       icon: '🚀',
       testCommands: ['fleet'],
-      macAppPath: '/Applications/Fleet.app'
+      macAppPath: '/Applications/Fleet.app',
+      winPaths: isWindows ? [
+        `${process.env['LOCALAPPDATA']}\\JetBrains\\Toolbox\\scripts\\fleet.cmd`
+      ] : []
+    },
+    {
+      name: 'Notepad++',
+      command: 'notepad++',
+      icon: '📝',
+      testCommands: isWindows ? ['notepad++'] : [],
+      windowsOnly: true,
+      winPaths: isWindows ? [
+        `${process.env['ProgramFiles']}\\Notepad++\\notepad++.exe`,
+        `${process.env['ProgramFiles(x86)']}\\Notepad++\\notepad++.exe`
+      ] : []
     }
   ];
 
@@ -237,6 +306,28 @@ async function detectInstalledIDEs() {
       continue;
     }
     
+    // On Windows, check known installation paths first
+    if (isWindows && ide.winPaths && ide.winPaths.length > 0) {
+      for (const winPath of ide.winPaths) {
+        try {
+          if (fs.existsSync(winPath)) {
+            ides.push({
+              name: ide.name,
+              command: `"${winPath}"`, // Quote the path for execution
+              icon: ide.icon,
+              isMacApp: false,
+              isWinPath: true
+            });
+            found = true;
+            break;
+          }
+        } catch (err) {
+          // Path doesn't exist, continue
+        }
+      }
+      if (found) continue;
+    }
+    
     // Test command-line commands
     if (!found && ide.testCommands) {
       for (const testCmd of ide.testCommands) {
@@ -247,13 +338,14 @@ async function detectInstalledIDEs() {
             : `which ${testCmd}`;
           
           await new Promise((resolve, reject) => {
-            exec(testCommand, { timeout: 1000 }, (error, stdout) => {
+            exec(testCommand, { timeout: 2000 }, (error, stdout) => {
               if (!error && stdout && stdout.trim()) {
                 ides.push({
                   name: ide.name,
                   command: testCmd,
                   icon: ide.icon,
-                  isMacApp: false
+                  isMacApp: false,
+                  isWinPath: false
                 });
                 resolve();
               } else {
@@ -332,11 +424,19 @@ async function detectInstalledTerminals() {
       testCommands: ['hyper']
     },
     {
+      name: 'Windows Terminal',
+      command: 'wt',
+      icon: '⚡',
+      windowsOnly: true,
+      testCommands: ['wt']
+    },
+    {
       name: 'PowerShell',
       command: 'powershell',
       icon: '💻',
       windowsOnly: true,
-      testCommands: ['powershell']
+      testCommands: ['powershell'],
+      default: isWindows
     },
     {
       name: 'CMD',
@@ -1020,20 +1120,37 @@ ipcMain.handle('play-project', async (_event, projectPath, customPort = null) =>
     const command = scriptParts[0];  // 'npm'
     const args = scriptParts.slice(1); // ['run', 'dev']
     
+    // Build spawn options - Cross-platform compatible
     const spawnOptions = {
       cwd: projectPath,
-      shell: true,
+      shell: isWindows ? true : getShell(), // Use proper shell on each platform
       env,
       stdio: ['pipe', 'pipe', 'pipe'], // Enable stdin, stdout, stderr pipes for interaction
-      // Windows-specific options
-      ...(isWindows && {
-        windowsHide: true,
-        windowsVerbatimArguments: false
-      })
     };
     
-    console.log(`Spawning: ${npmCmd} ${args.join(' ')}`);
-    const child = spawn(npmCmd, args, spawnOptions);
+    // Add Windows-specific options
+    if (isWindows) {
+      spawnOptions.windowsHide = true; // Hide the console window
+      spawnOptions.windowsVerbatimArguments = false;
+      // Don't detach on Windows - we need to capture output
+    }
+    
+    // Build the command properly for each platform
+    let spawnCmd, spawnArgs;
+    
+    if (isWindows) {
+      // On Windows, use cmd /c to run npm commands
+      spawnCmd = process.env.COMSPEC || 'cmd.exe';
+      spawnArgs = ['/c', `${npmCmd} ${args.join(' ')}`];
+      console.log(`Spawning (Windows): ${spawnCmd} ${spawnArgs.join(' ')}`);
+    } else {
+      // On Unix-like systems
+      spawnCmd = npmCmd;
+      spawnArgs = args;
+      console.log(`Spawning: ${spawnCmd} ${spawnArgs.join(' ')}`);
+    }
+    
+    const child = spawn(spawnCmd, spawnArgs, spawnOptions);
 
     runningProcesses.set(projectPath, child);
     updateTrayMenu(runningProcesses);
@@ -1386,6 +1503,8 @@ ipcMain.handle('open-in-editor', async (_event, projectPath, ideCommand = null) 
     }
     
     const normalizedPath = path.normalize(projectPath);
+    console.log(`Opening editor for: ${normalizedPath}`);
+    console.log(`IDE command: ${ideCommand || 'default'}`);
     
     if (ideCommand) {
       // User selected specific IDE
@@ -1393,16 +1512,15 @@ ipcMain.handle('open-in-editor', async (_event, projectPath, ideCommand = null) 
       
       // Check if it's a macOS app bundle
       const isMacApp = isMac && ideCommand.endsWith('.app');
+      // Check if it's a Windows full path (contains .exe or is quoted)
+      const isWinPath = isWindows && (ideCommand.includes('.exe') || ideCommand.startsWith('"'));
       
       if (isMacApp) {
         // Use 'open -a' for macOS app bundles
-        // Extract app name from path like '/Applications/WebStorm.app' -> 'WebStorm'
         const appName = path.basename(ideCommand, '.app');
-        // Use the full app path for open -a
         exec(`open -a "${ideCommand}" "${normalizedPath}"`, (error) => {
           if (error) {
             console.error(`Error opening with ${ideCommand}:`, error);
-            // Fallback: try with just the app name
             exec(`open -a "${appName}" "${normalizedPath}"`, (fallbackError) => {
               if (fallbackError) {
                 console.error(`Fallback also failed:`, fallbackError);
@@ -1410,12 +1528,44 @@ ipcMain.handle('open-in-editor', async (_event, projectPath, ideCommand = null) 
             });
           }
         });
+      } else if (isWinPath) {
+        // Windows: Use full path with start command for proper window handling
+        const cmd = `start "" ${ideCommand} "${normalizedPath}"`;
+        console.log(`Windows IDE command: ${cmd}`);
+        exec(cmd, { shell: true, windowsHide: false }, (error) => {
+          if (error) {
+            console.error(`Error opening with Windows path:`, error);
+            // Fallback: try direct execution
+            exec(`${ideCommand} "${normalizedPath}"`, { shell: true }, (fallbackError) => {
+              if (fallbackError) {
+                console.error(`Fallback also failed:`, fallbackError);
+                // Last resort: open in explorer
+                exec(`explorer "${normalizedPath}"`);
+              }
+            });
+          }
+        });
+      } else if (isWindows) {
+        // Windows with CLI command (like 'code')
+        const cmd = `${ideCommand} "${normalizedPath}"`;
+        console.log(`Windows CLI command: ${cmd}`);
+        exec(cmd, { shell: true }, (error) => {
+          if (error) {
+            console.error(`Error opening with ${ideCommand}:`, error);
+            // Try with start command
+            exec(`start "" ${ideCommand} "${normalizedPath}"`, { shell: true }, (startError) => {
+              if (startError) {
+                console.error(`Start command also failed:`, startError);
+                exec(`explorer "${normalizedPath}"`);
+              }
+            });
+          }
+        });
       } else {
-        // Use command directly (works for CLI commands and Windows)
+        // Unix/Linux: Use command directly
         exec(`${ideCommand} "${normalizedPath}"`, (error) => {
           if (error) {
             console.error(`Error opening with ${ideCommand}:`, error);
-            // On macOS, if command fails, try to find the app
             if (isMac) {
               const appName = ideCommand.split('/').pop() || ideCommand;
               exec(`open -a "${appName}" "${normalizedPath}"`, (fallbackError) => {
@@ -1430,10 +1580,22 @@ ipcMain.handle('open-in-editor', async (_event, projectPath, ideCommand = null) 
     } else {
       // Default: try VS Code first, fallback to file manager
       if (isWindows) {
-        exec(`code "${normalizedPath}"`, (error) => {
+        // Try code command first
+        exec(`code "${normalizedPath}"`, { shell: true }, (error) => {
           if (error) {
-            console.log('VS Code not found, opening in Explorer...');
-            exec(`explorer "${normalizedPath}"`);
+            console.log('VS Code CLI not found, trying VS Code path...');
+            const vscodePath = `${process.env['LOCALAPPDATA']}\\Programs\\Microsoft VS Code\\Code.exe`;
+            if (fs.existsSync(vscodePath)) {
+              exec(`start "" "${vscodePath}" "${normalizedPath}"`, { shell: true }, (pathError) => {
+                if (pathError) {
+                  console.log('VS Code not found, opening in Explorer...');
+                  exec(`explorer "${normalizedPath}"`);
+                }
+              });
+            } else {
+              console.log('VS Code not found, opening in Explorer...');
+              exec(`explorer "${normalizedPath}"`);
+            }
           }
         });
       } else if (isMac) {
@@ -1493,30 +1655,62 @@ ipcMain.handle('open-in-terminal', async (_event, projectPath, terminalPreferenc
     
     if (isWindows) {
       // Windows: Use preference or default
-      if (terminalPreference === 'powershell') {
-        exec(`powershell -NoExit -Command "cd '${normalizedPath}'"`, (error) => {
+      // Use 'start' command to open in a new window
+      console.log('🚀 Opening Windows terminal...');
+      
+      // Helper function to open Windows Terminal (new modern terminal)
+      const openWindowsTerminal = () => {
+        console.log('Trying Windows Terminal...');
+        exec(`wt -d "${normalizedPath}"`, { windowsHide: false }, (error) => {
           if (error) {
-            console.error(`Error opening PowerShell: ${error}`);
+            console.log('Windows Terminal not found, trying PowerShell...');
+            openPowerShell();
+          } else {
+            console.log('✅ Windows Terminal opened successfully');
           }
         });
-      } else if (terminalPreference === 'cmd') {
-        exec(`cmd /k "cd /d ${normalizedPath}"`, (error) => {
+      };
+      
+      // Helper function to open PowerShell
+      const openPowerShell = () => {
+        console.log('Opening PowerShell...');
+        // Use 'start' to open in a new window
+        const psCommand = `start powershell -NoExit -Command "Set-Location -Path '${normalizedPath.replace(/'/g, "''")}'"`; 
+        exec(psCommand, { windowsHide: false, shell: true }, (error) => {
           if (error) {
-            console.error(`Error opening CMD: ${error}`);
+            console.error(`PowerShell error: ${error.message}`);
+            openCmd();
+          } else {
+            console.log('✅ PowerShell opened successfully');
           }
         });
+      };
+      
+      // Helper function to open CMD
+      const openCmd = () => {
+        console.log('Opening CMD...');
+        // Use 'start' to open in a new window
+        const cmdCommand = `start cmd /k "cd /d "${normalizedPath}""`;
+        exec(cmdCommand, { windowsHide: false, shell: true }, (error) => {
+          if (error) {
+            console.error(`CMD error: ${error.message}`);
+            // Last resort: try to open folder in Explorer
+            exec(`explorer "${normalizedPath}"`);
+          } else {
+            console.log('✅ CMD opened successfully');
+          }
+        });
+      };
+      
+      if (terminalPreference === 'powershell' || terminalPreference === 'PowerShell') {
+        openPowerShell();
+      } else if (terminalPreference === 'cmd' || terminalPreference === 'CMD') {
+        openCmd();
+      } else if (terminalPreference === 'wt' || terminalPreference === 'Windows Terminal') {
+        openWindowsTerminal();
       } else {
-        // Default: Try PowerShell first, fallback to CMD
-        exec(`powershell -NoExit -Command "cd '${normalizedPath}'"`, (error) => {
-          if (error) {
-            // Fallback to CMD
-            exec(`cmd /k "cd /d ${normalizedPath}"`, (cmdError) => {
-              if (cmdError) {
-                console.error(`Error opening terminal: ${cmdError}`);
-              }
-            });
-          }
-        });
+        // Default: Try Windows Terminal first, then PowerShell, then CMD
+        openWindowsTerminal();
       }
     } else if (isMac) {
       // macOS: Use preference or default

@@ -1,11 +1,11 @@
-# 🚀 Premium Electron Node Manager
+# 🚀 Tafil — Universal Project Manager for Developers
 
 ![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![Electron](https://img.shields.io/badge/Electron-25.0+-purple.svg)
 ![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey.svg)
 
-A powerful, modern, and beautiful desktop application to manage all your Node.js projects in one place. Scan your directories, detect frameworks, run scripts, manage dependencies, and open projects in your favorite IDEs or terminals with a single click.
+**Tafil** is a powerful, modern, and beautiful desktop application to manage all your Node.js projects in one place. Scan your directories, detect frameworks, run scripts, manage dependencies, and open projects in your favorite IDEs or terminals with a single click.
 
 ## ✨ Features
 
@@ -34,18 +34,79 @@ A powerful, modern, and beautiful desktop application to manage all your Node.js
 
 ---
 
-## 🚀 Getting Started
+## 📥 Download & Install
+
+### Pre-built Releases
+
+Download the latest version for your platform from [**GitHub Releases**](https://github.com/Toseef-Ahmad/Tafil/releases):
+
+| Platform | Download | Notes |
+|----------|----------|-------|
+| **macOS** | `Tafil-x.x.x-mac-arm64.dmg` (Apple Silicon) <br> `Tafil-x.x.x-mac-x64.dmg` (Intel) | See [macOS installation](#macos-installation) |
+| **Windows** | `Tafil-x.x.x-win-x64.exe` (Installer) <br> `Tafil-x.x.x-portable.exe` (Portable) | See [Windows installation](#windows-installation) |
+| **Linux** | `Tafil-x.x.x.AppImage` <br> `Tafil-x.x.x-amd64.deb` <br> `Tafil-x.x.x-x86_64.rpm` | See [Linux installation](#linux-installation) |
+
+---
+
+### 🍎 macOS Installation
+
+1. Download the `.dmg` file for your Mac (arm64 for M1/M2/M3, x64 for Intel)
+2. Open the `.dmg` and drag **Tafil** to Applications
+3. **First launch:** Right-click the app → Click **Open** → Click **Open** again
+
+> ⚠️ **Note:** Since the app is not signed with an Apple Developer certificate, macOS will show a warning. This is normal for open-source apps. You only need to do this once.
+
+**Alternative:** Run in Terminal:
+```bash
+xattr -cr /Applications/Tafil.app
+```
+
+---
+
+### 🪟 Windows Installation
+
+1. Download the `.exe` installer or portable version
+2. Run the installer (or just run the portable `.exe`)
+3. **First launch:** If SmartScreen appears:
+   - Click "**More info**"
+   - Click "**Run anyway**"
+
+> ⚠️ **Note:** Windows SmartScreen shows a warning because the app isn't signed with a paid certificate. This is normal for open-source apps and is safe to bypass.
+
+---
+
+### 🐧 Linux Installation
+
+**AppImage (Universal):**
+```bash
+chmod +x Tafil-*.AppImage
+./Tafil-*.AppImage
+```
+
+**Debian/Ubuntu (.deb):**
+```bash
+sudo dpkg -i Tafil-*-amd64.deb
+```
+
+**Fedora/RHEL (.rpm):**
+```bash
+sudo rpm -i Tafil-*-x86_64.rpm
+```
+
+---
+
+## 🛠 Build from Source
 
 ### Prerequisites
-*   Node.js (v16 or higher)
+*   Node.js (v18 or higher)
 *   npm or yarn
 
-### Installation
+### Development Setup
 
 1.  **Clone the repository**
     ```bash
-    git clone https://github.com/yourusername/electron-node-manager.git
-    cd electron-node-manager
+    git clone https://github.com/Toseef-Ahmad/Tafil.git
+    cd Tafil
     ```
 
 2.  **Install dependencies**
@@ -55,30 +116,38 @@ A powerful, modern, and beautiful desktop application to manage all your Node.js
 
 3.  **Run in Development Mode**
     ```bash
-    npm start
+    npm run dev
     ```
 
-4.  **Build for Production**
-    ```bash
-    # For macOS
-    npm run build:mac
+### Build for Production
 
-    # For Windows
-    npm run build:win
+```bash
+# For macOS (DMG + ZIP)
+npm run build:mac
 
-    # For Linux
-    npm run build:linux
-    ```
+# For macOS Universal (Intel + Apple Silicon)
+npm run build:mac-universal
+
+# For Windows (NSIS Installer + Portable)
+npm run build:win
+
+# For Linux (AppImage, DEB, RPM)
+npm run build:linux
+
+# For all platforms
+npm run build:all
+```
+
+Build outputs are saved to the `release/` folder.
 
 ---
 
 ## 📸 Screenshots
 
-*(Add your screenshots here)*
+### Project Dashboard
+![Tafil Dashboard](screenshots/dashboard.png)
 
-| Project Dashboard | Settings & Preferences |
-|:---:|:---:|
-| *Place dashboard screenshot here* | *Place settings screenshot here* |
+*Manage all your Node.js projects in one beautiful interface. Run projects, open in your favorite IDE, launch terminals, and clean up node_modules with a single click.*
 
 ---
 
@@ -112,6 +181,6 @@ Distributed under the MIT License. See `LICENSE` for more information.
 
 ## 📬 Contact
 
-**Your Name** - [YourEmail@example.com](mailto:YourEmail@example.com)
+**Touseef Ahmad** - [ahmadtouseef946@gmail.com](mailto:ahmadtouseef946@gmail.com)
 
-Project Link: [https://github.com/yourusername/electron-node-manager](https://github.com/yourusername/electron-node-manager)
+Project Link: [https://github.com/Toseef-Ahmad/Tafil](https://github.com/Toseef-Ahmad/Tafil)
