@@ -1,0 +1,88 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Light mode styles */
+body.light-mode {
+  @apply bg-gradient-to-br from-gray-100 via-gray-200 to-gray-300 text-gray-900;
+}
+
+body.light-mode header {
+  @apply bg-white/90 border-gray-300;
+}
+
+body.light-mode .bg-white\/10 {
+  @apply bg-white/80 border-gray-300;
+}
+
+body.light-mode .bg-gray-800 {
+  @apply bg-white border border-gray-300;
+}
+
+body.light-mode .text-white {
+  @apply text-gray-900;
+}
+
+body.light-mode .text-gray-300 {
+  @apply text-gray-700;
+}
+
+body.light-mode .text-gray-400 {
+  @apply text-gray-600;
+}
+
+body.light-mode .bg-gray-900 {
+  @apply bg-gray-100;
+}
+
+body.light-mode input {
+  @apply bg-white border-gray-300 text-gray-900;
+}
+
+/* Animations */
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.animate-pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Smooth transitions */
+* {
+  transition-property: background-color, border-color, color, fill, stroke;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 200ms;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.1);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+body.light-mode ::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+body.light-mode ::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.3);
+}

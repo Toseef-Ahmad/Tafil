@@ -1,0 +1,86 @@
+{
+  "name": "electron-node-manager",
+  "version": "1.0.0",
+  "main": "main.js",
+  "scripts": {
+    "start": "npm run build-css && electron .",
+    "dev": "concurrently \"npm run watch-css\" \"cross-env NODE_ENV=development electron .\"",
+    "build-css": "tailwindcss -i ./styles.css -o ./dist/output.css --minify",
+    "watch-css": "tailwindcss -i ./styles.css -o ./dist/output.css --watch",
+    "build": "npm run build-css && electron-builder --config.asar=true",
+    "build:mac": "npm run build-css && electron-builder --mac",
+    "build:win": "npm run build-css && electron-builder --win",
+    "build:linux": "npm run build-css && electron-builder --linux",
+    "build:all": "npm run build-css && electron-builder -mwl",
+    "pack": "electron-builder --dir"
+  },
+  "build": {
+    "appId": "com.tafil.app",
+    "productName": "Tafil",
+    "compression": "maximum",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "renderer.js",
+      "index.html",
+      "dist/output.css",
+      "utils/**/*",
+      "!**/*.map",
+      "!**/*.md",
+      "!.git",
+      "!.vscode"
+    ],
+    "mac": {
+      "category": "public.app-category.developer-tools",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": ["x64", "arm64"]
+        }
+      ],
+      "icon": "build/icon.icns",
+      "minimumSystemVersion": "10.13.0"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64", "ia32"]
+        }
+      ],
+      "icon": "build/icon.ico"
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb",
+        "rpm"
+      ],
+      "category": "Development",
+      "icon": "build/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    },
+    "asar": true,
+    "npmRebuild": false,
+    "buildDependenciesFromSource": false
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0",
+    "cross-env": "^7.0.3",
+    "electron": "^33.2.1",
+    "electron-builder": "^25.1.8",
+    "tailwindcss": "^3.4.17"
+  },
+  "dependencies": {
+    "portfinder": "^1.0.32",
+    "ps-tree": "^1.2.0"
+  }
+}

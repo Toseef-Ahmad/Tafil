@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+  <title>Tafil</title>
+
+  <!-- Google Fonts (Inter) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap"
+    rel="stylesheet"
+  />
+
+  <!-- FontAwesome (CDN) -->
+  <script
+    src="https://kit.fontawesome.com/a076d05399.js"
+    crossorigin="anonymous"
+  ></script>
+
+  <!-- Tailwind compiled CSS -->
+  <link rel="stylesheet" href="./dist/output.css" />
+  <meta
+    http-equiv="Content-Security-Policy"
+    content="default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; script-src 'self' https://kit.fontawesome.com; connect-src 'self' https://ka-f.fontawesome.com;"
+  />
+  <style>
+    /* Custom Animations */
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    
+    @keyframes slideUp {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+    
+    .animate-fadeIn {
+      animation: fadeIn 0.2s ease-out;
+    }
+    
+    .animate-slideUp {
+      animation: slideUp 0.3s ease-out;
+    }
+    
+    /* Custom Scrollbar */
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 8px;
+    }
+    
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 10px;
+    }
+    
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: linear-gradient(to bottom, #8b5cf6, #6366f1);
+      border-radius: 10px;
+    }
+    
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+      background: linear-gradient(to bottom, #a78bfa, #818cf8);
+    }
+    
+    /* Settings gear animation */
+    @keyframes spin-slow {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+    
+    #settingsBtn:hover .fa-cog {
+      animation: spin-slow 2s linear infinite;
+    }
+  </style>
+</head>
+<body
+  class="min-h-screen bg-gradient-to-br from-gray-900 via-[#0F0F1F] to-[#1a1a1f] text-white flex flex-col font-sans"
+  style="font-family: 'Inter', sans-serif;"
+>
+  <!-- Header -->
+  <header
+    class="relative flex items-center justify-between px-6 py-4 shadow-md
+           bg-white/10 backdrop-blur-md border-b border-white/10"
+  >
+    <div class="flex items-center gap-3">
+      <!-- Settings Icon - Left Corner -->
+      <button
+        id="settingsBtn"
+        class="px-3 py-2 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg hover:from-blue-600 hover:to-purple-700 text-white font-medium shadow-lg transition-all duration-200 hover:shadow-xl hover:scale-105 flex items-center gap-2"
+        title="Settings"
+      >
+        <i class="fas fa-cog"></i>
+      </button>
+      
+      <!-- Brand -->
+      <div class="flex items-center gap-2">
+        <i class="fas fa-cube text-green-300 text-xl"></i>
+        <h1 class="text-2xl font-extrabold tracking-tight">Tafil</h1>
+        <span id="ideCount" class="text-xs text-gray-400 ml-2" style="display:none;">
+          <i class="fas fa-code"></i> <span id="ideCountNum">0</span> IDEs
+        </span>
+      </div>
+    </div>
+    <div class="flex items-center gap-3">
+      <button
+        id="scanProjectsBtn"
+        class="px-4 py-2 bg-green-500 rounded-lg hover:bg-green-600 text-white font-medium flex items-center gap-2 transition shadow-md"
+      >
+        <i class="fas fa-search"></i>
+        <span>Scan Home</span>
+      </button>
+      <button
+        id="scanCustomBtn"
+        class="px-4 py-2 bg-blue-500 rounded-lg hover:bg-blue-600 text-white font-medium flex items-center gap-2 transition shadow-md"
+      >
+        <i class="fas fa-folder-open"></i>
+        <span>Scan Folder</span>
+      </button>
+      <button
+        id="refreshBtn"
+        class="px-3 py-2 bg-gray-700 rounded-lg hover:bg-gray-600 text-white font-medium flex items-center gap-2 transition"
+        title="Refresh Projects (Ctrl+R)"
+      >
+        <i class="fas fa-sync-alt"></i>
+      </button>
+      <button
+        id="darkModeToggle"
+        class="px-3 py-2 bg-gray-700 rounded-lg hover:bg-gray-600 text-white font-medium flex items-center gap-2 transition"
+        title="Toggle Dark Mode"
+      >
+        <i class="fas fa-moon"></i>
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="px-6 py-8 flex-grow">
+    <!-- Info Box -->
+    <div
+      class="bg-white/10 rounded-lg shadow-md p-6 mb-8 backdrop-blur-sm border border-white/10"
+    >
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-xl font-semibold flex items-center gap-2">
+          <i class="fab fa-node-js text-green-400"></i>
+          <span>Node.js Projects</span>
+        </h2>
+        <!-- Enhanced Search Box -->
+        <div class="relative flex items-center gap-2">
+          <div class="relative">
+            <input
+              type="text"
+              id="searchInput"
+              placeholder="Quick search projects... (Ctrl+K)"
+              class="px-4 py-2.5 pl-10 bg-gray-800/70 border-2 border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 transition w-80 text-sm shadow-lg"
+            />
+            <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+            <span class="absolute right-3 top-1/2 transform -translate-y-1/2 text-xs text-gray-500 bg-gray-700/50 px-2 py-0.5 rounded">
+              Ctrl+K
+            </span>
+          </div>
+        </div>
+      </div>
+      <p id="info" class="text-gray-300">
+        Click "Scan Home" to find Node.js projects, or "Scan Folder" to choose a custom directory.
+      </p>
+    </div>
+
+    <!-- Project List -->
+    <div
+      id="projectList"
+      class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6"
+    >
+      <!-- Project cards will be dynamically appended here -->
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer
+    class="bg-white/10 backdrop-blur-sm border-t border-white/10 py-4 text-center text-xs text-gray-300"
+  >
+    <p class="opacity-80">
+      © 2025 Node Project Scanner - 
+      <span class="text-gray-400">Built with Electron + TailwindCSS</span>
+    </p>
+  </footer>
+
+  <!-- Modal for Missing Dependencies -->
+  <div id="dependencyModal" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50">
+    <div class="bg-gray-800 rounded-lg shadow-2xl p-8 max-w-md border border-gray-700">
+      <h3 class="text-2xl font-bold mb-4 flex items-center gap-2">
+        <i class="fas fa-exclamation-triangle text-yellow-400"></i>
+        <span>Dependencies Missing</span>
+      </h3>
+      <p class="text-gray-300 mb-6">
+        This project requires dependencies to be installed before running.
+        Would you like to install them now?
+      </p>
+      <div class="flex gap-3">
+        <button
+          id="modalInstallBtn"
+          class="flex-1 px-4 py-3 bg-green-500 hover:bg-green-600 rounded-lg text-white font-medium transition"
+        >
+          <i class="fas fa-download mr-2"></i>
+          Install Dependencies
+        </button>
+        <button
+          id="modalCancelBtn"
+          class="flex-1 px-4 py-3 bg-gray-600 hover:bg-gray-700 rounded-lg text-white font-medium transition"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Custom Port Modal -->
+  <div id="customPortModal" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50">
+    <div class="bg-gray-800 rounded-lg shadow-2xl p-8 max-w-md border border-gray-700">
+      <h3 class="text-2xl font-bold mb-4 flex items-center gap-2">
+        <i class="fas fa-network-wired text-blue-400"></i>
+        <span>Custom Port</span>
+      </h3>
+      <p class="text-gray-300 mb-4">
+        Enter a custom port number for this project:
+      </p>
+      <p class="text-sm text-gray-400 mb-4">
+        Default: <span id="defaultPortDisplay" class="text-green-400 font-semibold"></span>
+      </p>
+      <input
+        type="number"
+        id="customPortInput"
+        placeholder="e.g., 3000"
+        min="1000"
+        max="65535"
+        class="w-full px-4 py-3 bg-gray-900 border border-gray-600 rounded-lg text-white text-center text-2xl font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 mb-6"
+      />
+      <div class="flex gap-3">
+        <button
+          id="useDefaultPortBtn"
+          class="flex-1 px-4 py-3 bg-green-500 hover:bg-green-600 rounded-lg text-white font-medium transition"
+        >
+          <i class="fas fa-check mr-2"></i>
+          Use Default
+        </button>
+        <button
+          id="useCustomPortBtn"
+          class="flex-1 px-4 py-3 bg-blue-500 hover:bg-blue-600 rounded-lg text-white font-medium transition"
+        >
+          <i class="fas fa-arrow-right mr-2"></i>
+          Use Custom
+        </button>
+        <button
+          id="cancelPortBtn"
+          class="px-4 py-3 bg-gray-600 hover:bg-gray-700 rounded-lg text-white font-medium transition"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- IDE Selector Modal -->
+  <div id="ideModal" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50">
+    <div class="bg-gray-800 rounded-lg shadow-2xl p-8 max-w-md border border-gray-700">
+      <h3 class="text-2xl font-bold mb-4 flex items-center gap-2">
+        <i class="fas fa-code text-purple-400"></i>
+        <span>Select Editor</span>
+      </h3>
+      <p class="text-gray-300 mb-6">
+        Choose an editor or IDE to open this project:
+      </p>
+      <div id="ideList" class="space-y-2 mb-6 max-h-96 overflow-y-auto">
+        <!-- IDE options will be inserted here -->
+      </div>
+      <button
+        id="cancelIdeBtn"
+        class="w-full px-4 py-3 bg-gray-600 hover:bg-gray-700 rounded-lg text-white font-medium transition"
+      >
+        Cancel
+      </button>
+    </div>
+  </div>
+
+  <!-- Confirmation Dialog -->
+  <div id="confirmDialog" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50">
+    <div class="bg-gray-800 rounded-lg shadow-2xl p-8 max-w-md border border-gray-700">
+      <h3 class="text-2xl font-bold mb-4 flex items-center gap-2">
+        <i class="fas fa-trash text-red-400"></i>
+        <span id="confirmTitle">Confirm Action</span>
+      </h3>
+      <p id="confirmMessage" class="text-gray-300 mb-6">
+        Are you sure you want to proceed?
+      </p>
+      <div class="flex gap-3">
+        <button
+          id="confirmYesBtn"
+          class="flex-1 px-4 py-3 bg-red-500 hover:bg-red-600 rounded-lg text-white font-medium transition"
+        >
+          Yes, Remove
+        </button>
+        <button
+          id="confirmNoBtn"
+          class="flex-1 px-4 py-3 bg-gray-600 hover:bg-gray-700 rounded-lg text-white font-medium transition"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Logs Viewer Modal -->
+  <div id="logsModal" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50">
+    <div class="bg-gray-800 rounded-lg shadow-2xl p-6 max-w-4xl w-full max-h-[80vh] border border-gray-700">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-2xl font-bold flex items-center gap-2">
+          <i class="fas fa-terminal text-green-400"></i>
+          <span id="logsProjectName">Project Logs</span>
+        </h3>
+        <button
+          id="closeLogsBtn"
+          class="px-3 py-1 bg-gray-700 hover:bg-gray-600 rounded text-white transition"
+        >
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+      <div id="logsContent" class="bg-gray-900 rounded p-4 overflow-y-auto max-h-[60vh] font-mono text-sm">
+        <p class="text-gray-400">No logs available</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Settings Modal -->
+  <div id="settingsModal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-fadeIn">
+    <div class="bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl shadow-2xl p-8 max-w-3xl w-full border-2 border-white/10 max-h-[90vh] overflow-y-auto animate-slideUp">
+      <!-- Header -->
+      <div class="flex items-center justify-between mb-8 pb-4 border-b-2 border-white/10">
+        <div class="flex items-center gap-3">
+          <div class="p-3 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl shadow-lg">
+            <i class="fas fa-cog text-white text-2xl"></i>
+          </div>
+          <div>
+            <h3 class="text-3xl font-bold bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">Settings</h3>
+            <p class="text-sm text-gray-400">Customize your preferences</p>
+          </div>
+        </div>
+        <button
+          id="closeSettingsBtn"
+          class="p-2 hover:bg-white/10 rounded-lg transition-all duration-200 group"
+        >
+          <i class="fas fa-times text-gray-400 group-hover:text-white text-xl"></i>
+        </button>
+      </div>
+
+      <!-- Default IDE Section -->
+      <div class="mb-8 bg-white/5 rounded-xl p-6 border border-white/10 backdrop-blur-sm">
+        <div class="flex items-center gap-3 mb-4">
+          <div class="p-2 bg-purple-500/20 rounded-lg">
+            <i class="fas fa-code text-purple-400 text-lg"></i>
+          </div>
+          <div class="flex-1">
+            <h4 class="text-xl font-bold text-white">Default IDE/Editor</h4>
+            <p class="text-sm text-gray-400">Choose your preferred code editor</p>
+          </div>
+          <div id="currentIdeDisplay" class="text-sm text-purple-400 bg-purple-500/10 px-3 py-1 rounded-lg font-medium hidden">
+            <!-- Current IDE will be shown here -->
+          </div>
+        </div>
+        <p class="text-sm text-gray-400 mb-4 pl-12">
+          This IDE will be used when opening projects. Select "None" to choose each time.
+        </p>
+        <div id="defaultIdeList" class="space-y-2 max-h-64 overflow-y-auto custom-scrollbar pl-12">
+          <!-- IDE options will be inserted here -->
+        </div>
+        <p id="noIdeMessage" class="text-sm text-yellow-400 mt-3 pl-12 hidden flex items-center gap-2">
+          <i class="fas fa-exclamation-triangle"></i>
+          No IDEs detected. Please install an IDE to set a default.
+        </p>
+      </div>
+
+      <!-- Default Terminal Section -->
+      <div class="mb-8 bg-white/5 rounded-xl p-6 border border-white/10 backdrop-blur-sm">
+        <div class="flex items-center gap-3 mb-4">
+          <div class="p-2 bg-green-500/20 rounded-lg">
+            <i class="fas fa-terminal text-green-400 text-lg"></i>
+          </div>
+          <div class="flex-1">
+            <h4 class="text-xl font-bold text-white">Default Terminal</h4>
+            <p class="text-sm text-gray-400">Choose your preferred terminal application</p>
+          </div>
+          <div id="currentTerminalDisplay" class="text-sm text-green-400 bg-green-500/10 px-3 py-1 rounded-lg font-medium hidden">
+            <!-- Current terminal will be shown here -->
+          </div>
+        </div>
+        <p class="text-sm text-gray-400 mb-4 pl-12">
+          Select which terminal application to use when opening project directories.
+        </p>
+        <div id="defaultTerminalList" class="space-y-2 pl-12">
+          <!-- Terminal options will be inserted here -->
+        </div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="flex gap-3 pt-6 border-t-2 border-white/10">
+        <button
+          id="saveSettingsBtn"
+          class="flex-1 px-6 py-4 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 rounded-xl text-white font-bold transition-all duration-200 shadow-lg hover:shadow-xl hover:scale-[1.02] flex items-center justify-center gap-2"
+        >
+          <i class="fas fa-save"></i>
+          <span>Save Settings</span>
+        </button>
+        <button
+          id="cancelSettingsBtn"
+          class="px-6 py-4 bg-gray-700 hover:bg-gray-600 rounded-xl text-white font-medium transition-all duration-200"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Renderer script -->
+  <script src="renderer.js" defer></script>
+</body>
+</html>
