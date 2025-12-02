@@ -69,11 +69,18 @@ html {
 
 body {
   font-family: var(--font-sans);
-  background-color: #0a0a0b !important;
-  color: #fafafa !important;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
   line-height: 1.5;
   margin: 0;
   padding: 0;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Dark mode (default) */
+body:not(.light-mode) {
+  background-color: #0a0a0b !important;
+  color: #fafafa !important;
 }
 
 /* Ensure visibility */
@@ -835,34 +842,203 @@ body {
 }
 
 /* ============================================
-   LIGHT MODE (Optional)
+   LIGHT MODE
    ============================================ */
 
 body.light-mode {
   --bg-primary: #ffffff;
-  --bg-secondary: #fafafa;
-  --bg-tertiary: #f4f4f5;
-  --bg-elevated: #e4e4e7;
-  --bg-hover: #e4e4e7;
+  --bg-secondary: #f8fafc;
+  --bg-tertiary: #f1f5f9;
+  --bg-elevated: #e2e8f0;
+  --bg-hover: #e2e8f0;
   
   --border-subtle: rgba(0, 0, 0, 0.06);
   --border-default: rgba(0, 0, 0, 0.1);
   --border-hover: rgba(0, 0, 0, 0.15);
   
-  --text-primary: #09090b;
-  --text-secondary: #3f3f46;
-  --text-tertiary: #71717a;
-  --text-muted: #a1a1aa;
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-tertiary: #64748b;
+  --text-muted: #94a3b8;
   
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
-  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.1);
-  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.15);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.12);
+  
+  background-color: #ffffff !important;
+  color: #0f172a !important;
 }
 
+/* Light mode - Sidebar */
+body.light-mode .sidebar,
+body.light-mode #sidebar {
+  background-color: #f8fafc !important;
+  border-color: rgba(0, 0, 0, 0.08) !important;
+}
+
+body.light-mode .sidebar-item {
+  color: #475569;
+}
+
+body.light-mode .sidebar-item:hover {
+  background: rgba(0, 0, 0, 0.05);
+  color: #0f172a;
+}
+
+body.light-mode .sidebar-item.active {
+  background: rgba(139, 92, 246, 0.1);
+  color: #7c3aed;
+}
+
+/* Light mode - Header */
+body.light-mode header {
+  background-color: #ffffff !important;
+  border-color: rgba(0, 0, 0, 0.08) !important;
+}
+
+/* Light mode - Main content */
+body.light-mode main {
+  background-color: #ffffff !important;
+}
+
+/* Light mode - Project cards */
+body.light-mode .project-card {
+  background-color: #f8fafc !important;
+  border-color: rgba(0, 0, 0, 0.08) !important;
+  color: #0f172a !important;
+}
+
+body.light-mode .project-card:hover {
+  border-color: rgba(139, 92, 246, 0.3) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+body.light-mode .project-card h4 {
+  color: #0f172a !important;
+}
+
+body.light-mode .project-card p {
+  color: #64748b !important;
+}
+
+/* Light mode - Action buttons */
+body.light-mode .action-btn {
+  background: rgba(0, 0, 0, 0.05);
+  color: #64748b;
+}
+
+body.light-mode .action-btn:hover {
+  background: rgba(0, 0, 0, 0.1);
+  color: #0f172a;
+}
+
+/* Light mode - Modals */
+body.light-mode .modal-backdrop {
+  background: rgba(0, 0, 0, 0.4) !important;
+}
+
+body.light-mode .modal,
+body.light-mode [class*="modal"] > div:not(.modal-backdrop) {
+  background-color: #ffffff !important;
+  border-color: rgba(0, 0, 0, 0.1) !important;
+  color: #0f172a !important;
+}
+
+/* Light mode - Command Palette */
+body.light-mode .command-palette-box {
+  background: #ffffff !important;
+  border-color: rgba(0, 0, 0, 0.1) !important;
+}
+
+body.light-mode .command-input {
+  color: #0f172a !important;
+  border-color: rgba(0, 0, 0, 0.08) !important;
+}
+
+body.light-mode .command-input::placeholder {
+  color: #94a3b8 !important;
+}
+
+body.light-mode .command-item:hover,
+body.light-mode .command-item.selected {
+  background: rgba(139, 92, 246, 0.1) !important;
+}
+
+body.light-mode .command-item-title {
+  color: #0f172a !important;
+}
+
+body.light-mode .command-item-desc {
+  color: #64748b !important;
+}
+
+/* Light mode - Notifications */
+body.light-mode .notification {
+  background: #ffffff !important;
+  border-color: rgba(0, 0, 0, 0.1) !important;
+}
+
+/* Light mode - Collection items */
+body.light-mode .collection-item {
+  color: #475569;
+}
+
+body.light-mode .collection-item:hover {
+  background: rgba(0, 0, 0, 0.05);
+  color: #0f172a;
+}
+
+body.light-mode .collection-item.active {
+  background: rgba(139, 92, 246, 0.1);
+  color: #7c3aed;
+}
+
+body.light-mode .collection-count {
+  background: rgba(0, 0, 0, 0.05);
+  color: #64748b;
+}
+
+/* Light mode - Insights */
+body.light-mode .insights-panel {
+  background: #f8fafc !important;
+  border-color: rgba(0, 0, 0, 0.08) !important;
+}
+
+body.light-mode .insight-item {
+  border-color: rgba(0, 0, 0, 0.06) !important;
+}
+
+/* Light mode - Empty state */
+body.light-mode #emptyState h3 {
+  color: #0f172a !important;
+}
+
+body.light-mode #emptyState p {
+  color: #64748b !important;
+}
+
+/* Light mode - Scrollbar */
 body.light-mode ::-webkit-scrollbar-thumb {
   background: rgba(0, 0, 0, 0.15);
 }
 
 body.light-mode ::-webkit-scrollbar-thumb:hover {
   background: rgba(0, 0, 0, 0.25);
+}
+
+/* Light mode - Info panel */
+body.light-mode .info-panel {
+  background: #f8fafc !important;
+  border-color: rgba(0, 0, 0, 0.08) !important;
+}
+
+/* Light mode - Search */
+body.light-mode #commandTrigger {
+  background: rgba(0, 0, 0, 0.03) !important;
+  border-color: rgba(0, 0, 0, 0.08) !important;
+}
+
+body.light-mode .command-shortcut {
+  background: rgba(0, 0, 0, 0.05) !important;
+  color: #64748b !important;
 }

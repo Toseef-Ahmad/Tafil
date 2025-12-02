@@ -26,6 +26,101 @@ if (process.env.NODE_ENV !== 'development') {
   process.env.NODE_ENV = 'production';
 }
 
+// Fix PATH for packaged apps (critical for finding npm/node on all platforms)
+function fixPath() {
+  const home = process.env.HOME || process.env.USERPROFILE || '';
+  
+  // Common paths by platform
+  let additionalPaths = [];
+  
+  if (isMac) {
+    additionalPaths = [
+      '/usr/local/bin',
+      '/usr/bin',
+      '/bin',
+      '/usr/sbin',
+      '/sbin',
+      '/opt/homebrew/bin',           // M1/M2/M3 Mac Homebrew
+      '/opt/homebrew/sbin',
+      '/opt/local/bin',              // MacPorts
+      `${home}/.nvm/versions/node`,  // NVM (will check subdirs)
+      `${home}/.volta/bin`,          // Volta
+      `${home}/.fnm/current/bin`,    // FNM
+      `${home}/.asdf/shims`,         // ASDF
+      '/usr/local/opt/node/bin',     // Homebrew node
+    ];
+  } else if (isWindows) {
+    const appData = process.env.APPDATA || '';
+    const localAppData = process.env.LOCALAPPDATA || '';
+    const programFiles = process.env.ProgramFiles || 'C:\\Program Files';
+    const programFilesX86 = process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)';
+    
+    additionalPaths = [
+      `${programFiles}\\nodejs`,
+      `${programFilesX86}\\nodejs`,
+      `${appData}\\npm`,
+      `${localAppData}\\Programs\\nodejs`,
+      `${home}\\.nvm`,               // NVM for Windows
+      `${home}\\.volta\\bin`,        // Volta
+      `${appData}\\nvm`,             // NVM for Windows alternative
+      `${localAppData}\\Volta\\bin`, // Volta alternative
+    ];
+  } else if (isLinux) {
+    additionalPaths = [
+      '/usr/local/bin',
+      '/usr/bin',
+      '/bin',
+      '/usr/local/sbin',
+      '/usr/sbin',
+      '/sbin',
+      `${home}/.nvm/versions/node`,  // NVM
+      `${home}/.volta/bin`,          // Volta
+      `${home}/.fnm/current/bin`,    // FNM
+      `${home}/.asdf/shims`,         // ASDF
+      '/snap/bin',                   // Snap packages
+      `${home}/.local/bin`,          // User local bin
+    ];
+  }
+  
+  // Filter to existing paths
+  const existingNewPaths = additionalPaths.filter(p => {
+    try {
+      // Handle NVM path which has version subdirectories
+      if (p.includes('.nvm/versions/node')) {
+        const nvmDir = p;
+        if (fs.existsSync(nvmDir)) {
+          const versions = fs.readdirSync(nvmDir);
+          if (versions.length > 0) {
+            // Use the latest version
+            const latestVersion = versions.sort().reverse()[0];
+            const binPath = path.join(nvmDir, latestVersion, 'bin');
+            if (fs.existsSync(binPath)) {
+              return true;
+            }
+          }
+        }
+        return false;
+      }
+      return fs.existsSync(p);
+    } catch {
+      return false;
+    }
+  });
+  
+  // Merge with existing PATH
+  const existingPath = process.env.PATH || '';
+  const pathSeparator = isWindows ? ';' : ':';
+  const allPaths = [...new Set([...existingNewPaths, ...existingPath.split(pathSeparator)])];
+  
+  process.env.PATH = allPaths.filter(Boolean).join(pathSeparator);
+  console.log(`✅ Fixed PATH for ${process.platform}:`, process.env.PATH.substring(0, 200) + '...');
+}
+
+// Apply PATH fix for packaged apps
+if (!isDev) {
+  fixPath();
+}
+
 let mainWindow;
 let runningProcesses = new Map();
 
@@ -67,8 +162,60 @@ function isValidProjectPath(projectPath) {
 /**
  * Get the appropriate npm command for the platform
  */
+/**
+ * Get npm command with full path in production
+ */
 function getNpmCommand() {
-  return isWindows ? 'npm.cmd' : 'npm';
+  if (isDev) {
+    return isWindows ? 'npm.cmd' : 'npm';
+  }
+  
+  // In production, try to find npm's full path
+  if (isWindows) {
+    const npmPaths = [
+      'C:\\Program Files\\nodejs\\npm.cmd',
+      'C:\\Program Files (x86)\\nodejs\\npm.cmd',
+      process.env.APPDATA + '\\npm\\npm.cmd',
+    ];
+    
+    for (const npmPath of npmPaths) {
+      if (fs.existsSync(npmPath)) {
+        console.log('Found npm at:', npmPath);
+        return npmPath;
+      }
+    }
+    return 'npm.cmd'; // Fallback
+  } else {
+    // Unix-like systems
+    try {
+      // Try to use 'which' to find npm
+const { execSync } = require('child_process');
+      const npmPath = execSync('which npm', { encoding: 'utf8' }).trim();
+      if (npmPath && fs.existsSync(npmPath)) {
+        console.log('Found npm at:', npmPath);
+        return npmPath;
+      }
+    } catch (err) {
+      console.warn('Could not find npm with which:', err.message);
+    }
+    
+    // Try common locations
+    const npmPaths = [
+      '/usr/local/bin/npm',
+      '/opt/homebrew/bin/npm',
+      '/usr/bin/npm',
+      process.env.HOME + '/.nvm/versions/node/*/bin/npm',
+    ];
+    
+    for (const npmPath of npmPaths) {
+      if (fs.existsSync(npmPath)) {
+        console.log('Found npm at:', npmPath);
+        return npmPath;
+      }
+    }
+    
+    return 'npm'; // Fallback to PATH
+  }
 }
 
 /**
@@ -1130,7 +1277,28 @@ ipcMain.handle('play-project', async (_event, projectPath, customPort = null) =>
     const env = {
       ...process.env,
       FORCE_COLOR: '1',
+      // Ensure HOME is set (needed for npm config)
+      HOME: process.env.HOME || process.env.USERPROFILE || '',
+      // Ensure npm can find its config
+      npm_config_prefix: process.env.npm_config_prefix || '',
     };
+    
+    // On macOS/Linux, ensure we have proper shell environment
+    if (!isWindows) {
+      // Add common paths that might be in .bashrc/.zshrc but not inherited
+      const additionalPaths = [
+        '/usr/local/bin',
+        '/opt/homebrew/bin',
+        `${env.HOME}/.nvm/versions/node`,
+        `${env.HOME}/.volta/bin`,
+      ].filter(p => {
+        try { return fs.existsSync(p); } catch { return false; }
+      });
+      
+      if (additionalPaths.length > 0) {
+        env.PATH = [...additionalPaths, env.PATH || ''].join(':');
+      }
+    }
 
     // Set PORT for all frameworks (even if some ignore it)
     // This ensures CRA and other frameworks that respect PORT work correctly
@@ -1164,32 +1332,46 @@ ipcMain.handle('play-project', async (_event, projectPath, customPort = null) =>
     // Build spawn options - Cross-platform compatible
     const spawnOptions = {
       cwd: projectPath,
-      shell: isWindows ? true : getShell(), // Use proper shell on each platform
       env,
       stdio: ['pipe', 'pipe', 'pipe'], // Enable stdin, stdout, stderr pipes for interaction
     };
     
-    // Add Windows-specific options
-    if (isWindows) {
-      spawnOptions.windowsHide = true; // Hide the console window
-      spawnOptions.windowsVerbatimArguments = false;
-      // Don't detach on Windows - we need to capture output
-    }
-    
-    // Build the command properly for each platform
+    // Build the command
     let spawnCmd, spawnArgs;
+    const fullCommand = `${npmCmd} ${args.join(' ')}`;
     
     if (isWindows) {
-      // On Windows, use cmd /c to run npm commands
+      // On Windows, use cmd /c
       spawnCmd = process.env.COMSPEC || 'cmd.exe';
-      spawnArgs = ['/c', `${npmCmd} ${args.join(' ')}`];
+      spawnArgs = ['/c', fullCommand];
+      spawnOptions.windowsHide = true;
       console.log(`Spawning (Windows): ${spawnCmd} ${spawnArgs.join(' ')}`);
     } else {
-      // On Unix-like systems
-      spawnCmd = npmCmd;
-      spawnArgs = args;
-      console.log(`Spawning: ${spawnCmd} ${spawnArgs.join(' ')}`);
+      // On macOS/Linux, use login shell to get proper environment
+      // This sources .bashrc/.zshrc to get NVM, Volta, etc.
+      const userShell = process.env.SHELL || '/bin/sh';
+      const shellName = path.basename(userShell);
+      
+      // Build a command that sources the user's profile first
+      let shellCommand;
+      if (shellName === 'zsh') {
+        // For zsh, source .zshrc
+        shellCommand = `source ~/.zshrc 2>/dev/null || true; ${fullCommand}`;
+      } else if (shellName === 'bash') {
+        // For bash, source .bashrc
+        shellCommand = `source ~/.bashrc 2>/dev/null || true; ${fullCommand}`;
+      } else {
+        // For other shells, just run the command
+        shellCommand = fullCommand;
+      }
+      
+      spawnCmd = '/bin/sh';
+      spawnArgs = ['-c', shellCommand];
+      console.log(`Spawning (Unix): ${spawnCmd} -c "${shellCommand.substring(0, 100)}..."`);
     }
+    
+    console.log(`Working directory: ${projectPath}`);
+    console.log(`Environment PATH (first 300 chars): ${env.PATH?.substring(0, 300)}...`);
     
     const child = spawn(spawnCmd, spawnArgs, spawnOptions);
 
@@ -1251,7 +1433,7 @@ ipcMain.handle('play-project', async (_event, projectPath, customPort = null) =>
           output.includes('address already in use');
         
         if (!isErrorMessage) {
-          const portPatterns = [
+      const portPatterns = [
             /(?:Local|local):\s*http:\/\/localhost:(\d+)/i,  // Vite style: Local: http://localhost:5173
             /(?:ready|running|listening).*?(?:on|at|:)\s*(?:http:\/\/)?(?:localhost|127\.0\.0\.1|0\.0\.0\.0):(\d+)/i,
             /http:\/\/(?:localhost|127\.0\.0\.1|0\.0\.0\.0):(\d+)/i,
@@ -1260,11 +1442,11 @@ ipcMain.handle('play-project', async (_event, projectPath, customPort = null) =>
             /Local:\s+http:\/\/localhost:(\d+)/i,  // CRA Local
             /Compiled successfully!/i, // If we see this for CRA, we can try to find port in previous lines
             /started.*?(\d{4,5})/i
-          ];
+      ];
 
-          for (const pattern of portPatterns) {
-            const match = output.match(pattern);
-            if (match) {
+      for (const pattern of portPatterns) {
+        const match = output.match(pattern);
+        if (match) {
               const detectedPort = parseInt(match[1], 10);
               // Validate port number
               if (detectedPort >= 1000 && detectedPort <= 65535) {
@@ -1272,14 +1454,14 @@ ipcMain.handle('play-project', async (_event, projectPath, customPort = null) =>
                 hasDetectedPort = true;
                 console.log(`✅ Detected actual running port: ${actualPort} for ${projectInfo.type}`);
                 
-                mainWindow?.webContents.send('project-status', {
-                  projectPath,
-                  status: 'running',
-                  port: actualPort,
-                  pid: child.pid,
+          mainWindow?.webContents.send('project-status', {
+            projectPath,
+            status: 'running',
+            port: actualPort,
+            pid: child.pid,
                   framework: projectInfo.type,
-                });
-                break;
+          });
+          break;
               }
             }
           }
@@ -1290,8 +1472,11 @@ ipcMain.handle('play-project', async (_event, projectPath, customPort = null) =>
     });
 
     // Handle stderr
+    let stderrBuffer = ''; // Capture stderr for error reporting
+    
     child.stderr.on('data', (data) => {
       const error = data.toString();
+      stderrBuffer += error;
       console.log(`[${projectPath}] STDERR: ${error}`);
       
       // Send to renderer for logs only - don't change project status based on stderr
@@ -1322,11 +1507,25 @@ ipcMain.handle('play-project', async (_event, projectPath, customPort = null) =>
 
     // Handle errors
     child.on('error', (err) => {
-      console.error(`Error running project at ${projectPath}:`, err.message);
+      console.error(`Error running project at ${projectPath}:`, err);
+      console.error('Error details:', {
+        code: err.code,
+        message: err.message,
+        command: spawnCmd,
+        args: spawnArgs,
+        cwd: projectPath,
+        PATH: process.env.PATH,
+      });
+      
+      let errorMessage = err.message;
+      if (err.code === 'ENOENT') {
+        errorMessage = 'npm command not found. Please ensure Node.js is installed and in your PATH.';
+      }
+      
       mainWindow?.webContents.send('project-status', {
         projectPath,
         status: 'error',
-        error: err.message,
+        error: errorMessage,
       });
       runningProcesses.delete(projectPath);
     });
@@ -1334,6 +1533,69 @@ ipcMain.handle('play-project', async (_event, projectPath, customPort = null) =>
     // Handle exit
     child.on('exit', (code, signal) => {
       console.log(`❌ Process exited for ${projectPath}. Code: ${code}, Signal: ${signal}`);
+      console.log(`STDERR buffer: ${stderrBuffer.substring(0, 500)}`);
+      console.log(`STDOUT buffer: ${stdoutBuffer.substring(0, 500)}`);
+      
+      // Special handling for exit code 127 (command not found)
+      if (code === 127) {
+        console.error('❌ Exit code 127: Command not found. npm or node may not be in PATH.');
+        console.error('Current PATH:', process.env.PATH);
+        console.error('Attempted command:', spawnCmd, spawnArgs);
+        
+        mainWindow?.webContents.send('project-status', {
+          projectPath,
+          status: 'error',
+          error: 'Command not found (exit code 127). Please ensure Node.js and npm are installed and accessible.',
+        });
+      runningProcesses.delete(projectPath);
+        updateTrayMenu(runningProcesses);
+        return;
+      }
+      
+      // Special handling for exit code 1 (general error)
+      if (code === 1) {
+        console.error('❌ Exit code 1: Process failed.');
+        console.error('STDERR:', stderrBuffer);
+        
+        // Try to extract a meaningful error message
+        let errorMsg = 'Process failed. ';
+        
+        // Check for common errors
+        if (stderrBuffer.includes('ENOENT') || stderrBuffer.includes('not found')) {
+          errorMsg += 'A required command or file was not found.';
+        } else if (stderrBuffer.includes('EACCES') || stderrBuffer.includes('permission denied')) {
+          errorMsg += 'Permission denied.';
+        } else if (stderrBuffer.includes('npm ERR!')) {
+          // Extract npm error
+          const npmErrMatch = stderrBuffer.match(/npm ERR! ([^\n]+)/);
+          if (npmErrMatch) {
+            errorMsg += npmErrMatch[1];
+          } else {
+            errorMsg += 'npm encountered an error.';
+          }
+        } else if (stderrBuffer.includes('Cannot find module')) {
+          errorMsg += 'Missing module. Try running npm install first.';
+        } else if (stderrBuffer.length > 0) {
+          // Use first line of stderr
+          const firstLine = stderrBuffer.split('\n')[0].trim();
+          if (firstLine.length > 0 && firstLine.length < 100) {
+            errorMsg += firstLine;
+          } else {
+            errorMsg += 'Check logs for details.';
+          }
+        } else {
+          errorMsg += 'Check logs for details.';
+        }
+        
+        mainWindow?.webContents.send('project-status', {
+          projectPath,
+          status: 'error',
+          error: errorMsg,
+        });
+        runningProcesses.delete(projectPath);
+        updateTrayMenu(runningProcesses);
+        return;
+      }
       
       // Check if this was a CRA port conflict exit
       const wasCRAPortConflict = projectInfo.framework === 'cra' && 
@@ -1559,7 +1821,7 @@ ipcMain.handle('open-in-editor', async (_event, projectPath, ideCommand = null) 
         // Use 'open -a' for macOS app bundles
         const appName = path.basename(ideCommand, '.app');
         exec(`open -a "${ideCommand}" "${normalizedPath}"`, (error) => {
-          if (error) {
+      if (error) {
             console.error(`Error opening with ${ideCommand}:`, error);
             exec(`open -a "${appName}" "${normalizedPath}"`, (fallbackError) => {
               if (fallbackError) {

@@ -37,6 +37,21 @@
     <!-- Downloads folder access -->
     <key>com.apple.security.files.downloads.read-write</key>
     <true/>
+    
+    <!-- Full disk access for reading project files anywhere -->
+    <key>com.apple.security.files.all</key>
+    <true/>
+    
+    <!-- Disable App Sandbox (required for spawning npm/node processes) -->
+    <key>com.apple.security.app-sandbox</key>
+    <false/>
+    
+    <!-- Inherit permissions to child processes -->
+    <key>com.apple.security.inherit</key>
+    <true/>
+    
+    <!-- Allow execution of arbitrary executables (npm, node, etc.) -->
+    <key>com.apple.security.cs.disable-executable-page-protection</key>
+    <true/>
 </dict>
 </plist>
-

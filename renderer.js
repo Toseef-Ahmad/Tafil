@@ -1126,21 +1126,71 @@ function createSettingsOption(value, name, icon, label, isSelected) {
 // =====================================================
 function toggleDarkMode() {
   isDarkMode = !isDarkMode;
-  document.body.classList.toggle('light-mode', !isDarkMode);
+  applyTheme();
   localStorage.setItem('darkMode', isDarkMode ? 'true' : 'false');
+  showNotification(`Switched to ${isDarkMode ? 'dark' : 'light'} mode`, 'info');
+}
+
+function applyTheme() {
+  // Apply theme class
+  document.body.classList.toggle('light-mode', !isDarkMode);
   
-  moonIcon?.classList.toggle('hidden', !isDarkMode);
-  sunIcon?.classList.toggle('hidden', isDarkMode);
+  // Update icons
+  if (moonIcon) moonIcon.classList.toggle('hidden', !isDarkMode);
+  if (sunIcon) sunIcon.classList.toggle('hidden', isDarkMode);
+  
+  // Update inline styles for elements that need them
+  const sidebar = document.getElementById('sidebar');
+  const header = document.querySelector('header');
+  const main = document.querySelector('main');
+  
+  if (isDarkMode) {
+    // Dark mode colors
+    if (sidebar) {
+      sidebar.style.backgroundColor = '#111113';
+      sidebar.style.borderColor = 'rgba(255, 255, 255, 0.06)';
+    }
+    if (header) {
+      header.style.backgroundColor = '#0a0a0b';
+      header.style.borderColor = 'rgba(255, 255, 255, 0.06)';
+    }
+    if (main) {
+      main.style.backgroundColor = '#0a0a0b';
+    }
+    document.body.style.backgroundColor = '#0a0a0b';
+    document.body.style.color = '#fafafa';
+  } else {
+    // Light mode colors
+    if (sidebar) {
+      sidebar.style.backgroundColor = '#f8fafc';
+      sidebar.style.borderColor = 'rgba(0, 0, 0, 0.08)';
+    }
+    if (header) {
+      header.style.backgroundColor = '#ffffff';
+      header.style.borderColor = 'rgba(0, 0, 0, 0.08)';
+    }
+    if (main) {
+      main.style.backgroundColor = '#ffffff';
+    }
+    document.body.style.backgroundColor = '#ffffff';
+    document.body.style.color = '#0f172a';
+  }
+  
+  // Re-render cards to update their styles
+  if (currentProjects.length > 0) {
+    renderProjectCards(filteredProjects.length > 0 ? filteredProjects : currentProjects);
+  }
 }
 
 function loadDarkModePreference() {
   const saved = localStorage.getItem('darkMode');
   if (saved !== null) {
     isDarkMode = saved === 'true';
-    document.body.classList.toggle('light-mode', !isDarkMode);
-    moonIcon?.classList.toggle('hidden', !isDarkMode);
-    sunIcon?.classList.toggle('hidden', isDarkMode);
+  } else {
+    // Default to dark mode, or check system preference
+    isDarkMode = window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? true;
   }
+  applyTheme();
 }
 
 // =====================================================
@@ -1312,12 +1362,26 @@ async function populateCardContent(card, project) {
 
   card.className = `project-card ${isRunning ? 'running' : ''}`;
   
+  // Theme-aware colors
+  const textPrimary = isDarkMode ? '#fafafa' : '#0f172a';
+  const textSecondary = isDarkMode ? '#71717a' : '#64748b';
+  const textMuted = isDarkMode ? '#52525b' : '#94a3b8';
+  const bgCard = isDarkMode ? '#111113' : '#f8fafc';
+  const borderColor = isDarkMode ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.08)';
+  const btnBg = isDarkMode ? '#27272a' : 'rgba(0, 0, 0, 0.05)';
+  const btnColor = isDarkMode ? '#a1a1aa' : '#64748b';
+  
+  // Apply card styles
+  card.style.backgroundColor = bgCard;
+  card.style.borderColor = borderColor;
+  card.style.color = textPrimary;
+  
   card.innerHTML = `
     <div class="flex items-start justify-between gap-2 mb-2">
       <div class="min-w-0 flex-1">
-        <h4 class="truncate text-sm font-semibold" style="color: #fafafa;">${escapeHtml(projectName)}</h4>
+        <h4 class="truncate text-sm font-semibold" style="color: ${textPrimary};">${escapeHtml(projectName)}</h4>
         ${project.message && !['No commits yet', 'No Git history', 'Git Error'].includes(project.message) 
-          ? `<p class="truncate text-xs mt-0.5" style="color: #71717a;">${Icons.gitBranch} ${escapeHtml(project.message)}</p>` 
+          ? `<p class="truncate text-xs mt-0.5" style="color: ${textSecondary};">${Icons.gitBranch} ${escapeHtml(project.message)}</p>` 
           : ''
         }
       </div>
@@ -1340,19 +1404,19 @@ async function populateCardContent(card, project) {
       </div>
     ` : ''}
     
-    <div class="flex items-center gap-2 text-xs mb-2 flex-wrap" style="color: #52525b;">
+    <div class="flex items-center gap-2 text-xs mb-2 flex-wrap" style="color: ${textMuted};">
       <span class="flex items-center gap-1">${Icons.clock} ${timeStr}</span>
       ${isRunning && runningInfo?.port 
-        ? `<span class="flex items-center gap-1 px-2 py-0.5 rounded" style="background: rgba(14,165,233,0.1); color: #0ea5e9;">${Icons.server} :${runningInfo.port}</span>` 
+        ? `<span class="flex items-center gap-1 px-2 py-0.5 rounded" style="background: rgba(14,165,233,0.15); color: #0ea5e9;">${Icons.server} :${runningInfo.port}</span>` 
         : ''
       }
       ${collectionNames.length > 0 
-        ? collectionNames.map(name => `<span class="flex items-center gap-1 px-2 py-0.5 rounded" style="background: rgba(139,92,246,0.1); color: #a78bfa; font-size: 10px;">${Icons.folder} ${escapeHtml(name)}</span>`).join('')
+        ? collectionNames.map(name => `<span class="flex items-center gap-1 px-2 py-0.5 rounded" style="background: rgba(139,92,246,0.15); color: #a78bfa; font-size: 10px;">${Icons.folder} ${escapeHtml(name)}</span>`).join('')
         : ''
       }
     </div>
     
-    <p class="text-xs truncate mb-3" style="color: #52525b;" title="${escapeHtml(project.path)}">${escapeHtml(shortPath)}</p>
+    <p class="text-xs truncate mb-3" style="color: ${textMuted};" title="${escapeHtml(project.path)}">${escapeHtml(shortPath)}</p>
     
     <div class="flex items-center gap-1.5 flex-wrap">
       ${dependenciesInstalled 
@@ -1372,20 +1436,20 @@ async function populateCardContent(card, project) {
           </button>`
         : ''
       }
-      <button class="action-btn editor-button" title="Open in editor">
+      <button class="action-btn editor-button" style="background: ${btnBg}; color: ${btnColor};" title="Open in editor">
         ${Icons.code}
       </button>
-      <button class="action-btn terminal-button" title="Open in terminal">
+      <button class="action-btn terminal-button" style="background: ${btnBg}; color: ${btnColor};" title="Open in terminal">
         ${Icons.terminal}
       </button>
-      <button class="action-btn collection-button" title="Add to collection">
+      <button class="action-btn collection-button" style="background: ${btnBg}; color: ${btnColor};" title="Add to collection">
         ${Icons.folder}
       </button>
-      <button class="action-btn insights-button" title="View insights">
+      <button class="action-btn insights-button" style="background: ${btnBg}; color: ${btnColor};" title="View insights">
         ${Icons.chart}
       </button>
       ${dependenciesInstalled 
-        ? `<button class="action-btn remove-modules-button" title="Remove node_modules">
+        ? `<button class="action-btn remove-modules-button" style="background: ${btnBg}; color: ${btnColor};" title="Remove node_modules">
             ${Icons.trash}
           </button>`
         : ''
