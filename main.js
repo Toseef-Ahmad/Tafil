@@ -1041,12 +1041,51 @@ ipcMain.handle('remove-node-modules', async (_event, projectPath) => {
 // Helper to check if we have execution permissions
 async function checkExecutePermissions(projectPath) {
   try {
+    // Just check if we can read the directory and package.json
     const stats = await fsPromises.stat(projectPath);
-    const mode = stats.mode;
-    // Check if we have read & execute permissions
-    return !!(mode & fs.constants.S_IRUSR && mode & fs.constants.S_IXUSR);
+    if (!stats.isDirectory()) {
+      console.error('Project path is not a directory:', projectPath);
+      return false;
+    }
+    
+    // Check if we can access package.json
+    const packageJsonPath = path.join(projectPath, 'package.json');
+    try {
+      await fsPromises.access(packageJsonPath, fs.constants.R_OK);
+      return true;
+    } catch (err) {
+      console.error('Cannot read package.json:', err);
+      return false;
+    }
   } catch (err) {
     console.error('Error checking permissions:', err);
+    return false;
+  }
+}
+
+// Helper to fix common permission issues
+async function fixProjectPermissions(projectPath) {
+  if (isWindows) {
+    // Windows doesn't have the same permission model
+    return true;
+  }
+  
+  try {
+    console.log(`Attempting to fix permissions for: ${projectPath}`);
+    
+    // On macOS/Linux, ensure the project directory is readable and executable
+    const { exec } = require('child_process');
+    const { promisify } = require('util');
+    const execAsync = promisify(exec);
+    
+    // Make sure we have read/write access to the project directory
+    // This won't require sudo if the user owns the directory
+    await execAsync(`chmod -R u+rwX "${projectPath}"`);
+    
+    console.log(`✅ Fixed permissions for: ${projectPath}`);
+    return true;
+  } catch (err) {
+    console.error('Failed to fix permissions:', err);
     return false;
   }
 }
@@ -1106,9 +1145,6 @@ async function detectProjectType(projectPath) {
 
 /**
  * Check if a port is available
- */
-/**
- * Check if a port is available
  * More robust check with retry to avoid race conditions
  */
 function isPortAvailable(port) {
@@ -1130,6 +1166,20 @@ function isPortAvailable(port) {
     
     server.listen(port, '0.0.0.0');
   });
+}
+
+/**
+ * Check if a port is being used by a Tafil-managed process
+ * Returns {isTafil: boolean, projectPath: string | null}
+ */
+function checkPortOwnership(port) {
+  // Check if any running process in Tafil is using this port
+  for (const [projPath, info] of runningProcesses.entries()) {
+    if (info.port === port) {
+      return { isTafil: true, projectPath: projPath };
+    }
+  }
+  return { isTafil: false, projectPath: null };
 }
 
 /**
@@ -1169,9 +1219,29 @@ ipcMain.handle('play-project', async (_event, projectPath, customPort = null) =>
     }
     
     // Check if we have necessary permissions
-    const hasPermissions = await checkExecutePermissions(projectPath);
+    let hasPermissions = await checkExecutePermissions(projectPath);
     if (!hasPermissions) {
-      throw new Error('Insufficient permissions to execute project. Please check folder permissions.');
+      console.log(`⚠️ Permission denied for ${projectPath}. Attempting to fix...`);
+      
+      // Try to fix permissions automatically
+      const fixed = await fixProjectPermissions(projectPath);
+      
+      if (fixed) {
+        // Check again after fixing
+        hasPermissions = await checkExecutePermissions(projectPath);
+        if (!hasPermissions) {
+          return {
+            success: false,
+            error: 'Insufficient permissions to access this project.\n\nPlease check folder permissions or try running:\nchmod -R u+rwX "' + projectPath + '"'
+          };
+        }
+        console.log(`✅ Permissions fixed for ${projectPath}`);
+      } else {
+        return {
+          success: false,
+          error: 'Permission denied. Could not automatically fix permissions.\n\nPlease run this command in terminal:\nchmod -R u+rwX "' + projectPath + '"'
+        };
+      }
     }
 
     // Detect project type and framework
@@ -1233,17 +1303,22 @@ ipcMain.handle('play-project', async (_event, projectPath, customPort = null) =>
       console.log(`Default port ${projectInfo.defaultPort} available: ${isDefaultAvailable}`);
       
       if (!isDefaultAvailable) {
-        console.log(`⚠️ Default port ${projectInfo.defaultPort} is occupied. Finding fallback port...`);
-        const fallbackPort = await findAvailablePort(projectInfo.defaultPort + 1);
+        // Port is occupied - check if it's by Tafil or an external process
+        const ownership = checkPortOwnership(projectInfo.defaultPort);
         
-        if (fallbackPort) {
-          console.log(`✅ Found fallback port: ${fallbackPort}`);
-          suggestedPort = fallbackPort;
-        } else {
-          console.error(`❌ No fallback ports available`);
+        if (ownership.isTafil) {
+          // Another Tafil-managed project is using this port
+          console.log(`⚠️ Port ${projectInfo.defaultPort} is used by Tafil project: ${ownership.projectPath}`);
           return {
             success: false,
-            error: `Port ${projectInfo.defaultPort} is occupied and no fallback ports available. Please close other services or specify a custom port.`
+            error: `Port ${projectInfo.defaultPort} is already in use by another project managed by Tafil:\n${path.basename(ownership.projectPath)}\n\nPlease stop that project first, or use a custom port.`
+          };
+        } else {
+          // External process is using the port
+          console.log(`⚠️ Port ${projectInfo.defaultPort} is occupied by an external process (not managed by Tafil)`);
+          return {
+            success: false,
+            error: `Port ${projectInfo.defaultPort} is already in use by another application (not managed by Tafil).\n\nPlease:\n- Stop the external application using port ${projectInfo.defaultPort}, or\n- Click "Custom Port" to specify a different port for this project.`
           };
         }
       } else {
@@ -1375,10 +1450,14 @@ ipcMain.handle('play-project', async (_event, projectPath, customPort = null) =>
     
     const child = spawn(spawnCmd, spawnArgs, spawnOptions);
 
-    runningProcesses.set(projectPath, child);
+    runningProcesses.set(projectPath, { 
+      process: child, 
+      port: suggestedPort,  // Store the intended port
+      framework: projectInfo.framework 
+    });
     updateTrayMenu(runningProcesses);
     
-    let actualPort = null;
+    let actualPort = suggestedPort; // Initialize with suggested port
     let hasDetectedPort = false;
     let stdoutBuffer = ''; // Buffer to accumulate stdout for better CRA prompt detection
     const startTime = Date.now();
@@ -1452,6 +1531,14 @@ ipcMain.handle('play-project', async (_event, projectPath, customPort = null) =>
               if (detectedPort >= 1000 && detectedPort <= 65535) {
                 actualPort = detectedPort;
                 hasDetectedPort = true;
+                
+                // Update the stored port information
+                if (runningProcesses.has(projectPath)) {
+                  const processInfo = runningProcesses.get(projectPath);
+                  processInfo.port = actualPort;
+                  runningProcesses.set(projectPath, processInfo);
+                }
+                
                 console.log(`✅ Detected actual running port: ${actualPort} for ${projectInfo.type}`);
                 
           mainWindow?.webContents.send('project-status', {
@@ -1684,11 +1771,13 @@ ipcMain.handle('stop-project', async (_event, projectPath) => {
       };
     }
     
-    const childProcess = runningProcesses.get(projectPath);
-    if (!childProcess) {
+    const processInfo = runningProcesses.get(projectPath);
+    if (!processInfo) {
       console.log(`No running process found for ${projectPath}`);
       return { success: false, message: 'Project not running' };
     }
+    
+    const childProcess = processInfo.process || processInfo; // Support old format too
 
     return new Promise((resolve) => {
       // Cross-platform process termination
