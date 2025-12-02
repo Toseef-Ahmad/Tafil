@@ -609,6 +609,95 @@ function showNewCollectionModal() {
   }
 }
 
+// Collection Picker - shows when clicking folder icon on project card
+let pendingCollectionProject = null;
+
+function showCollectionPicker(projectPath) {
+  pendingCollectionProject = projectPath;
+  
+  // Get user collections (not system ones except uncategorized)
+  const userCollections = collections.filter(c => !c.isSystem || c.id === 'uncategorized');
+  const projectCols = projectCollections[projectPath] || [];
+  
+  // Use command palette as picker
+  commandPalette.classList.remove('hidden');
+  commandInput.value = '';
+  commandInput.placeholder = 'Select a collection...';
+  commandInput.focus();
+  
+  commandItems = userCollections.map(col => ({
+    type: 'collection',
+    id: col.id,
+    title: col.name,
+    desc: projectCols.includes(col.id) ? '✓ Already in this collection' : 'Click to add',
+    icon: Icons.folder,
+    isInCollection: projectCols.includes(col.id),
+    action: () => {
+      toggleProjectInCollection(projectPath, col.id);
+      hideCommandPalette();
+    }
+  }));
+  
+  // Add "Create new collection" option
+  commandItems.push({
+    type: 'action',
+    id: 'new',
+    title: '+ Create New Collection',
+    desc: 'Create a new collection for this project',
+    icon: Icons.plus,
+    action: () => {
+      hideCommandPalette();
+      showNewCollectionModal();
+    }
+  });
+  
+  renderCollectionPicker();
+}
+
+function renderCollectionPicker() {
+  commandResults.innerHTML = commandItems.map((cmd, index) => `
+    <div class="command-item ${index === commandSelectedIndex ? 'selected' : ''}" data-index="${index}">
+      <div class="command-item-icon" style="${cmd.isInCollection ? 'color: #10b981;' : ''}">${cmd.icon}</div>
+      <div class="command-item-text">
+        <div class="command-item-title">${escapeHtml(cmd.title)}</div>
+        <div class="command-item-desc" style="${cmd.isInCollection ? 'color: #10b981;' : ''}">${escapeHtml(cmd.desc)}</div>
+      </div>
+      ${cmd.isInCollection ? `<span style="color: #10b981;">${Icons.check}</span>` : ''}
+    </div>
+  `).join('');
+  
+  // Add click handlers
+  commandResults.querySelectorAll('.command-item').forEach((item, index) => {
+    item.addEventListener('click', () => executeCommand(commandItems[index]));
+    item.addEventListener('mouseenter', () => {
+      commandSelectedIndex = index;
+      updateCommandSelection();
+    });
+  });
+}
+
+function toggleProjectInCollection(projectPath, collectionId) {
+  if (!projectCollections[projectPath]) {
+    projectCollections[projectPath] = [];
+  }
+  
+  const index = projectCollections[projectPath].indexOf(collectionId);
+  const collection = collections.find(c => c.id === collectionId);
+  
+  if (index === -1) {
+    // Add to collection
+    projectCollections[projectPath].push(collectionId);
+    showNotification(`Added to "${collection?.name || 'collection'}"`, 'success');
+  } else {
+    // Remove from collection
+    projectCollections[projectPath].splice(index, 1);
+    showNotification(`Removed from "${collection?.name || 'collection'}"`, 'info');
+  }
+  
+  saveCollections();
+  renderCollections();
+}
+
 function handleCreateCollection() {
   const name = newCollectionInput.value.trim();
   if (!name) return;
@@ -1205,6 +1294,12 @@ async function populateCardContent(card, project) {
   // Store deps status
   projectStats.set(project.path, { hasDeps: dependenciesInstalled });
   
+  // Get project collections
+  const projectCols = projectCollections[project.path] || [];
+  const collectionNames = projectCols
+    .map(colId => collections.find(c => c.id === colId)?.name)
+    .filter(Boolean);
+  
   // Truncate path
   const shortPath = project.path.length > 40 
     ? '...' + project.path.slice(-37) 
@@ -1245,10 +1340,14 @@ async function populateCardContent(card, project) {
       </div>
     ` : ''}
     
-    <div class="flex items-center gap-3 text-xs mb-2" style="color: #52525b;">
+    <div class="flex items-center gap-2 text-xs mb-2 flex-wrap" style="color: #52525b;">
       <span class="flex items-center gap-1">${Icons.clock} ${timeStr}</span>
       ${isRunning && runningInfo?.port 
         ? `<span class="flex items-center gap-1 px-2 py-0.5 rounded" style="background: rgba(14,165,233,0.1); color: #0ea5e9;">${Icons.server} :${runningInfo.port}</span>` 
+        : ''
+      }
+      ${collectionNames.length > 0 
+        ? collectionNames.map(name => `<span class="flex items-center gap-1 px-2 py-0.5 rounded" style="background: rgba(139,92,246,0.1); color: #a78bfa; font-size: 10px;">${Icons.folder} ${escapeHtml(name)}</span>`).join('')
         : ''
       }
     </div>
@@ -1279,6 +1378,9 @@ async function populateCardContent(card, project) {
       <button class="action-btn terminal-button" title="Open in terminal">
         ${Icons.terminal}
       </button>
+      <button class="action-btn collection-button" title="Add to collection">
+        ${Icons.folder}
+      </button>
       <button class="action-btn insights-button" title="View insights">
         ${Icons.chart}
       </button>
@@ -1298,6 +1400,7 @@ async function populateCardContent(card, project) {
   const browserButton = card.querySelector(".browser-button");
   const editorButton = card.querySelector(".editor-button");
   const terminalButton = card.querySelector(".terminal-button");
+  const collectionButton = card.querySelector(".collection-button");
   const insightsButton = card.querySelector(".insights-button");
   const removeButton = card.querySelector(".remove-modules-button");
 
@@ -1308,6 +1411,7 @@ async function populateCardContent(card, project) {
   browserButton?.addEventListener("click", (e) => { e.stopPropagation(); if (runningInfo) openInBrowser(runningInfo.port); });
   editorButton?.addEventListener("click", (e) => { e.stopPropagation(); openInEditor(project.path); });
   terminalButton?.addEventListener("click", (e) => { e.stopPropagation(); openInTerminal(project.path); });
+  collectionButton?.addEventListener("click", (e) => { e.stopPropagation(); showCollectionPicker(project.path); });
   insightsButton?.addEventListener("click", (e) => { e.stopPropagation(); showProjectInsights(project.path); });
 }
 
