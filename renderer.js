@@ -1,4 +1,4 @@
-// renderer.js - Premium UI Version
+// renderer.js - Tafil Premium UI with Collections, Command Palette, Insights
 
 // Helper for path operations
 const path = {
@@ -7,18 +7,46 @@ const path = {
   }
 };
 
+// =====================================================
 // DOM Elements
-const infoEl = document.getElementById("info");
+// =====================================================
 const projectListEl = document.getElementById("projectList");
-const scanProjectsBtn = document.getElementById("scanProjectsBtn");
-const scanCustomBtn = document.getElementById("scanCustomBtn");
-const searchInput = document.getElementById("searchInput");
-const darkModeToggle = document.getElementById("darkModeToggle");
+const viewTitleEl = document.getElementById("viewTitle");
+const viewSubtitleEl = document.getElementById("viewSubtitle");
+const emptyStateEl = document.getElementById("emptyState");
+const insightsPanelEl = document.getElementById("insightsPanel");
+const insightsListEl = document.getElementById("insightsList");
+
+// Sidebar elements
+const sidebar = document.getElementById("sidebar");
+const toggleSidebarBtn = document.getElementById("toggleSidebar");
+const navAllProjects = document.getElementById("navAllProjects");
+const navRunning = document.getElementById("navRunning");
+const navInsights = document.getElementById("navInsights");
+const allProjectsCountEl = document.getElementById("allProjectsCount");
+const runningCountEl = document.getElementById("runningCount");
+const runningNumEl = document.getElementById("runningNum");
+const collectionsList = document.getElementById("collectionsList");
+const addCollectionBtn = document.getElementById("addCollectionBtn");
+const scanHomeBtn = document.getElementById("scanHomeBtn");
+const scanFolderBtn = document.getElementById("scanFolderBtn");
+
+// Header elements
+const commandTrigger = document.getElementById("commandTrigger");
 const refreshBtn = document.getElementById("refreshBtn");
-const ideCountEl = document.getElementById("ideCount");
-const ideCountNum = document.getElementById("ideCountNum");
+const darkModeToggle = document.getElementById("darkModeToggle");
 const moonIcon = document.getElementById("moonIcon");
 const sunIcon = document.getElementById("sunIcon");
+const ideCountEl = document.getElementById("ideCount");
+const ideCountNum = document.getElementById("ideCountNum");
+
+// Command Palette
+const commandPalette = document.getElementById("commandPalette");
+const commandInput = document.getElementById("commandInput");
+const commandResults = document.getElementById("commandResults");
+
+// Notifications
+const notificationsContainer = document.getElementById("notificationsContainer");
 
 // Modal elements
 const dependencyModal = document.getElementById("dependencyModal");
@@ -29,21 +57,10 @@ const confirmYesBtn = document.getElementById("confirmYesBtn");
 const confirmNoBtn = document.getElementById("confirmNoBtn");
 const logsModal = document.getElementById("logsModal");
 const closeLogsBtn = document.getElementById("closeLogsBtn");
+const logsContent = document.getElementById("logsContent");
+const logsProjectName = document.getElementById("logsProjectName");
 
-// Custom Port Modal elements
-const customPortModal = document.getElementById("customPortModal");
-const customPortInput = document.getElementById("customPortInput");
-const useDefaultPortBtn = document.getElementById("useDefaultPortBtn");
-const useCustomPortBtn = document.getElementById("useCustomPortBtn");
-const cancelPortBtn = document.getElementById("cancelPortBtn");
-const defaultPortDisplay = document.getElementById("defaultPortDisplay");
-
-// IDE Modal elements
-const ideModal = document.getElementById("ideModal");
-const ideList = document.getElementById("ideList");
-const cancelIdeBtn = document.getElementById("cancelIdeBtn");
-
-// Settings Modal elements
+// Settings Modal
 const settingsModal = document.getElementById("settingsModal");
 const settingsBtn = document.getElementById("settingsBtn");
 const closeSettingsBtn = document.getElementById("closeSettingsBtn");
@@ -52,10 +69,26 @@ const cancelSettingsBtn = document.getElementById("cancelSettingsBtn");
 const defaultIdeList = document.getElementById("defaultIdeList");
 const defaultTerminalList = document.getElementById("defaultTerminalList");
 const noIdeMessage = document.getElementById("noIdeMessage");
-const currentIdeDisplay = document.getElementById("currentIdeDisplay");
-const currentTerminalDisplay = document.getElementById("currentTerminalDisplay");
 
+// New Collection Modal
+const newCollectionModal = document.getElementById("newCollectionModal");
+const closeNewCollectionBtn = document.getElementById("closeNewCollectionBtn");
+const newCollectionInput = document.getElementById("newCollectionInput");
+const createCollectionBtn = document.getElementById("createCollectionBtn");
+
+// Project Insights Modal
+const projectInsightsModal = document.getElementById("projectInsightsModal");
+const closeInsightsBtn = document.getElementById("closeInsightsBtn");
+const insightsProjectName = document.getElementById("insightsProjectName");
+const projectInsightsContent = document.getElementById("projectInsightsContent");
+
+// Empty state buttons
+const emptyStateScanHome = document.getElementById("emptyStateScanHome");
+const emptyStateScanFolder = document.getElementById("emptyStateScanFolder");
+
+// =====================================================
 // State
+// =====================================================
 let currentProjects = [];
 let filteredProjects = [];
 let runningProjects = new Map();
@@ -67,11 +100,21 @@ let projectStatuses = new Map();
 let lastRefreshTime = Date.now();
 let pendingActionProject = null;
 let pendingRemoveProject = null;
-let pendingPortProject = null;
-let pendingIdeProject = null;
 let installedIDEs = [];
 let installedTerminals = [];
 let isDarkMode = true;
+let currentView = 'all';
+let commandSelectedIndex = 0;
+let commandItems = [];
+
+// Collections
+let collections = [
+  { id: 'all', name: 'All Projects', icon: 'folder', isSystem: true },
+  { id: 'running', name: 'Running', icon: 'play', isSystem: true },
+  { id: 'uncategorized', name: 'Uncategorized', icon: 'inbox', isSystem: true }
+];
+let projectCollections = {}; // { projectPath: [collectionIds] }
+let activeCollection = 'all';
 
 // Settings
 let defaultIDE = null;
@@ -80,7 +123,9 @@ let defaultTerminal = null;
 const REFRESH_INTERVAL = 60000;
 const REFRESH_THROTTLE = 5000;
 
-// Lucide-style SVG Icons
+// =====================================================
+// SVG Icons
+// =====================================================
 const Icons = {
   play: '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="5 3 19 12 5 21 5 3"/></svg>',
   stop: '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="none"><rect width="14" height="14" x="5" y="5" rx="1"/></svg>',
@@ -92,22 +137,39 @@ const Icons = {
   folder: '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/></svg>',
   clock: '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>',
   gitBranch: '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" x2="6" y1="3" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg>',
-  externalLink: '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" x2="21" y1="14" y2="3"/></svg>',
   server: '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="8" x="2" y="2" rx="2" ry="2"/><rect width="20" height="8" x="2" y="14" rx="2" ry="2"/><line x1="6" x2="6.01" y1="6" y2="6"/><line x1="6" x2="6.01" y1="18" y2="18"/></svg>',
   check: '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>',
   info: '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>',
   alertCircle: '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>',
-  arrowRight: '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>',
+  chart: '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>',
+  search: '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>',
+  home: '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>',
+  inbox: '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>',
+  plus: '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>',
+  warning: '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>',
+  package: '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>',
 };
 
+// =====================================================
 // Initialize
+// =====================================================
 document.addEventListener("DOMContentLoaded", async () => {
-  infoEl.textContent = 'Click "Scan Home" to find Node.js projects';
+  console.log('🚀 Tafil initializing...');
+  
+  // Load saved data
+  try {
+    loadCollections();
+    loadDarkModePreference();
+    loadSettings();
+  } catch (err) {
+    console.error('Error loading saved data:', err);
+  }
   
   // Load installed IDEs and Terminals
   try {
     installedIDEs = await window.electronAPI.getInstalledIDEs();
-    if (installedIDEs.length > 0) {
+    console.log(`✅ Loaded ${installedIDEs.length} IDEs`);
+    if (installedIDEs.length > 0 && ideCountNum && ideCountEl) {
       ideCountNum.textContent = installedIDEs.length;
       ideCountEl.classList.remove('hidden');
     }
@@ -117,55 +179,112 @@ document.addEventListener("DOMContentLoaded", async () => {
   
   try {
     installedTerminals = await window.electronAPI.getInstalledTerminals();
+    console.log(`✅ Loaded ${installedTerminals.length} Terminals`);
   } catch (err) {
     console.error('Error loading Terminals:', err);
   }
   
-  // Event listeners
-  scanProjectsBtn.addEventListener("click", renderProjects);
-  scanCustomBtn.addEventListener("click", renderCustomProjects);
-  darkModeToggle.addEventListener("click", toggleDarkMode);
-  refreshBtn.addEventListener("click", () => {
+  // Render collections
+  try {
+    renderCollections();
+  } catch (err) {
+    console.error('Error rendering collections:', err);
+  }
+  
+  // Event listeners - Sidebar
+  console.log('📌 Attaching event listeners...');
+  console.log('  - toggleSidebarBtn:', !!toggleSidebarBtn);
+  console.log('  - scanHomeBtn:', !!scanHomeBtn);
+  console.log('  - scanFolderBtn:', !!scanFolderBtn);
+  console.log('  - addCollectionBtn:', !!addCollectionBtn);
+  
+  if (toggleSidebarBtn) {
+    toggleSidebarBtn.addEventListener("click", () => {
+      console.log('Toggle sidebar clicked');
+      toggleSidebar();
+    });
+  }
+  if (navAllProjects) navAllProjects.addEventListener("click", () => switchView('all'));
+  if (navRunning) navRunning.addEventListener("click", () => switchView('running'));
+  if (navInsights) navInsights.addEventListener("click", () => switchView('insights'));
+  if (scanHomeBtn) {
+    scanHomeBtn.addEventListener("click", () => {
+      console.log('Scan Home clicked');
+      renderProjects();
+    });
+  }
+  if (scanFolderBtn) {
+    scanFolderBtn.addEventListener("click", () => {
+      console.log('Scan Folder clicked');
+      renderCustomProjects();
+    });
+  }
+  if (addCollectionBtn) {
+    addCollectionBtn.addEventListener("click", () => {
+      console.log('Add Collection clicked');
+      showNewCollectionModal();
+    });
+  }
+  
+  // Event listeners - Header
+  if (commandTrigger) commandTrigger.addEventListener("click", showCommandPalette);
+  if (refreshBtn) refreshBtn.addEventListener("click", () => {
     renderProjectCards(currentProjects);
-    infoEl.textContent = 'Projects refreshed';
+    showNotification('Projects refreshed', 'success');
+  });
+  if (darkModeToggle) darkModeToggle.addEventListener("click", toggleDarkMode);
+  
+  // Event listeners - Settings
+  if (settingsBtn) settingsBtn.addEventListener("click", showSettingsModal);
+  if (closeSettingsBtn) closeSettingsBtn.addEventListener("click", hideSettingsModal);
+  if (cancelSettingsBtn) cancelSettingsBtn.addEventListener("click", hideSettingsModal);
+  if (saveSettingsBtn) saveSettingsBtn.addEventListener("click", saveSettings);
+  
+  // Event listeners - Modals
+  if (modalCancelBtn) modalCancelBtn.addEventListener("click", hideModals);
+  if (modalInstallBtn) modalInstallBtn.addEventListener("click", handleModalInstall);
+  if (confirmNoBtn) confirmNoBtn.addEventListener("click", hideModals);
+  if (confirmYesBtn) confirmYesBtn.addEventListener("click", handleConfirmRemove);
+  if (closeLogsBtn) closeLogsBtn.addEventListener("click", () => logsModal?.classList.add("hidden"));
+  
+  // New Collection Modal
+  if (closeNewCollectionBtn) closeNewCollectionBtn.addEventListener("click", () => newCollectionModal?.classList.add("hidden"));
+  if (createCollectionBtn) createCollectionBtn.addEventListener("click", handleCreateCollection);
+  if (newCollectionInput) newCollectionInput.addEventListener("keypress", (e) => {
+    if (e.key === 'Enter') handleCreateCollection();
   });
   
-  searchInput.addEventListener("input", handleSearch);
+  // Project Insights Modal
+  if (closeInsightsBtn) closeInsightsBtn.addEventListener("click", () => projectInsightsModal?.classList.add("hidden"));
   
-  // Modal listeners
-  modalCancelBtn.addEventListener("click", hideModals);
-  modalInstallBtn.addEventListener("click", handleModalInstall);
-  confirmNoBtn.addEventListener("click", hideModals);
-  confirmYesBtn.addEventListener("click", handleConfirmRemove);
-  closeLogsBtn.addEventListener("click", () => logsModal.classList.add("hidden"));
+  // Empty state buttons
+  if (emptyStateScanHome) emptyStateScanHome.addEventListener("click", renderProjects);
+  if (emptyStateScanFolder) emptyStateScanFolder.addEventListener("click", renderCustomProjects);
   
-  cancelPortBtn.addEventListener("click", hideModals);
-  useDefaultPortBtn.addEventListener("click", handleUseDefaultPort);
-  useCustomPortBtn.addEventListener("click", handleUseCustomPort);
-  customPortInput.addEventListener("keypress", (e) => {
-    if (e.key === 'Enter') handleUseCustomPort();
+  // Command Palette
+  if (commandInput) {
+    commandInput.addEventListener("input", handleCommandInput);
+    commandInput.addEventListener("keydown", handleCommandKeydown);
+  }
+  if (commandPalette) commandPalette.addEventListener("click", (e) => {
+    if (e.target === commandPalette) hideCommandPalette();
   });
-  
-  cancelIdeBtn.addEventListener("click", hideModals);
-  
-  settingsBtn.addEventListener("click", showSettingsModal);
-  closeSettingsBtn.addEventListener("click", hideSettingsModal);
-  cancelSettingsBtn.addEventListener("click", hideSettingsModal);
-  saveSettingsBtn.addEventListener("click", saveSettings);
   
   // Click outside modals to close
-  [dependencyModal, confirmDialog, logsModal, customPortModal, ideModal, settingsModal].forEach(modal => {
-    modal.addEventListener("click", (e) => {
-      if (e.target === modal) {
-        if (modal === settingsModal) hideSettingsModal();
-        else if (modal === logsModal) logsModal.classList.add("hidden");
-        else hideModals();
-      }
-    });
+  [dependencyModal, confirmDialog, logsModal, settingsModal, newCollectionModal, projectInsightsModal].forEach(modal => {
+    if (modal) {
+      modal.addEventListener("click", (e) => {
+        if (e.target === modal) {
+          modal.classList.add("hidden");
+        }
+      });
+    }
   });
   
   // Keyboard shortcuts
   document.addEventListener("keydown", handleKeyboardShortcuts);
+  
+  console.log('✅ Tafil initialized successfully!');
 
   // Listen for project status updates
   window.electronAPI.onProjectStatus((_event, statusData) => {
@@ -177,19 +296,25 @@ document.addEventListener("DOMContentLoaded", async () => {
       projectProcesses.set(projectPath, pid);
       activeConnections.set(port, projectPath);
       setCardStatus(projectPath, `Running on :${port}`, 'success');
+      showNotification(`${path.basename(projectPath)} started on port ${port}`, 'success');
+      updateRunningCount();
       setTimeout(() => clearCardStatus(projectPath), 3000);
     } else if (status === "stopped") {
       runningProjects.delete(projectPath);
       projectProcesses.delete(projectPath);
-      for (const [p, path] of activeConnections.entries()) {
-        if (path === projectPath) activeConnections.delete(p);
+      for (const [port, projPath] of activeConnections.entries()) {
+        if (projPath === projectPath) activeConnections.delete(port);
       }
       setCardStatus(projectPath, 'Stopped', 'success');
+      showNotification(`${path.basename(projectPath)} stopped`, 'info');
+      updateRunningCount();
       setTimeout(() => clearCardStatus(projectPath), 2000);
     } else if (status === "error") {
       runningProjects.delete(projectPath);
       projectProcesses.delete(projectPath);
       setCardStatus(projectPath, error || "Error occurred", 'error');
+      showNotification(`Error: ${error || 'Unknown error'}`, 'error');
+      updateRunningCount();
     }
 
     updateSingleCard(projectPath);
@@ -232,52 +357,560 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }, 5000);
   
-  loadDarkModePreference();
-  loadSettings();
+  // Show empty state
+  updateEmptyState();
 });
 
-// Keyboard shortcuts
+// =====================================================
+// Keyboard Shortcuts
+// =====================================================
 function handleKeyboardShortcuts(e) {
+  // Command Palette: Cmd/Ctrl + K
   if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
     e.preventDefault();
-    searchInput.focus();
-    searchInput.select();
+    showCommandPalette();
   }
   
+  // Refresh: Cmd/Ctrl + R
   if ((e.ctrlKey || e.metaKey) && e.key === 'r') {
     e.preventDefault();
     renderProjects();
   }
   
+  // Escape: Close modals
   if (e.key === 'Escape') {
     hideModals();
     hideSettingsModal();
-    logsModal.classList.add("hidden");
+    hideCommandPalette();
+    logsModal?.classList.add("hidden");
+    newCollectionModal?.classList.add("hidden");
+    projectInsightsModal?.classList.add("hidden");
   }
 }
 
+// =====================================================
+// Command Palette
+// =====================================================
+function showCommandPalette() {
+  commandPalette.classList.remove('hidden');
+  commandInput.value = '';
+  commandInput.focus();
+  commandSelectedIndex = 0;
+  renderCommandResults('');
+}
+
+function hideCommandPalette() {
+  commandPalette.classList.add('hidden');
+  commandInput.value = '';
+}
+
+function handleCommandInput(e) {
+  const query = e.target.value.toLowerCase();
+  commandSelectedIndex = 0;
+  renderCommandResults(query);
+}
+
+function handleCommandKeydown(e) {
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    commandSelectedIndex = Math.min(commandSelectedIndex + 1, commandItems.length - 1);
+    updateCommandSelection();
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    commandSelectedIndex = Math.max(commandSelectedIndex - 1, 0);
+    updateCommandSelection();
+  } else if (e.key === 'Enter') {
+    e.preventDefault();
+    executeCommand(commandItems[commandSelectedIndex]);
+  }
+}
+
+function renderCommandResults(query) {
+  // Build command list
+  const commands = [
+    { type: 'action', id: 'scan-home', title: 'Scan Home Directory', desc: 'Find Node.js projects in home folder', icon: Icons.home, action: renderProjects },
+    { type: 'action', id: 'scan-folder', title: 'Scan Custom Folder', desc: 'Choose a folder to scan', icon: Icons.folder, action: renderCustomProjects },
+    { type: 'action', id: 'refresh', title: 'Refresh Projects', desc: 'Reload project list', icon: Icons.check, action: () => renderProjectCards(currentProjects) },
+    { type: 'view', id: 'view-all', title: 'View All Projects', desc: 'Show all projects', icon: Icons.folder, action: () => switchView('all') },
+    { type: 'view', id: 'view-running', title: 'View Running Projects', desc: 'Show running projects only', icon: Icons.play, action: () => switchView('running') },
+    { type: 'view', id: 'view-insights', title: 'View Insights', desc: 'Show project insights', icon: Icons.chart, action: () => switchView('insights') },
+    { type: 'action', id: 'settings', title: 'Open Settings', desc: 'Configure preferences', icon: Icons.info, action: showSettingsModal },
+    { type: 'action', id: 'new-collection', title: 'New Collection', desc: 'Create a new project collection', icon: Icons.plus, action: showNewCollectionModal },
+  ];
+  
+  // Add projects to command list
+  currentProjects.forEach(project => {
+    const isRunning = runningProjects.has(project.path);
+    commands.push({
+      type: 'project',
+      id: project.path,
+      title: project.name || path.basename(project.path),
+      desc: project.path,
+      icon: isRunning ? Icons.play : Icons.folder,
+      isRunning,
+      action: () => {
+        hideCommandPalette();
+        if (isRunning) {
+          const info = runningProjects.get(project.path);
+          if (info?.port) openInBrowser(info.port);
+        } else {
+          attemptRunProject(project.path);
+        }
+      }
+    });
+  });
+  
+  // Filter commands
+  commandItems = query 
+    ? commands.filter(cmd => 
+        cmd.title.toLowerCase().includes(query) || 
+        cmd.desc.toLowerCase().includes(query)
+      )
+    : commands.slice(0, 10);
+  
+  // Render
+  commandResults.innerHTML = commandItems.map((cmd, index) => `
+    <div class="command-item ${index === commandSelectedIndex ? 'selected' : ''}" data-index="${index}">
+      <div class="command-item-icon">${cmd.icon}</div>
+      <div class="command-item-text">
+        <div class="command-item-title">${escapeHtml(cmd.title)}</div>
+        <div class="command-item-desc">${escapeHtml(cmd.desc)}</div>
+      </div>
+      ${cmd.isRunning ? '<span class="running-badge"><span class="dot"></span>Running</span>' : ''}
+    </div>
+  `).join('');
+  
+  // Add click handlers
+  commandResults.querySelectorAll('.command-item').forEach((item, index) => {
+    item.addEventListener('click', () => executeCommand(commandItems[index]));
+    item.addEventListener('mouseenter', () => {
+      commandSelectedIndex = index;
+      updateCommandSelection();
+    });
+  });
+}
+
+function updateCommandSelection() {
+  commandResults.querySelectorAll('.command-item').forEach((item, index) => {
+    item.classList.toggle('selected', index === commandSelectedIndex);
+  });
+}
+
+function executeCommand(cmd) {
+  if (cmd && cmd.action) {
+    hideCommandPalette();
+    cmd.action();
+  }
+}
+
+// =====================================================
+// Notifications
+// =====================================================
+function showNotification(message, type = 'info') {
+  const notification = document.createElement('div');
+  notification.className = `notification ${type}`;
+  notification.innerHTML = `
+    <span style="color: ${type === 'success' ? '#10b981' : type === 'error' ? '#f43f5e' : type === 'warning' ? '#f59e0b' : '#0ea5e9'};">
+      ${type === 'success' ? Icons.check : type === 'error' ? Icons.alertCircle : type === 'warning' ? Icons.warning : Icons.info}
+    </span>
+    <span style="flex: 1; font-size: 13px; color: #fafafa;">${escapeHtml(message)}</span>
+    <button onclick="this.parentElement.remove()" class="action-btn" style="width: 20px; height: 20px;">×</button>
+  `;
+  
+  notificationsContainer.appendChild(notification);
+  
+  // Auto remove after 4 seconds
+  setTimeout(() => {
+    notification.style.opacity = '0';
+    notification.style.transform = 'translateX(100%)';
+    setTimeout(() => notification.remove(), 200);
+  }, 4000);
+}
+
+// =====================================================
+// Collections
+// =====================================================
+function loadCollections() {
+  try {
+    const savedCollections = localStorage.getItem('collections');
+    const savedProjectCollections = localStorage.getItem('projectCollections');
+    
+    if (savedCollections) {
+      const parsed = JSON.parse(savedCollections);
+      // Merge with system collections
+      collections = [
+        { id: 'all', name: 'All Projects', icon: 'folder', isSystem: true },
+        { id: 'running', name: 'Running', icon: 'play', isSystem: true },
+        ...parsed.filter(c => !c.isSystem),
+        { id: 'uncategorized', name: 'Uncategorized', icon: 'inbox', isSystem: true }
+      ];
+    }
+    
+    if (savedProjectCollections) {
+      projectCollections = JSON.parse(savedProjectCollections);
+    }
+  } catch (err) {
+    console.error('Error loading collections:', err);
+  }
+}
+
+function saveCollections() {
+  try {
+    localStorage.setItem('collections', JSON.stringify(collections.filter(c => !c.isSystem)));
+    localStorage.setItem('projectCollections', JSON.stringify(projectCollections));
+  } catch (err) {
+    console.error('Error saving collections:', err);
+  }
+}
+
+function renderCollections() {
+  const userCollections = collections.filter(c => !c.isSystem || c.id === 'uncategorized');
+  
+  collectionsList.innerHTML = userCollections.map(col => {
+    const count = col.id === 'uncategorized' 
+      ? currentProjects.filter(p => !projectCollections[p.path] || projectCollections[p.path].length === 0).length
+      : currentProjects.filter(p => projectCollections[p.path]?.includes(col.id)).length;
+    
+    return `
+      <div class="collection-item ${activeCollection === col.id ? 'active' : ''}" 
+           data-collection="${col.id}"
+           draggable="false"
+           ondragover="handleCollectionDragOver(event)"
+           ondragleave="handleCollectionDragLeave(event)"
+           ondrop="handleCollectionDrop(event, '${col.id}')">
+        <div class="flex items-center gap-2">
+          <span style="color: #71717a;">${col.id === 'uncategorized' ? Icons.inbox : Icons.folder}</span>
+          <span class="sidebar-text">${escapeHtml(col.name)}</span>
+        </div>
+        <span class="collection-count">${count}</span>
+      </div>
+    `;
+  }).join('');
+  
+  // Add click handlers
+  collectionsList.querySelectorAll('.collection-item').forEach(item => {
+    item.addEventListener('click', () => {
+      const colId = item.dataset.collection;
+      switchToCollection(colId);
+    });
+  });
+}
+
+function showNewCollectionModal() {
+  console.log('showNewCollectionModal called');
+  if (newCollectionModal) {
+    newCollectionModal.classList.remove('hidden');
+    if (newCollectionInput) {
+      newCollectionInput.value = '';
+      newCollectionInput.focus();
+    }
+  } else {
+    console.error('newCollectionModal not found!');
+  }
+}
+
+function handleCreateCollection() {
+  const name = newCollectionInput.value.trim();
+  if (!name) return;
+  
+  const id = 'col_' + Date.now();
+  collections.splice(collections.length - 1, 0, { id, name, icon: 'folder' });
+  saveCollections();
+  renderCollections();
+  newCollectionModal.classList.add('hidden');
+  showNotification(`Collection "${name}" created`, 'success');
+}
+
+function switchToCollection(colId) {
+  activeCollection = colId;
+  
+  // Update active state
+  collectionsList.querySelectorAll('.collection-item').forEach(item => {
+    item.classList.toggle('active', item.dataset.collection === colId);
+  });
+  navAllProjects.classList.remove('active');
+  navRunning.classList.remove('active');
+  navInsights.classList.remove('active');
+  
+  // Filter projects
+  let filtered;
+  if (colId === 'uncategorized') {
+    filtered = currentProjects.filter(p => !projectCollections[p.path] || projectCollections[p.path].length === 0);
+  } else {
+    filtered = currentProjects.filter(p => projectCollections[p.path]?.includes(colId));
+  }
+  
+  const collection = collections.find(c => c.id === colId);
+  viewTitleEl.textContent = collection?.name || 'Collection';
+  viewSubtitleEl.textContent = `${filtered.length} projects`;
+  
+  currentView = 'collection';
+  insightsPanelEl.classList.add('hidden');
+  renderProjectCards(filtered);
+}
+
+// Drag and drop handlers
+function handleCollectionDragOver(e) {
+  e.preventDefault();
+  e.currentTarget.classList.add('drag-over');
+}
+
+function handleCollectionDragLeave(e) {
+  e.currentTarget.classList.remove('drag-over');
+}
+
+function handleCollectionDrop(e, collectionId) {
+  e.preventDefault();
+  e.currentTarget.classList.remove('drag-over');
+  
+  const projectPath = e.dataTransfer.getData('text/plain');
+  if (!projectPath) return;
+  
+  // Add to collection
+  if (!projectCollections[projectPath]) {
+    projectCollections[projectPath] = [];
+  }
+  if (!projectCollections[projectPath].includes(collectionId)) {
+    projectCollections[projectPath].push(collectionId);
+    saveCollections();
+    renderCollections();
+    showNotification(`Project added to collection`, 'success');
+  }
+}
+
+// =====================================================
+// Views
+// =====================================================
+function switchView(view) {
+  currentView = view;
+  activeCollection = view === 'all' ? 'all' : null;
+  
+  // Update sidebar active states
+  navAllProjects.classList.toggle('active', view === 'all');
+  navRunning.classList.toggle('active', view === 'running');
+  navInsights.classList.toggle('active', view === 'insights');
+  collectionsList.querySelectorAll('.collection-item').forEach(item => {
+    item.classList.remove('active');
+  });
+  
+  // Update view content
+  insightsPanelEl.classList.toggle('hidden', view !== 'insights');
+  
+  if (view === 'all') {
+    viewTitleEl.textContent = 'All Projects';
+    viewSubtitleEl.textContent = `${currentProjects.length} projects`;
+    renderProjectCards(currentProjects);
+  } else if (view === 'running') {
+    viewTitleEl.textContent = 'Running Projects';
+    const runningList = currentProjects.filter(p => runningProjects.has(p.path));
+    viewSubtitleEl.textContent = `${runningList.length} running`;
+    renderProjectCards(runningList);
+  } else if (view === 'insights') {
+    viewTitleEl.textContent = 'Project Insights';
+    viewSubtitleEl.textContent = 'Health overview of your projects';
+    renderInsights();
+    renderProjectCards(currentProjects);
+  }
+  
+  updateEmptyState();
+}
+
+function updateRunningCount() {
+  const count = runningProjects.size;
+  runningNumEl.textContent = count;
+  runningCountEl.classList.toggle('hidden', count === 0);
+  allProjectsCountEl.textContent = currentProjects.length;
+}
+
+function updateEmptyState() {
+  const hasProjects = currentProjects.length > 0;
+  emptyStateEl.classList.toggle('hidden', hasProjects);
+  projectListEl.classList.toggle('hidden', !hasProjects);
+}
+
+// =====================================================
+// Insights
+// =====================================================
+function renderInsights() {
+  const insights = [];
+  
+  // Check for projects without node_modules
+  const missingDeps = currentProjects.filter(p => !projectStats.get(p.path)?.hasDeps);
+  if (missingDeps.length > 0) {
+    insights.push({
+      type: 'warning',
+      title: `${missingDeps.length} projects missing dependencies`,
+      desc: 'Run npm install to set them up'
+    });
+  }
+  
+  // Running projects
+  if (runningProjects.size > 0) {
+    insights.push({
+      type: 'success',
+      title: `${runningProjects.size} projects running`,
+      desc: 'Active development servers'
+    });
+  }
+  
+  // Total projects
+  insights.push({
+    type: 'info',
+    title: `${currentProjects.length} total projects`,
+    desc: 'Across all collections'
+  });
+  
+  insightsListEl.innerHTML = insights.map(insight => `
+    <div class="insight-item">
+      <div class="insight-icon ${insight.type}">
+        ${insight.type === 'warning' ? Icons.warning : insight.type === 'success' ? Icons.check : Icons.info}
+      </div>
+      <div>
+        <div class="text-sm font-medium" style="color: #fafafa;">${escapeHtml(insight.title)}</div>
+        <div class="text-xs" style="color: #71717a;">${escapeHtml(insight.desc)}</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function showProjectInsights(projectPath) {
+  const project = currentProjects.find(p => p.path === projectPath);
+  if (!project) return;
+  
+  insightsProjectName.textContent = project.name || path.basename(projectPath);
+  
+  // Build insights content
+  let content = `
+    <div class="space-y-4">
+      <div class="insight-item">
+        <div class="insight-icon info">${Icons.folder}</div>
+        <div>
+          <div class="text-sm font-medium" style="color: #fafafa;">Location</div>
+          <div class="text-xs" style="color: #71717a;">${escapeHtml(projectPath)}</div>
+        </div>
+      </div>
+  `;
+  
+  // Check dependencies
+  const hasDeps = await areDependenciesInstalled(projectPath);
+  content += `
+    <div class="insight-item">
+      <div class="insight-icon ${hasDeps ? 'success' : 'warning'}">${hasDeps ? Icons.check : Icons.warning}</div>
+      <div>
+        <div class="text-sm font-medium" style="color: #fafafa;">Dependencies</div>
+        <div class="text-xs" style="color: #71717a;">${hasDeps ? 'Installed' : 'Not installed'}</div>
+      </div>
+    </div>
+  `;
+  
+  // Running status
+  const isRunning = runningProjects.has(projectPath);
+  const runningInfo = isRunning ? runningProjects.get(projectPath) : null;
+  content += `
+    <div class="insight-item">
+      <div class="insight-icon ${isRunning ? 'success' : 'info'}">${isRunning ? Icons.play : Icons.info}</div>
+      <div>
+        <div class="text-sm font-medium" style="color: #fafafa;">Status</div>
+        <div class="text-xs" style="color: #71717a;">${isRunning ? `Running on port ${runningInfo?.port}` : 'Not running'}</div>
+      </div>
+    </div>
+  `;
+  
+  // Git info
+  if (project.message && !['No commits yet', 'No Git history', 'Git Error'].includes(project.message)) {
+    content += `
+      <div class="insight-item">
+        <div class="insight-icon info">${Icons.gitBranch}</div>
+        <div>
+          <div class="text-sm font-medium" style="color: #fafafa;">Last Commit</div>
+          <div class="text-xs" style="color: #71717a;">${escapeHtml(project.message)}</div>
+        </div>
+      </div>
+    `;
+  }
+  
+  content += '</div>';
+  
+  projectInsightsContent.innerHTML = content;
+  projectInsightsModal.classList.remove('hidden');
+}
+
+// =====================================================
+// Sidebar
+// =====================================================
+function toggleSidebar() {
+  console.log('toggleSidebar called');
+  if (sidebar) {
+    sidebar.classList.toggle('collapsed');
+    localStorage.setItem('sidebarCollapsed', sidebar.classList.contains('collapsed'));
+  } else {
+    console.error('sidebar not found!');
+  }
+}
+
+// =====================================================
+// Modals
+// =====================================================
 function hideModals() {
-  dependencyModal.classList.add("hidden");
-  confirmDialog.classList.add("hidden");
-  customPortModal.classList.add("hidden");
-  ideModal.classList.add("hidden");
+  dependencyModal?.classList.add("hidden");
+  confirmDialog?.classList.add("hidden");
   pendingActionProject = null;
   pendingRemoveProject = null;
-  pendingPortProject = null;
-  pendingIdeProject = null;
 }
 
 function hideSettingsModal() {
-  settingsModal.classList.add("hidden");
+  settingsModal?.classList.add("hidden");
 }
 
+function showDependencyModal(projectPath) {
+  pendingActionProject = projectPath;
+  dependencyModal.classList.remove("hidden");
+}
+
+async function handleModalInstall() {
+  const projectPath = pendingActionProject;
+  hideModals();
+  if (!projectPath) return;
+  
+  setCardStatus(projectPath, 'Installing dependencies...', 'info');
+  updateSingleCard(projectPath);
+  
+  try {
+    await window.electronAPI.installDependencies(projectPath);
+    setCardStatus(projectPath, 'Dependencies installed', 'success');
+    showNotification('Dependencies installed successfully', 'success');
+    setTimeout(() => {
+      clearCardStatus(projectPath);
+      updateSingleCard(projectPath);
+    }, 2000);
+  } catch (err) {
+    setCardStatus(projectPath, 'Installation failed', 'error');
+    showNotification('Failed to install dependencies', 'error');
+  }
+}
+
+function handleConfirmRemove() {
+  const projectPath = pendingRemoveProject;
+  hideModals();
+  if (!projectPath) return;
+  removeModules(projectPath);
+}
+
+// =====================================================
 // Settings
+// =====================================================
 function loadSettings() {
   try {
     const savedIDE = localStorage.getItem('defaultIDE');
     const savedTerminal = localStorage.getItem('defaultTerminal');
     if (savedIDE) defaultIDE = JSON.parse(savedIDE);
     if (savedTerminal) defaultTerminal = JSON.parse(savedTerminal);
+    
+    // Load sidebar state
+    const sidebarCollapsed = localStorage.getItem('sidebarCollapsed');
+    if (sidebarCollapsed === 'true') {
+      sidebar?.classList.add('collapsed');
+    }
   } catch (err) {
     console.error('Error loading settings:', err);
   }
@@ -313,34 +946,13 @@ function saveSettings() {
     }
     
     hideSettingsModal();
-    infoEl.textContent = 'Settings saved';
-    setTimeout(() => {
-      if (currentProjects.length > 0) {
-        infoEl.textContent = `${currentProjects.length} projects`;
-      }
-    }, 2000);
+    showNotification('Settings saved', 'success');
   } catch (err) {
     console.error('Error saving settings:', err);
   }
 }
 
 async function showSettingsModal() {
-  // Update current displays
-  if (defaultIDE) {
-    currentIdeDisplay.textContent = defaultIDE.name;
-    currentIdeDisplay.classList.remove('hidden');
-  } else {
-    currentIdeDisplay.classList.add('hidden');
-  }
-  
-  if (defaultTerminal) {
-    currentTerminalDisplay.textContent = defaultTerminal.name;
-    currentTerminalDisplay.classList.remove('hidden');
-  } else {
-    currentTerminalDisplay.textContent = 'System Default';
-    currentTerminalDisplay.classList.remove('hidden');
-  }
-  
   // Refresh lists
   try {
     installedIDEs = await window.electronAPI.getInstalledIDEs();
@@ -352,9 +964,9 @@ async function showSettingsModal() {
   // Populate IDE list
   defaultIdeList.innerHTML = '';
   if (installedIDEs.length === 0) {
-    noIdeMessage.classList.remove('hidden');
+    noIdeMessage?.classList.remove('hidden');
   } else {
-    noIdeMessage.classList.add('hidden');
+    noIdeMessage?.classList.add('hidden');
     
     // None option
     const noneOption = createSettingsOption(-1, 'defaultIDE', '❓', 'None (Always ask)', !defaultIDE);
@@ -384,49 +996,52 @@ async function showSettingsModal() {
 
 function createSettingsOption(value, name, icon, label, isSelected) {
   const option = document.createElement('label');
-  option.className = `settings-option ${isSelected ? 'selected' : ''}`;
-  option.innerHTML = `
-    <input type="radio" name="${name}" value="${value}" ${isSelected ? 'checked' : ''} />
-    <span class="settings-option-icon">${icon}</span>
-    <span class="settings-option-name">${escapeHtml(label)}</span>
-    ${isSelected ? Icons.check : ''}
+  option.style.cssText = `
+    display: flex; align-items: center; gap: 10px; padding: 10px 12px;
+    background: ${isSelected ? 'rgba(139, 92, 246, 0.15)' : 'rgba(255,255,255,0.03)'};
+    border: 1px solid ${isSelected ? 'rgba(139, 92, 246, 0.3)' : 'rgba(255,255,255,0.06)'};
+    border-radius: 8px; cursor: pointer; transition: all 0.15s ease;
   `;
+  option.innerHTML = `
+    <input type="radio" name="${name}" value="${value}" ${isSelected ? 'checked' : ''} style="display: none;" />
+    <span style="font-size: 16px;">${icon}</span>
+    <span style="flex: 1; font-size: 13px; color: #fafafa;">${escapeHtml(label)}</span>
+    ${isSelected ? `<span style="color: #a78bfa;">${Icons.check}</span>` : ''}
+  `;
+  
+  option.addEventListener('click', () => {
+    // Update all options in this group
+    const allOptions = option.parentElement.querySelectorAll('label');
+    allOptions.forEach(opt => {
+      opt.style.background = 'rgba(255,255,255,0.03)';
+      opt.style.borderColor = 'rgba(255,255,255,0.06)';
+      const checkIcon = opt.querySelector('span:last-child');
+      if (checkIcon && checkIcon.innerHTML.includes('svg')) {
+        checkIcon.remove();
+      }
+    });
+    
+    option.style.background = 'rgba(139, 92, 246, 0.15)';
+    option.style.borderColor = 'rgba(139, 92, 246, 0.3)';
+    const checkSpan = document.createElement('span');
+    checkSpan.style.color = '#a78bfa';
+    checkSpan.innerHTML = Icons.check;
+    option.appendChild(checkSpan);
+  });
+  
   return option;
 }
 
-// Search
-let searchTimeout = null;
-function handleSearch(e) {
-  const searchTerm = e.target.value.toLowerCase().trim();
-  
-  if (!searchTerm) {
-    filteredProjects = [];
-    renderProjectCards(currentProjects);
-    infoEl.textContent = `${currentProjects.length} projects`;
-    return;
-  }
-  
-  filteredProjects = currentProjects.filter(project => {
-    const nameMatch = project.name.toLowerCase().includes(searchTerm);
-    const pathMatch = project.path.toLowerCase().includes(searchTerm);
-    const branchMatch = project.message?.toLowerCase().includes(searchTerm);
-    return nameMatch || pathMatch || branchMatch;
-  });
-  
-  renderProjectCards(filteredProjects);
-  infoEl.textContent = filteredProjects.length > 0 
-    ? `${filteredProjects.length} results for "${e.target.value}"`
-    : `No results for "${e.target.value}"`;
-}
-
-// Dark mode
+// =====================================================
+// Dark Mode
+// =====================================================
 function toggleDarkMode() {
   isDarkMode = !isDarkMode;
   document.body.classList.toggle('light-mode', !isDarkMode);
   localStorage.setItem('darkMode', isDarkMode ? 'true' : 'false');
   
-  moonIcon.classList.toggle('hidden', !isDarkMode);
-  sunIcon.classList.toggle('hidden', isDarkMode);
+  moonIcon?.classList.toggle('hidden', !isDarkMode);
+  sunIcon?.classList.toggle('hidden', isDarkMode);
 }
 
 function loadDarkModePreference() {
@@ -434,18 +1049,22 @@ function loadDarkModePreference() {
   if (saved !== null) {
     isDarkMode = saved === 'true';
     document.body.classList.toggle('light-mode', !isDarkMode);
-    moonIcon.classList.toggle('hidden', !isDarkMode);
-    sunIcon.classList.toggle('hidden', isDarkMode);
+    moonIcon?.classList.toggle('hidden', !isDarkMode);
+    sunIcon?.classList.toggle('hidden', isDarkMode);
   }
 }
 
+// =====================================================
 // Projects
+// =====================================================
 async function softRefreshProjects() {
   try {
     const projects = await window.electronAPI.scanAllProjects();
     if (!projects) return;
     currentProjects = mergeProjectLists(currentProjects, projects);
     updateProjectCards(currentProjects);
+    updateRunningCount();
+    renderCollections();
   } catch (err) {
     console.error("Error in soft refresh:", err);
   }
@@ -461,25 +1080,42 @@ function mergeProjectLists(oldList, newList) {
 }
 
 async function renderProjects() {
-  projectListEl.innerHTML = '<div class="empty-state"><div class="empty-state-icon">⏳</div><p class="empty-state-title">Scanning...</p></div>';
+  console.log('renderProjects called');
+  
+  if (projectListEl) {
+    projectListEl.innerHTML = `
+      <div class="col-span-full flex flex-col items-center justify-center py-12">
+        <div class="w-10 h-10 border-2 border-violet-500 border-t-transparent rounded-full animate-spin mb-3"></div>
+        <p class="text-sm" style="color: #71717a;">Scanning for projects...</p>
+      </div>
+    `;
+  }
+  if (emptyStateEl) emptyStateEl.classList.add('hidden');
+  if (projectListEl) projectListEl.classList.remove('hidden');
   
   try {
+    console.log('Calling scanAllProjects...');
     const projects = await window.electronAPI.scanAllProjects();
+    console.log('scanAllProjects returned:', projects?.length, 'projects');
     
     if (!projects || projects.length === 0) {
-      projectListEl.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📁</div><p class="empty-state-title">No projects found</p><p class="empty-state-desc">Try scanning a different location</p></div>';
-      infoEl.textContent = 'No projects found';
+      currentProjects = [];
+      updateEmptyState();
+      viewSubtitleEl.textContent = 'No projects found';
       return;
     }
 
     currentProjects = projects;
     filteredProjects = [];
-    searchInput.value = '';
-    infoEl.textContent = `${projects.length} projects`;
+    allProjectsCountEl.textContent = projects.length;
+    viewSubtitleEl.textContent = `${projects.length} projects`;
     renderProjectCards(projects);
+    renderCollections();
+    updateEmptyState();
+    showNotification(`Found ${projects.length} projects`, 'success');
   } catch (err) {
     console.error("Error scanning:", err);
-    projectListEl.innerHTML = '<div class="empty-state"><div class="empty-state-icon">❌</div><p class="empty-state-title">Scan failed</p></div>';
+    showNotification('Failed to scan projects', 'error');
   }
 }
 
@@ -488,23 +1124,26 @@ async function renderCustomProjects() {
     const projects = await window.electronAPI.scanCustomFolder();
     
     if (!projects) {
-      infoEl.textContent = 'Scan cancelled';
+      showNotification('Scan cancelled', 'info');
       return;
     }
 
     if (projects.length === 0) {
-      projectListEl.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📁</div><p class="empty-state-title">No projects in folder</p></div>';
-      infoEl.textContent = 'No projects found';
+      showNotification('No projects found in folder', 'warning');
       return;
     }
 
     currentProjects = projects;
     filteredProjects = [];
-    searchInput.value = '';
-    infoEl.textContent = `${projects.length} projects`;
+    allProjectsCountEl.textContent = projects.length;
+    viewSubtitleEl.textContent = `${projects.length} projects`;
     renderProjectCards(projects);
+    renderCollections();
+    updateEmptyState();
+    showNotification(`Found ${projects.length} projects`, 'success');
   } catch (err) {
     console.error("Error scanning folder:", err);
+    showNotification('Failed to scan folder', 'error');
   }
 }
 
@@ -514,6 +1153,7 @@ async function renderProjectCards(projects) {
     const card = await createProjectCard(project);
     projectListEl.appendChild(card);
   }
+  updateEmptyState();
 }
 
 async function updateProjectCards(projects) {
@@ -540,6 +1180,17 @@ async function createProjectCard(project) {
   const card = document.createElement("div");
   card.className = "project-card";
   card.dataset.projectPath = project.path;
+  card.draggable = true;
+  
+  // Drag events for collections
+  card.addEventListener('dragstart', (e) => {
+    e.dataTransfer.setData('text/plain', project.path);
+    card.classList.add('dragging');
+  });
+  card.addEventListener('dragend', () => {
+    card.classList.remove('dragging');
+  });
+  
   await populateCardContent(card, project);
   return card;
 }
@@ -551,9 +1202,12 @@ async function populateCardContent(card, project) {
   const projectName = project.name || path.basename(project.path);
   const cardStatus = projectStatuses.get(project.path);
   
+  // Store deps status
+  projectStats.set(project.path, { hasDeps: dependenciesInstalled });
+  
   // Truncate path
-  const shortPath = project.path.length > 45 
-    ? '...' + project.path.slice(-42) 
+  const shortPath = project.path.length > 40 
+    ? '...' + project.path.slice(-37) 
     : project.path;
   
   // Format timestamp
@@ -561,74 +1215,75 @@ async function populateCardContent(card, project) {
     ? formatRelativeTime(project.timestamp * 1000)
     : 'No commits';
 
-  card.className = `project-card ${isRunning ? 'is-running' : ''}`;
-  card.style.backgroundColor = '#111113';
-  card.style.color = '#fafafa';
-  card.style.border = '1px solid rgba(255, 255, 255, 0.06)';
-  card.style.borderRadius = '12px';
-  card.style.padding = '14px 16px';
+  card.className = `project-card ${isRunning ? 'running' : ''}`;
   
   card.innerHTML = `
     <div class="flex items-start justify-between gap-2 mb-2">
       <div class="min-w-0 flex-1">
-        <h4 class="card-title truncate" style="color: #fafafa; font-weight: 600; font-size: 0.875rem;">${escapeHtml(projectName)}</h4>
+        <h4 class="truncate text-sm font-semibold" style="color: #fafafa;">${escapeHtml(projectName)}</h4>
         ${project.message && !['No commits yet', 'No Git history', 'Git Error'].includes(project.message) 
-          ? `<p class="card-subtitle truncate" style="color: #71717a; font-size: 0.75rem;">${Icons.gitBranch} ${escapeHtml(project.message)}</p>` 
+          ? `<p class="truncate text-xs mt-0.5" style="color: #71717a;">${Icons.gitBranch} ${escapeHtml(project.message)}</p>` 
           : ''
         }
       </div>
       <div class="flex flex-col items-end gap-1 flex-shrink-0">
         ${isRunning 
-          ? `<span class="status-badge running" style="background: rgba(16, 185, 129, 0.15); color: #10b981; padding: 2px 8px; border-radius: 9999px; font-size: 0.6875rem;"><span class="status-dot pulse"></span>Running</span>` 
+          ? `<span class="running-badge"><span class="dot"></span>Running</span>` 
           : ''
         }
         ${isRunning && runningInfo?.framework 
-          ? `<span class="framework-badge" style="background: rgba(139, 92, 246, 0.15); color: #8b5cf6; padding: 2px 6px; border-radius: 4px; font-size: 0.625rem; text-transform: uppercase;">${escapeHtml(runningInfo.framework)}</span>` 
+          ? `<span class="framework-badge ${runningInfo.framework.toLowerCase()}">${escapeHtml(runningInfo.framework)}</span>` 
           : ''
         }
       </div>
     </div>
     
-    <div class="card-status-message ${cardStatus ? cardStatus.type : ''}" style="display: ${cardStatus ? 'flex' : 'none'}; color: #fafafa;">
-      ${cardStatus ? `${getStatusIcon(cardStatus.type)}<span>${escapeHtml(cardStatus.message)}</span>` : ''}
-    </div>
+    ${cardStatus ? `
+      <div class="flex items-center gap-2 py-2 px-3 rounded-md mb-2" style="background: ${cardStatus.type === 'success' ? 'rgba(16,185,129,0.1)' : cardStatus.type === 'error' ? 'rgba(244,63,94,0.1)' : 'rgba(14,165,233,0.1)'}; color: ${cardStatus.type === 'success' ? '#10b981' : cardStatus.type === 'error' ? '#f43f5e' : '#0ea5e9'};">
+        ${getStatusIcon(cardStatus.type)}
+        <span class="text-xs">${escapeHtml(cardStatus.message)}</span>
+      </div>
+    ` : ''}
     
-    <div class="card-meta" style="color: #52525b; font-size: 0.6875rem; margin-top: 8px;">
-      <span class="card-meta-item">${Icons.clock} ${timeStr}</span>
+    <div class="flex items-center gap-3 text-xs mb-2" style="color: #52525b;">
+      <span class="flex items-center gap-1">${Icons.clock} ${timeStr}</span>
       ${isRunning && runningInfo?.port 
-        ? `<span class="port-badge" style="background: rgba(14, 165, 233, 0.15); color: #0ea5e9; padding: 2px 6px; border-radius: 4px; font-size: 0.6875rem;">${Icons.server} :${runningInfo.port}</span>` 
+        ? `<span class="flex items-center gap-1 px-2 py-0.5 rounded" style="background: rgba(14,165,233,0.1); color: #0ea5e9;">${Icons.server} :${runningInfo.port}</span>` 
         : ''
       }
     </div>
     
-    <p class="card-path" style="color: #52525b; font-size: 0.6875rem; margin-top: 4px;" title="${escapeHtml(project.path)}">${escapeHtml(shortPath)}</p>
+    <p class="text-xs truncate mb-3" style="color: #52525b;" title="${escapeHtml(project.path)}">${escapeHtml(shortPath)}</p>
     
-    <div class="card-actions" style="margin-top: 12px; display: flex; gap: 6px; flex-wrap: wrap;">
+    <div class="flex items-center gap-1.5 flex-wrap">
       ${dependenciesInstalled 
-        ? `<button class="action-btn action-btn-run play-button" style="background: #10b981; color: white; padding: 5px 8px; border-radius: 6px; font-size: 0.6875rem; border: none; cursor: pointer; display: ${isRunning ? 'none' : 'inline-flex'}; align-items: center; gap: 4px;">
-            ${Icons.play} Run
+        ? `<button class="action-btn play play-button" style="display: ${isRunning ? 'none' : 'flex'};" title="Run project">
+            ${Icons.play}
           </button>`
-        : `<button class="action-btn action-btn-default install-button" style="background: #27272a; color: #a1a1aa; padding: 5px 8px; border-radius: 6px; font-size: 0.6875rem; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
-            ${Icons.download} Install
+        : `<button class="action-btn install-button" title="Install dependencies">
+            ${Icons.download}
           </button>`
       }
-      <button class="action-btn action-btn-stop stop-button" style="background: #f43f5e; color: white; padding: 5px 8px; border-radius: 6px; font-size: 0.6875rem; border: none; cursor: pointer; display: ${!isRunning ? 'none' : 'inline-flex'}; align-items: center; gap: 4px;">
-        ${Icons.stop} Stop
+      <button class="action-btn stop stop-button" style="display: ${!isRunning ? 'none' : 'flex'};" title="Stop project">
+        ${Icons.stop}
       </button>
       ${isRunning 
-        ? `<button class="action-btn action-btn-default browser-button" style="background: #27272a; color: #a1a1aa; padding: 5px 8px; border-radius: 6px; font-size: 0.6875rem; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
-            ${Icons.globe} Open
+        ? `<button class="action-btn browser-button" title="Open in browser">
+            ${Icons.globe}
           </button>`
         : ''
       }
-      <button class="action-btn action-btn-default editor-button" style="background: #27272a; color: #a1a1aa; padding: 5px 8px; border-radius: 6px; font-size: 0.6875rem; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;" title="${installedIDEs.length} editors">
-        ${Icons.code} Editor
+      <button class="action-btn editor-button" title="Open in editor">
+        ${Icons.code}
       </button>
-      <button class="action-btn action-btn-default terminal-button" style="background: #27272a; color: #a1a1aa; padding: 5px 8px; border-radius: 6px; font-size: 0.6875rem; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
+      <button class="action-btn terminal-button" title="Open in terminal">
         ${Icons.terminal}
       </button>
+      <button class="action-btn insights-button" title="View insights">
+        ${Icons.chart}
+      </button>
       ${dependenciesInstalled 
-        ? `<button class="action-btn action-btn-default remove-modules-button" style="background: #27272a; color: #a1a1aa; padding: 5px 8px; border-radius: 6px; font-size: 0.6875rem; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;" title="Remove node_modules">
+        ? `<button class="action-btn remove-modules-button" title="Remove node_modules">
             ${Icons.trash}
           </button>`
         : ''
@@ -643,22 +1298,24 @@ async function populateCardContent(card, project) {
   const browserButton = card.querySelector(".browser-button");
   const editorButton = card.querySelector(".editor-button");
   const terminalButton = card.querySelector(".terminal-button");
+  const insightsButton = card.querySelector(".insights-button");
   const removeButton = card.querySelector(".remove-modules-button");
 
-  removeButton?.addEventListener("click", () => removeModulesFromProject(project.path));
-  playButton?.addEventListener("click", () => attemptRunProject(project.path));
-  stopButton?.addEventListener("click", () => stopProject(project.path));
-  installButton?.addEventListener("click", () => installProjectDependencies(project.path));
-  browserButton?.addEventListener("click", () => { if (runningInfo) openInBrowser(runningInfo.port); });
-  editorButton?.addEventListener("click", () => openInEditor(project.path));
-  terminalButton?.addEventListener("click", () => openInTerminal(project.path));
+  removeButton?.addEventListener("click", (e) => { e.stopPropagation(); removeModulesFromProject(project.path); });
+  playButton?.addEventListener("click", (e) => { e.stopPropagation(); attemptRunProject(project.path); });
+  stopButton?.addEventListener("click", (e) => { e.stopPropagation(); stopProject(project.path); });
+  installButton?.addEventListener("click", (e) => { e.stopPropagation(); installProjectDependencies(project.path); });
+  browserButton?.addEventListener("click", (e) => { e.stopPropagation(); if (runningInfo) openInBrowser(runningInfo.port); });
+  editorButton?.addEventListener("click", (e) => { e.stopPropagation(); openInEditor(project.path); });
+  terminalButton?.addEventListener("click", (e) => { e.stopPropagation(); openInTerminal(project.path); });
+  insightsButton?.addEventListener("click", (e) => { e.stopPropagation(); showProjectInsights(project.path); });
 }
 
 function getStatusIcon(type) {
   switch(type) {
     case 'success': return Icons.check;
     case 'error': return Icons.alertCircle;
-    case 'warning': return Icons.alertCircle;
+    case 'warning': return Icons.warning;
     default: return Icons.info;
   }
 }
@@ -677,7 +1334,9 @@ function formatRelativeTime(timestamp) {
   return new Date(timestamp).toLocaleDateString();
 }
 
+// =====================================================
 // Actions
+// =====================================================
 async function attemptRunProject(projectPath) {
   const depsInstalled = await areDependenciesInstalled(projectPath);
   if (!depsInstalled) {
@@ -697,114 +1356,22 @@ async function runProjectWithPort(projectPath, customPort = null) {
       setCardStatus(projectPath, result.error, 'error');
     } else if (result.message) {
       setCardStatus(projectPath, result.message, 'success');
-      setTimeout(() => clearCardStatus(projectPath), 3000);
     }
-    updateSingleCard(projectPath);
   } catch (err) {
-    setCardStatus(projectPath, err.message, 'error');
-    updateSingleCard(projectPath);
+    console.error("Error running project:", err);
+    setCardStatus(projectPath, 'Failed to start', 'error');
   }
 }
 
 async function stopProject(projectPath) {
-  if (!runningProjects.has(projectPath)) return;
-
-  try {
-    const stillAlive = await verifyProcessStatus(projectPath);
-    if (!stillAlive) {
-      runningProjects.delete(projectPath);
-      projectProcesses.delete(projectPath);
-      updateSingleCard(projectPath);
-      return;
-    }
-    setCardStatus(projectPath, 'Stopping...', 'info');
-    const result = await window.electronAPI.stopProject(projectPath);
-    if (!result.success) {
-      setCardStatus(projectPath, result.message || 'Failed to stop', 'error');
-    } else {
-      setCardStatus(projectPath, 'Stopped', 'success');
-      setTimeout(() => clearCardStatus(projectPath), 2000);
-    }
-    updateSingleCard(projectPath);
-  } catch (err) {
-    setCardStatus(projectPath, err.message, 'error');
-    updateSingleCard(projectPath);
-  }
-}
-
-async function verifyProcessStatus(projectPath) {
-  try {
-    const pid = projectProcesses.get(projectPath);
-    if (!pid) return false;
-    const isRunning = await window.electronAPI.checkProcessStatus(pid);
-    if (!isRunning) {
-      runningProjects.delete(projectPath);
-      projectProcesses.delete(projectPath);
-      for (const [p, path] of activeConnections.entries()) {
-        if (path === projectPath) activeConnections.delete(p);
-      }
-      updateSingleCard(projectPath);
-    }
-    return isRunning;
-  } catch (err) {
-    return false;
-  }
-}
-
-async function openInBrowser(port) {
-  try {
-    await window.electronAPI.openInBrowser(port);
-  } catch (err) {
-    console.error("Error opening browser:", err);
-  }
-}
-
-async function openInEditor(projectPath) {
-  if (defaultIDE) {
-    setCardStatus(projectPath, `Opening in ${defaultIDE.name}...`, 'info');
-    updateSingleCard(projectPath);
-    await window.electronAPI.openInEditor(projectPath, defaultIDE.command);
-    setTimeout(() => { clearCardStatus(projectPath); updateSingleCard(projectPath); }, 2000);
-    return;
-  }
+  setCardStatus(projectPath, 'Stopping...', 'info');
+  updateSingleCard(projectPath);
   
-  if (installedIDEs.length > 1) {
-    showIDEModal(projectPath);
-  } else if (installedIDEs.length === 1) {
-    await window.electronAPI.openInEditor(projectPath, installedIDEs[0].command);
-  } else {
-    await window.electronAPI.openInEditor(projectPath);
-  }
-}
-
-async function openInTerminal(projectPath) {
   try {
-    setCardStatus(projectPath, 'Opening terminal...', 'info');
-    updateSingleCard(projectPath);
-    
-    const terminalPreference = defaultTerminal ? defaultTerminal.command : null;
-    const result = await window.electronAPI.openInTerminal(projectPath, terminalPreference);
-    
-    if (result.success) {
-      setCardStatus(projectPath, 'Terminal opened', 'success');
-      setTimeout(() => { clearCardStatus(projectPath); updateSingleCard(projectPath); }, 2000);
-    } else {
-      setCardStatus(projectPath, result.error || 'Failed', 'error');
-      updateSingleCard(projectPath);
-    }
+    await window.electronAPI.stopProject(projectPath);
   } catch (err) {
-    setCardStatus(projectPath, err.message, 'error');
-    updateSingleCard(projectPath);
-  }
-}
-
-async function areDependenciesInstalled(projectPath) {
-  try {
-    const hasPackageJson = await window.electronAPI.fileExists(`${projectPath}/package.json`);
-    const hasNodeModules = await window.electronAPI.fileExists(`${projectPath}/node_modules`);
-    return hasPackageJson && hasNodeModules;
-  } catch (err) {
-    return false;
+    console.error("Error stopping project:", err);
+    setCardStatus(projectPath, 'Failed to stop', 'error');
   }
 }
 
@@ -813,152 +1380,156 @@ async function installProjectDependencies(projectPath) {
   updateSingleCard(projectPath);
   
   try {
-    const result = await window.electronAPI.installDependencies(projectPath);
-    if (result.success) {
-      setCardStatus(projectPath, 'Installed', 'success');
+    await window.electronAPI.installDependencies(projectPath);
+    setCardStatus(projectPath, 'Installed', 'success');
+    showNotification('Dependencies installed', 'success');
+    setTimeout(() => {
+      clearCardStatus(projectPath);
       updateSingleCard(projectPath);
-      setTimeout(() => clearCardStatus(projectPath), 3000);
-    } else {
-      setCardStatus(projectPath, 'Install failed', 'error');
-      updateSingleCard(projectPath);
-    }
+    }, 2000);
   } catch (err) {
-    setCardStatus(projectPath, err.message, 'error');
-    updateSingleCard(projectPath);
+    console.error("Error installing:", err);
+    setCardStatus(projectPath, 'Install failed', 'error');
+    showNotification('Installation failed', 'error');
   }
 }
 
-async function removeModulesFromProject(projectPath) {
-  const projectName = path.basename(projectPath);
-  showConfirmDialog("Remove node_modules", `Remove node_modules from "${projectName}"?`, projectPath);
-}
-
-async function actuallyRemoveModules(projectPath) {
-  setCardStatus(projectPath, 'Removing...', 'info');
-  try {
-    const result = await window.electronAPI.removeNodeModules(projectPath);
-    if (result.success) {
-      setCardStatus(projectPath, 'Removed', 'success');
-      updateSingleCard(projectPath);
-      setTimeout(() => clearCardStatus(projectPath), 3000);
-    } else {
-      setCardStatus(projectPath, result.message || 'Failed', 'error');
-      updateSingleCard(projectPath);
-    }
-  } catch (err) {
-    setCardStatus(projectPath, err.message, 'error');
-    updateSingleCard(projectPath);
-  }
-}
-
-// Modals
-function showDependencyModal(projectPath) {
-  pendingActionProject = projectPath;
-  dependencyModal.classList.remove("hidden");
-}
-
-async function showIDEModal(projectPath) {
-  pendingIdeProject = projectPath;
-  ideList.innerHTML = '<p class="text-xs text-muted text-center py-4">Loading...</p>';
-  ideModal.classList.remove("hidden");
-  
-  try {
-    installedIDEs = await window.electronAPI.getInstalledIDEs();
-  } catch (err) {
-    console.error('Error:', err);
-  }
-  
-  ideList.innerHTML = '';
-  
-  if (installedIDEs.length === 0) {
-    ideList.innerHTML = '<p class="text-xs text-muted text-center py-4">No IDEs detected</p>';
-    return;
-  }
-  
-  installedIDEs.forEach(ide => {
-    const button = document.createElement('button');
-    button.className = 'settings-option w-full';
-    button.innerHTML = `
-      <span class="settings-option-icon">${ide.icon}</span>
-      <span class="settings-option-name">${escapeHtml(ide.name)}</span>
-      ${Icons.arrowRight}
-    `;
-    button.addEventListener('click', () => handleIDESelection(ide.command));
-    ideList.appendChild(button);
-  });
-}
-
-async function handleIDESelection(ideCommand) {
-  if (pendingIdeProject) {
-    const projectPath = pendingIdeProject;
-    const ide = installedIDEs.find(i => i.command === ideCommand);
-    hideModals();
-    setCardStatus(projectPath, `Opening in ${ide?.name || 'editor'}...`, 'info');
-    updateSingleCard(projectPath);
-    await window.electronAPI.openInEditor(projectPath, ideCommand);
-    setTimeout(() => { clearCardStatus(projectPath); updateSingleCard(projectPath); }, 2000);
-  }
-}
-
-function showConfirmDialog(title, message, projectPath) {
-  document.getElementById("confirmTitle").textContent = title;
-  document.getElementById("confirmMessage").textContent = message;
+function removeModulesFromProject(projectPath) {
   pendingRemoveProject = projectPath;
+  document.getElementById('confirmMessage').textContent = 
+    'This will delete the node_modules folder. You will need to run npm install again.';
   confirmDialog.classList.remove("hidden");
 }
 
-async function handleModalInstall() {
-  if (pendingActionProject) {
-    const projectPath = pendingActionProject;
-    hideModals();
-    await installProjectDependencies(projectPath);
-  }
-}
-
-async function handleConfirmRemove() {
-  if (pendingRemoveProject) {
-    const projectPath = pendingRemoveProject;
-    hideModals();
-    await actuallyRemoveModules(projectPath);
-  }
-}
-
-async function handleUseDefaultPort() {
-  if (pendingPortProject) {
-    const projectPath = pendingPortProject;
-    hideModals();
-    await runProjectWithPort(projectPath, null);
-  }
-}
-
-async function handleUseCustomPort() {
-  const customPort = parseInt(customPortInput.value, 10);
+async function removeModules(projectPath) {
+  setCardStatus(projectPath, 'Removing...', 'info');
+  updateSingleCard(projectPath);
   
-  if (!customPortInput.value || isNaN(customPort) || customPort < 1000 || customPort > 65535) {
-    customPortInput.style.borderColor = '#f43f5e';
-    setTimeout(() => customPortInput.style.borderColor = '', 500);
-    return;
-  }
-  
-  if (pendingPortProject) {
-    const projectPath = pendingPortProject;
-    hideModals();
-    await runProjectWithPort(projectPath, customPort);
+  try {
+    await window.electronAPI.removeNodeModules(projectPath);
+    setCardStatus(projectPath, 'Removed', 'success');
+    showNotification('node_modules removed', 'success');
+    setTimeout(() => {
+      clearCardStatus(projectPath);
+      updateSingleCard(projectPath);
+    }, 2000);
+  } catch (err) {
+    console.error("Error removing:", err);
+    setCardStatus(projectPath, 'Remove failed', 'error');
+    showNotification('Failed to remove node_modules', 'error');
   }
 }
 
-// Status
-function setCardStatus(projectPath, message, type = 'info') {
+async function openInBrowser(port) {
+  try {
+    await window.electronAPI.openInBrowser(port);
+  } catch (err) {
+    console.error("Error opening browser:", err);
+    showNotification('Failed to open browser', 'error');
+  }
+}
+
+async function openInEditor(projectPath) {
+  try {
+    if (defaultIDE) {
+      await window.electronAPI.openInEditor(projectPath, defaultIDE.command);
+    } else if (installedIDEs.length === 1) {
+      await window.electronAPI.openInEditor(projectPath, installedIDEs[0].command);
+    } else if (installedIDEs.length > 1) {
+      // Show quick picker in command palette style
+      showIDEPicker(projectPath);
+    } else {
+      await window.electronAPI.openInEditor(projectPath, null);
+    }
+  } catch (err) {
+    console.error("Error opening editor:", err);
+    showNotification('Failed to open editor', 'error');
+  }
+}
+
+function showIDEPicker(projectPath) {
+  commandPalette.classList.remove('hidden');
+  commandInput.value = '';
+  commandInput.placeholder = 'Select an editor...';
+  commandInput.focus();
+  
+  commandItems = installedIDEs.map(ide => ({
+    type: 'ide',
+    id: ide.command,
+    title: ide.name,
+    desc: ide.command,
+    icon: `<span style="font-size: 16px;">${ide.icon}</span>`,
+    action: async () => {
+      hideCommandPalette();
+      await window.electronAPI.openInEditor(projectPath, ide.command);
+    }
+  }));
+  
+  commandResults.innerHTML = commandItems.map((cmd, index) => `
+    <div class="command-item ${index === 0 ? 'selected' : ''}" data-index="${index}">
+      <div class="command-item-icon">${cmd.icon}</div>
+      <div class="command-item-text">
+        <div class="command-item-title">${escapeHtml(cmd.title)}</div>
+        <div class="command-item-desc">${escapeHtml(cmd.desc)}</div>
+      </div>
+    </div>
+  `).join('');
+  
+  commandResults.querySelectorAll('.command-item').forEach((item, index) => {
+    item.addEventListener('click', () => executeCommand(commandItems[index]));
+  });
+  
+  commandSelectedIndex = 0;
+}
+
+async function openInTerminal(projectPath) {
+  try {
+    await window.electronAPI.openInTerminal(projectPath, defaultTerminal?.command || null);
+  } catch (err) {
+    console.error("Error opening terminal:", err);
+    showNotification('Failed to open terminal', 'error');
+  }
+}
+
+async function verifyProcessStatus(projectPath) {
+  const runningInfo = runningProjects.get(projectPath);
+  if (!runningInfo?.pid) return;
+  
+  try {
+    const isRunning = await window.electronAPI.checkProcessStatus(runningInfo.pid);
+    if (!isRunning) {
+      runningProjects.delete(projectPath);
+      projectProcesses.delete(projectPath);
+      updateSingleCard(projectPath);
+      updateRunningCount();
+    }
+  } catch (err) {
+    console.error("Error verifying process:", err);
+  }
+}
+
+// =====================================================
+// Helpers
+// =====================================================
+async function areDependenciesInstalled(projectPath) {
+  try {
+    const nodeModulesPath = projectPath + '/node_modules';
+    return await window.electronAPI.fileExists(nodeModulesPath);
+  } catch {
+    return false;
+  }
+}
+
+function setCardStatus(projectPath, message, type) {
   projectStatuses.set(projectPath, { message, type });
 }
 
 function clearCardStatus(projectPath) {
   projectStatuses.delete(projectPath);
-  updateSingleCard(projectPath);
 }
 
-// Utils
 function escapeHtml(text) {
+  if (!text) return '';
   const div = document.createElement('div');
   div.textContent = text;
   return div.innerHTML;
