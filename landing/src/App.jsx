@@ -13,7 +13,7 @@ export default function App() {
 
   // Update these with your actual GitHub username
   const GITHUB_USERNAME = "Toseef-Ahmad";
-  const REPO_NAME = "tafil";
+  const REPO_NAME = "Tafil";
   const RELEASES_URL = `https://github.com/${GITHUB_USERNAME}/${REPO_NAME}/releases`;
   const GITHUB_URL = `https://github.com/${GITHUB_USERNAME}/${REPO_NAME}`;
 

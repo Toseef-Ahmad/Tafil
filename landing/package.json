@@ -2,7 +2,7 @@
   "name": "tafil-landing",
   "version": "1.0.0",
   "type": "module",
-  "homepage": "https://Toseef-Ahmad.github.io/tafil",
+  "homepage": "https://Toseef-Ahmad.github.io/Tafil",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
