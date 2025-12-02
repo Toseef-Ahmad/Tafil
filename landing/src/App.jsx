@@ -457,8 +457,8 @@ export default function App() {
           </div>
           
           <div className="pt-8 border-t border-white/10 flex flex-col md:flex-row justify-between items-center gap-4 text-sm text-neutral-500">
-            <p>© 2024 Tafil. Built by <a href={`https://github.com/${GITHUB_USERNAME}`} target="_blank" rel="noopener noreferrer" className="text-green-400 hover:text-green-300">Touseef Ahmad</a></p>
-            <p>MIT License • Open Source</p>
+            <p>© 2025 Tafil. Built by <a href={`https://github.com/${GITHUB_USERNAME}`} target="_blank" rel="noopener noreferrer" className="text-green-400 hover:text-green-300">Touseef Ahmad</a></p>
+            <p>GPL 2.0 License • Open Source</p>
           </div>
         </div>
       </footer>
