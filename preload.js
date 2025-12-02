@@ -25,6 +25,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   openInEditor: (projectPath, ideCommand) => ipcRenderer.invoke('open-in-editor', projectPath, ideCommand),
   openInTerminal: (projectPath, terminalPreference) => ipcRenderer.invoke('open-in-terminal', projectPath, terminalPreference),
 
+  // ~~~~~~~~~~~~~~ External Process Detection ~~~~~~~~~~~~~~
+  detectExternalProcesses: () => ipcRenderer.invoke('detect-external-processes'),
+  checkPortProcess: (port) => ipcRenderer.invoke('check-port-process', port),
+
   // ~~~~~~~~~~~~~~ From main to renderer ~~~~~~~~~~~~~~
   onProjectStatus: (callback) => ipcRenderer.on('project-status', callback),
 

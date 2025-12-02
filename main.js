@@ -7,6 +7,7 @@ const fsPromises = require('fs').promises;
 const psTree = require('ps-tree');
 const { exec, spawn } = require('child_process');
 const portfinder = require('portfinder');
+const { detectExternalNodeProcesses, getProcessOnPort } = require('./utils/externalProcessDetector');
 const { scanNodeProjects } = require('./utils/gitScanner');
 
 const {
@@ -1314,11 +1315,46 @@ ipcMain.handle('play-project', async (_event, projectPath, customPort = null) =>
             error: `Port ${projectInfo.defaultPort} is already in use by another project managed by Tafil:\n${path.basename(ownership.projectPath)}\n\nPlease stop that project first, or use a custom port.`
           };
         } else {
-          // External process is using the port
+          // External process is using the port - check if it's this same project
           console.log(`⚠️ Port ${projectInfo.defaultPort} is occupied by an external process (not managed by Tafil)`);
+          
+          const externalProcess = await getProcessOnPort(projectInfo.defaultPort);
+          let errorMessage = `Port ${projectInfo.defaultPort} is already in use by another application (not managed by Tafil).`;
+          
+          if (externalProcess && externalProcess.projectPath) {
+            // Check if it's the same project
+            if (externalProcess.projectPath === projectPath) {
+              errorMessage = `This project is already running on port ${projectInfo.defaultPort} in an external terminal!\n\n` +
+                           `Command: ${externalProcess.command}\n` +
+                           `PID: ${externalProcess.pid}\n\n` +
+                           `Please:\n` +
+                           `- Stop the external process first, or\n` +
+                           `- Use this port to monitor it (coming soon!)`;
+            } else {
+              errorMessage = `Port ${projectInfo.defaultPort} is in use by another project:\n\n` +
+                           `Project: ${path.basename(externalProcess.projectPath)}\n` +
+                           `Command: ${externalProcess.command}\n` +
+                           `PID: ${externalProcess.pid}\n\n` +
+                           `Please:\n` +
+                           `- Stop that project, or\n` +
+                           `- Use a custom port for this project.`;
+            }
+          } else if (externalProcess) {
+            errorMessage = `Port ${projectInfo.defaultPort} is in use by:\n\n` +
+                         `Command: ${externalProcess.command}\n` +
+                         `PID: ${externalProcess.pid}\n\n` +
+                         `Please:\n` +
+                         `- Stop the external application, or\n` +
+                         `- Click "Custom Port" to specify a different port.`;
+          } else {
+            errorMessage += `\n\nPlease:\n` +
+                          `- Stop the external application using port ${projectInfo.defaultPort}, or\n` +
+                          `- Click "Custom Port" to specify a different port for this project.`;
+          }
+          
           return {
             success: false,
-            error: `Port ${projectInfo.defaultPort} is already in use by another application (not managed by Tafil).\n\nPlease:\n- Stop the external application using port ${projectInfo.defaultPort}, or\n- Click "Custom Port" to specify a different port for this project.`
+            error: errorMessage
           };
         }
       } else {
@@ -2309,6 +2345,33 @@ EOF`;
     return { success: true };
   } catch (err) {
     console.error('Error opening in terminal:', err);
+    return { success: false, error: err.message };
+  }
+});
+
+// ========================================
+// External Process Detection
+// ========================================
+
+// Detect all Node.js dev servers running on the machine
+ipcMain.handle('detect-external-processes', async () => {
+  try {
+    const externalProcesses = await detectExternalNodeProcesses();
+    console.log(`Found ${externalProcesses.length} external Node.js processes`);
+    return { success: true, processes: externalProcesses };
+  } catch (err) {
+    console.error('Error detecting external processes:', err);
+    return { success: false, error: err.message, processes: [] };
+  }
+});
+
+// Check what's running on a specific port
+ipcMain.handle('check-port-process', async (_event, port) => {
+  try {
+    const process = await getProcessOnPort(port);
+    return { success: true, process };
+  } catch (err) {
+    console.error(`Error checking port ${port}:`, err);
     return { success: false, error: err.message };
   }
 });

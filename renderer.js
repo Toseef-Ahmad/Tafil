@@ -92,6 +92,7 @@ const emptyStateScanFolder = document.getElementById("emptyStateScanFolder");
 let currentProjects = [];
 let filteredProjects = [];
 let runningProjects = new Map();
+let externalProjects = new Map(); // NEW: Track external running projects
 let projectProcesses = new Map();
 let activeConnections = new Map();
 let projectLogs = new Map();
@@ -357,9 +358,51 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }, 5000);
   
+  // Scan for external processes periodically
+  scanExternalProcesses();
+  setInterval(scanExternalProcesses, 10000); // Every 10 seconds
+  
   // Show empty state
   updateEmptyState();
 });
+
+// =====================================================
+// External Process Detection
+// =====================================================
+async function scanExternalProcesses() {
+  try {
+    const result = await window.electronAPI.detectExternalProcesses();
+    
+    if (result.success && result.processes) {
+      // Clear previous external projects
+      externalProjects.clear();
+      
+      // Add new external projects
+      result.processes.forEach(proc => {
+        if (proc.projectPath) {
+          // Only track external processes that have a detectable project path
+          externalProjects.set(proc.projectPath, {
+            port: proc.port,
+            pid: proc.pid,
+            command: proc.command,
+            status: 'external',
+            external: true
+          });
+        }
+      });
+      
+      // Update running count to include external projects
+      updateRunningCount();
+      
+      // Update any cards that match external projects
+      externalProjects.forEach((info, projectPath) => {
+        updateSingleCard(projectPath);
+      });
+    }
+  } catch (err) {
+    console.error('Error scanning external processes:', err);
+  }
+}
 
 // =====================================================
 // Keyboard Shortcuts
@@ -805,7 +848,7 @@ function switchView(view) {
 }
 
 function updateRunningCount() {
-  const count = runningProjects.size;
+  const count = runningProjects.size + externalProjects.size;
   runningNumEl.textContent = count;
   runningCountEl.classList.toggle('hidden', count === 0);
   allProjectsCountEl.textContent = currentProjects.length;
@@ -1336,7 +1379,8 @@ async function createProjectCard(project) {
 
 async function populateCardContent(card, project) {
   const isRunning = runningProjects.has(project.path);
-  const runningInfo = isRunning ? runningProjects.get(project.path) : null;
+  const isExternal = externalProjects.has(project.path);
+  const runningInfo = isRunning ? runningProjects.get(project.path) : (isExternal ? externalProjects.get(project.path) : null);
   const dependenciesInstalled = await areDependenciesInstalled(project.path);
   const projectName = project.name || path.basename(project.path);
   const cardStatus = projectStatuses.get(project.path);
@@ -1386,11 +1430,13 @@ async function populateCardContent(card, project) {
         }
       </div>
       <div class="flex flex-col items-end gap-1 flex-shrink-0">
-        ${isRunning 
-          ? `<span class="running-badge"><span class="dot"></span>Running</span>` 
+        ${isRunning || isExternal
+          ? `<span class="running-badge ${isExternal ? 'external' : ''}">
+               <span class="dot"></span>${isExternal ? 'External' : 'Running'}
+             </span>` 
           : ''
         }
-        ${isRunning && runningInfo?.framework 
+        ${(isRunning || isExternal) && runningInfo?.framework 
           ? `<span class="framework-badge ${runningInfo.framework.toLowerCase()}">${escapeHtml(runningInfo.framework)}</span>` 
           : ''
         }
@@ -1406,8 +1452,8 @@ async function populateCardContent(card, project) {
     
     <div class="flex items-center gap-2 text-xs mb-2 flex-wrap" style="color: ${textMuted};">
       <span class="flex items-center gap-1">${Icons.clock} ${timeStr}</span>
-      ${isRunning && runningInfo?.port 
-        ? `<span class="flex items-center gap-1 px-2 py-0.5 rounded" style="background: rgba(14,165,233,0.15); color: #0ea5e9;">${Icons.server} :${runningInfo.port}</span>` 
+      ${(isRunning || isExternal) && runningInfo?.port 
+        ? `<span class="flex items-center gap-1 px-2 py-0.5 rounded" style="background: ${isExternal ? 'rgba(59,130,246,0.15)' : 'rgba(14,165,233,0.15)'}; color: ${isExternal ? '#3b82f6' : '#0ea5e9'};">${Icons.server} :${runningInfo.port}</span>` 
         : ''
       }
       ${collectionNames.length > 0 
