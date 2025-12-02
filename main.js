@@ -597,6 +597,31 @@ function checkFullDiskAccess() {
 // ensureAdminPrivileges();
 // Once app is ready, create the tray
 app.whenReady().then(() => {
+  // Set dock icon on macOS
+  if (isMac && app.dock) {
+    const dockIconPath = path.join(__dirname, 'build', 'icon.png');
+    if (fs.existsSync(dockIconPath)) {
+      const dockIcon = nativeImage.createFromPath(dockIconPath);
+      if (!dockIcon.isEmpty()) {
+        app.dock.setIcon(dockIcon);
+        console.log('✅ Dock icon set');
+      }
+    }
+  }
+  
+  // Set app icon globally
+  const appIconPath = isMac 
+    ? path.join(__dirname, 'build', 'icon.png')
+    : isWindows 
+      ? path.join(__dirname, 'build', 'icon.ico')
+      : path.join(__dirname, 'build', 'icon.png');
+  
+  if (fs.existsSync(appIconPath)) {
+    console.log(`✅ App icon exists at: ${appIconPath}`);
+  } else {
+    console.warn(`⚠️ App icon not found at: ${appIconPath}`);
+  }
+  
   createWindow(); // Create the main window first
   checkFullDiskAccess(); // Ensure required permissions
   ensureFullPermissions();
@@ -684,10 +709,26 @@ function updateTrayMenu(runningProjectsMap) {
 // You can call updateTrayMenu(runningProcesses) whenever a project starts or stops
 
 function createWindow() {
+  // Set app icon based on platform
+  let iconPath;
+  if (isMac) {
+    // Try .icns first for better quality, fallback to .png
+    const icnsPath = path.join(__dirname, 'build', 'icon.icns');
+    const pngPath = path.join(__dirname, 'build', 'icon.png');
+    iconPath = fs.existsSync(icnsPath) ? icnsPath : pngPath;
+  } else if (isWindows) {
+    iconPath = path.join(__dirname, 'build', 'icon.ico');
+  } else {
+    iconPath = path.join(__dirname, 'build', 'icon.png');
+  }
+  
+  console.log(`Using app icon: ${iconPath}`);
+  
   mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
     title: 'Tafil',
+    icon: iconPath,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
@@ -1251,32 +1292,31 @@ ipcMain.handle('play-project', async (_event, projectPath, customPort = null) =>
     // Handle stderr
     child.stderr.on('data', (data) => {
       const error = data.toString();
-      console.error(`[${projectPath}] STDERR: ${error}`);
+      console.log(`[${projectPath}] STDERR: ${error}`);
       
-      // Send to renderer for logs, but don't treat as error unless it's critical
+      // Send to renderer for logs only - don't change project status based on stderr
+      // Most stderr output is just warnings, not actual fatal errors
       mainWindow?.webContents.send('project-logs', {
         projectPath,
         type: 'stderr',
         log: error,
       });
 
-      // Only treat as error if it contains actual error keywords (not warnings)
-      // Ignore CRA's "Something is already running on port" message if we're handling it
-      const isCriticalError = 
-        (error.toLowerCase().includes('error:') ||
-        error.toLowerCase().includes('failed') ||
-        error.toLowerCase().includes('cannot find') ||
-        error.toLowerCase().includes('eacces') ||
-        error.toLowerCase().includes('permission denied')) &&
-        !error.includes('Something is already running on port'); // CRA will prompt for alternative
-
-      if (isCriticalError) {
-        console.error(`Critical error detected in ${projectPath}`);
-        mainWindow?.webContents.send('project-status', {
-          projectPath,
-          status: 'error',
-          error: 'An error occurred. Check logs for details.',
-        });
+      // IMPORTANT: Don't mark project as error based on stderr content!
+      // Many frameworks output warnings to stderr that are NOT fatal errors.
+      // Examples that should NOT stop the project:
+      // - "fetch failed" (API call failed, not process crash)
+      // - "Warning:" messages
+      // - Deprecation notices
+      // - React/Next.js compilation warnings
+      // 
+      // Only the 'exit' event should determine if the project actually stopped.
+      // The process is still running even if it logs errors to stderr.
+      
+      // Just log it for debugging
+      const lowerError = error.toLowerCase();
+      if (lowerError.includes('eacces') || lowerError.includes('permission denied')) {
+        console.warn(`⚠️ Permission warning in ${projectPath}: ${error.substring(0, 100)}`);
       }
     });
 

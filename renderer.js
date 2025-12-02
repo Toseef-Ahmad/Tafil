@@ -1,4 +1,4 @@
-// renderer.js
+// renderer.js - Premium UI Version
 
 // Helper for path operations
 const path = {
@@ -7,6 +7,7 @@ const path = {
   }
 };
 
+// DOM Elements
 const infoEl = document.getElementById("info");
 const projectListEl = document.getElementById("projectList");
 const scanProjectsBtn = document.getElementById("scanProjectsBtn");
@@ -16,6 +17,8 @@ const darkModeToggle = document.getElementById("darkModeToggle");
 const refreshBtn = document.getElementById("refreshBtn");
 const ideCountEl = document.getElementById("ideCount");
 const ideCountNum = document.getElementById("ideCountNum");
+const moonIcon = document.getElementById("moonIcon");
+const sunIcon = document.getElementById("sunIcon");
 
 // Modal elements
 const dependencyModal = document.getElementById("dependencyModal");
@@ -52,65 +55,81 @@ const noIdeMessage = document.getElementById("noIdeMessage");
 const currentIdeDisplay = document.getElementById("currentIdeDisplay");
 const currentTerminalDisplay = document.getElementById("currentTerminalDisplay");
 
+// State
 let currentProjects = [];
 let filteredProjects = [];
-let runningProjects = new Map(); // projectPath -> { port, status, pid, startTime? }
-let projectProcesses = new Map(); // projectPath -> pid
-let activeConnections = new Map(); // port -> projectPath
-let projectLogs = new Map(); // projectPath -> [log lines]
-let projectStats = new Map(); // projectPath -> { memory, cpu, etc. }
-let projectStatuses = new Map(); // projectPath -> { message, type: 'info'|'success'|'error'|'warning' }
+let runningProjects = new Map();
+let projectProcesses = new Map();
+let activeConnections = new Map();
+let projectLogs = new Map();
+let projectStats = new Map();
+let projectStatuses = new Map();
 let lastRefreshTime = Date.now();
-let pendingActionProject = null; // For modal dialogs
-let pendingRemoveProject = null; // For confirmation dialog
-let pendingPortProject = null; // For custom port modal
-let pendingIdeProject = null; // For IDE selector modal
-let installedIDEs = []; // Cache of detected IDEs
-let installedTerminals = []; // Cache of detected Terminals
-let isDarkMode = true; // Default is dark mode
+let pendingActionProject = null;
+let pendingRemoveProject = null;
+let pendingPortProject = null;
+let pendingIdeProject = null;
+let installedIDEs = [];
+let installedTerminals = [];
+let isDarkMode = true;
 
 // Settings
-let defaultIDE = null; // { name, command }
-let defaultTerminal = null; // { name, command }
+let defaultIDE = null;
+let defaultTerminal = null;
 
-const REFRESH_INTERVAL = 60000; // 60 seconds
-const REFRESH_THROTTLE = 5000; // Minimum time between refreshes
+const REFRESH_INTERVAL = 60000;
+const REFRESH_THROTTLE = 5000;
 
+// Lucide-style SVG Icons
+const Icons = {
+  play: '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="5 3 19 12 5 21 5 3"/></svg>',
+  stop: '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="none"><rect width="14" height="14" x="5" y="5" rx="1"/></svg>',
+  globe: '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>',
+  code: '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>',
+  terminal: '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" x2="20" y1="19" y2="19"/></svg>',
+  trash: '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>',
+  download: '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>',
+  folder: '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/></svg>',
+  clock: '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>',
+  gitBranch: '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" x2="6" y1="3" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg>',
+  externalLink: '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" x2="21" y1="14" y2="3"/></svg>',
+  server: '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="8" x="2" y="2" rx="2" ry="2"/><rect width="20" height="8" x="2" y="14" rx="2" ry="2"/><line x1="6" x2="6.01" y1="6" y2="6"/><line x1="6" x2="6.01" y1="18" y2="18"/></svg>',
+  check: '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>',
+  info: '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>',
+  alertCircle: '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>',
+  arrowRight: '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>',
+};
+
+// Initialize
 document.addEventListener("DOMContentLoaded", async () => {
-  infoEl.textContent = 'Click "Scan Home" to find Node.js projects, or "Scan Folder" to choose a custom directory.';
+  infoEl.textContent = 'Click "Scan Home" to find Node.js projects';
   
-  // Load installed IDEs and Terminals on startup
+  // Load installed IDEs and Terminals
   try {
     installedIDEs = await window.electronAPI.getInstalledIDEs();
-    console.log(`Detected ${installedIDEs.length} installed IDEs:`, installedIDEs);
-    
-    // Update IDE count display
     if (installedIDEs.length > 0) {
       ideCountNum.textContent = installedIDEs.length;
-      ideCountEl.style.display = 'block';
+      ideCountEl.classList.remove('hidden');
     }
   } catch (err) {
-    console.error('Error loading installed IDEs:', err);
+    console.error('Error loading IDEs:', err);
   }
   
   try {
     installedTerminals = await window.electronAPI.getInstalledTerminals();
-    console.log(`Detected ${installedTerminals.length} installed Terminals:`, installedTerminals);
   } catch (err) {
-    console.error('Error loading installed Terminals:', err);
+    console.error('Error loading Terminals:', err);
   }
   
-  // Button event listeners
+  // Event listeners
   scanProjectsBtn.addEventListener("click", renderProjects);
   scanCustomBtn.addEventListener("click", renderCustomProjects);
   darkModeToggle.addEventListener("click", toggleDarkMode);
   refreshBtn.addEventListener("click", () => {
-    const projectsToRefresh = filteredProjects.length > 0 ? currentProjects : currentProjects;
-    renderProjectCards(projectsToRefresh);
-    infoEl.textContent = 'Projects refreshed!';
+    renderProjectCards(currentProjects);
+    infoEl.textContent = 'Projects refreshed';
   });
   
-  // Search input listener
   searchInput.addEventListener("input", handleSearch);
   
   // Modal listeners
@@ -120,7 +139,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   confirmYesBtn.addEventListener("click", handleConfirmRemove);
   closeLogsBtn.addEventListener("click", () => logsModal.classList.add("hidden"));
   
-  // Custom Port Modal listeners
   cancelPortBtn.addEventListener("click", hideModals);
   useDefaultPortBtn.addEventListener("click", handleUseDefaultPort);
   useCustomPortBtn.addEventListener("click", handleUseCustomPort);
@@ -128,91 +146,59 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (e.key === 'Enter') handleUseCustomPort();
   });
   
-  // IDE Modal listeners
   cancelIdeBtn.addEventListener("click", hideModals);
   
-  // Settings Modal listeners
   settingsBtn.addEventListener("click", showSettingsModal);
   closeSettingsBtn.addEventListener("click", hideSettingsModal);
   cancelSettingsBtn.addEventListener("click", hideSettingsModal);
   saveSettingsBtn.addEventListener("click", saveSettings);
   
-  // Load settings from localStorage
-  loadSettings();
-  
-  // Update UI to show current settings
-  updateSettingsDisplay();
-  
   // Click outside modals to close
-  dependencyModal.addEventListener("click", (e) => {
-    if (e.target === dependencyModal) hideModals();
-  });
-  confirmDialog.addEventListener("click", (e) => {
-    if (e.target === confirmDialog) hideModals();
-  });
-  logsModal.addEventListener("click", (e) => {
-    if (e.target === logsModal) logsModal.classList.add("hidden");
-  });
-  customPortModal.addEventListener("click", (e) => {
-    if (e.target === customPortModal) hideModals();
-  });
-  ideModal.addEventListener("click", (e) => {
-    if (e.target === ideModal) hideModals();
-  });
-  settingsModal.addEventListener("click", (e) => {
-    if (e.target === settingsModal) hideSettingsModal();
+  [dependencyModal, confirmDialog, logsModal, customPortModal, ideModal, settingsModal].forEach(modal => {
+    modal.addEventListener("click", (e) => {
+      if (e.target === modal) {
+        if (modal === settingsModal) hideSettingsModal();
+        else if (modal === logsModal) logsModal.classList.add("hidden");
+        else hideModals();
+      }
+    });
   });
   
   // Keyboard shortcuts
   document.addEventListener("keydown", handleKeyboardShortcuts);
 
-  // Listen for project status from main
+  // Listen for project status updates
   window.electronAPI.onProjectStatus((_event, statusData) => {
-    const { projectPath, status, port, error, code, signal, pid, framework } = statusData;
-    console.log("Project Status Update:", statusData);
+    const { projectPath, status, port, error, pid, framework } = statusData;
+    console.log("Project Status:", statusData);
 
     if (status === "running") {
-      runningProjects.set(projectPath, { 
-        port, 
-        status: "running", 
-        pid,
-        framework: framework || 'Unknown'
-      });
+      runningProjects.set(projectPath, { port, status: "running", pid, framework: framework || 'Unknown' });
       projectProcesses.set(projectPath, pid);
       activeConnections.set(port, projectPath);
-      
-      const frameworkText = framework ? ` (${framework})` : '';
-      setCardStatus(projectPath, `Running${frameworkText} on port ${port}`, 'success');
+      setCardStatus(projectPath, `Running on :${port}`, 'success');
       setTimeout(() => clearCardStatus(projectPath), 3000);
     } else if (status === "stopped") {
       runningProjects.delete(projectPath);
       projectProcesses.delete(projectPath);
-      // remove from activeConnections
       for (const [p, path] of activeConnections.entries()) {
-        if (path === projectPath) {
-          activeConnections.delete(p);
-        }
+        if (path === projectPath) activeConnections.delete(p);
       }
-      setCardStatus(projectPath, 'Project stopped successfully', 'success');
+      setCardStatus(projectPath, 'Stopped', 'success');
       setTimeout(() => clearCardStatus(projectPath), 2000);
     } else if (status === "error") {
-      // It's truly an error if main says so
       runningProjects.delete(projectPath);
       projectProcesses.delete(projectPath);
-      setCardStatus(projectPath, `Error: ${error || "Unknown error"}`, 'error');
-      console.error(`Project ${projectPath} error:`, error, code, signal);
+      setCardStatus(projectPath, error || "Error occurred", 'error');
     }
 
-    // Update only the affected card instead of re-rendering everything
     updateSingleCard(projectPath);
   });
 
-  // Listen for tray actions
+  // Tray actions
   window.electronAPI.onTrayOpenBrowser((_event, projectPath) => {
     const project = runningProjects.get(projectPath);
-    if (project?.port) {
-      openInBrowser(project.port);
-    }
+    if (project?.port) openInBrowser(project.port);
   });
 
   window.electronAPI.onTrayOpenEditor((_event, projectPath) => {
@@ -223,83 +209,53 @@ document.addEventListener("DOMContentLoaded", async () => {
     stopProject(projectPath);
   });
 
-  // Listen for project logs (stderr, etc.)
+  // Project logs
   window.electronAPI.onProjectLogs?.((_event, logData) => {
     const { projectPath, type, log } = logData;
-    // e.g., store the logs in a Map and render them in the UI
     const existingLogs = projectLogs.get(projectPath) || [];
     existingLogs.push(`[${type}] ${log}`);
     projectLogs.set(projectPath, existingLogs);
-
-    // Update the card display for logs
-    const card = document.querySelector(`[data-project-path="${projectPath}"]`);
-    if (card) {
-      const project = currentProjects.find(p => p.path === projectPath);
-      if (project) {
-        populateCardContent(card, project);
-      }
-    }
   });
 
-  // Optional: auto refresh
+  // Auto refresh
   setInterval(() => {
-    const now = Date.now();
-    if (
-      document.visibilityState === "visible" &&
-      now - lastRefreshTime >= REFRESH_THROTTLE
-    ) {
-      lastRefreshTime = now;
+    if (document.visibilityState === "visible" && Date.now() - lastRefreshTime >= REFRESH_THROTTLE) {
+      lastRefreshTime = Date.now();
       softRefreshProjects();
     }
   }, REFRESH_INTERVAL);
 
-  // Periodically verify processes
+  // Verify processes
   setInterval(async () => {
     for (const [projectPath] of runningProjects) {
       await verifyProcessStatus(projectPath);
     }
   }, 5000);
   
-  // Load dark mode preference
   loadDarkModePreference();
+  loadSettings();
 });
 
-/**
- * Handle keyboard shortcuts
- */
+// Keyboard shortcuts
 function handleKeyboardShortcuts(e) {
-  // Ctrl/Cmd + K: Focus search
   if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
     e.preventDefault();
     searchInput.focus();
     searchInput.select();
   }
   
-  // Ctrl/Cmd + R: Refresh projects
   if ((e.ctrlKey || e.metaKey) && e.key === 'r') {
     e.preventDefault();
     renderProjects();
   }
   
-  // Escape: Close modals
   if (e.key === 'Escape') {
     hideModals();
+    hideSettingsModal();
     logsModal.classList.add("hidden");
-  }
-  
-  // Ctrl/Cmd + O: Open selected project in editor
-  if ((e.ctrlKey || e.metaKey) && e.key === 'o') {
-    e.preventDefault();
-    const firstProject = currentProjects[0];
-    if (firstProject) {
-      openInEditor(firstProject.path);
-    }
   }
 }
 
-/**
- * Hide all modals
- */
 function hideModals() {
   dependencyModal.classList.add("hidden");
   confirmDialog.classList.add("hidden");
@@ -311,53 +267,24 @@ function hideModals() {
   pendingIdeProject = null;
 }
 
-/**
- * Hide settings modal
- */
 function hideSettingsModal() {
   settingsModal.classList.add("hidden");
 }
 
-/**
- * Load settings from localStorage
- */
+// Settings
 function loadSettings() {
   try {
-    const savedDefaultIDE = localStorage.getItem('defaultIDE');
-    const savedDefaultTerminal = localStorage.getItem('defaultTerminal');
-    
-    if (savedDefaultIDE) {
-      defaultIDE = JSON.parse(savedDefaultIDE);
-    }
-    
-    if (savedDefaultTerminal) {
-      defaultTerminal = JSON.parse(savedDefaultTerminal);
-    }
-    
-    console.log('✅ Settings loaded:', { defaultIDE, defaultTerminal });
+    const savedIDE = localStorage.getItem('defaultIDE');
+    const savedTerminal = localStorage.getItem('defaultTerminal');
+    if (savedIDE) defaultIDE = JSON.parse(savedIDE);
+    if (savedTerminal) defaultTerminal = JSON.parse(savedTerminal);
   } catch (err) {
     console.error('Error loading settings:', err);
   }
 }
 
-/**
- * Update UI to show current settings
- */
-function updateSettingsDisplay() {
-  if (defaultIDE) {
-    console.log(`Default IDE set to: ${defaultIDE.name}`);
-  }
-  if (defaultTerminal) {
-    console.log(`Default Terminal set to: ${defaultTerminal.name}`);
-  }
-}
-
-/**
- * Save settings to localStorage
- */
 function saveSettings() {
   try {
-    // Get selected IDE
     const selectedIdeRadio = document.querySelector('input[name="defaultIDE"]:checked');
     if (selectedIdeRadio) {
       const ideIndex = parseInt(selectedIdeRadio.value);
@@ -368,89 +295,58 @@ function saveSettings() {
         defaultIDE = null;
         localStorage.removeItem('defaultIDE');
       }
-    } else {
-      defaultIDE = null;
-      localStorage.removeItem('defaultIDE');
     }
     
-    // Get selected Terminal
     const selectedTerminalRadio = document.querySelector('input[name="defaultTerminal"]:checked');
     if (selectedTerminalRadio) {
       const terminalCommand = selectedTerminalRadio.value;
       if (terminalCommand === 'system-default') {
-        defaultTerminal = null; // Use system default
+        defaultTerminal = null;
         localStorage.removeItem('defaultTerminal');
       } else {
-        // Find the terminal in the installed list to get full info
         const terminal = installedTerminals.find(t => t.command === terminalCommand);
         if (terminal) {
           defaultTerminal = { name: terminal.name, command: terminal.command };
           localStorage.setItem('defaultTerminal', JSON.stringify(defaultTerminal));
-        } else {
-          defaultTerminal = null;
-          localStorage.removeItem('defaultTerminal');
         }
       }
-    } else {
-      defaultTerminal = null;
-      localStorage.removeItem('defaultTerminal');
-    }
-    
-    console.log('✅ Settings saved:', { defaultIDE, defaultTerminal });
-    
-    // Log what will be used
-    if (defaultIDE) {
-      console.log(`📌 Default IDE: ${defaultIDE.name} (${defaultIDE.command})`);
-    } else {
-      console.log('📌 No default IDE set - will ask each time');
-    }
-    
-    if (defaultTerminal) {
-      console.log(`📌 Default Terminal: ${defaultTerminal.name}`);
-    } else {
-      console.log('📌 Using system default terminal');
     }
     
     hideSettingsModal();
-    
-    // Show success message
-    infoEl.textContent = 'Settings saved successfully!';
+    infoEl.textContent = 'Settings saved';
     setTimeout(() => {
       if (currentProjects.length > 0) {
-        infoEl.textContent = `Found ${currentProjects.length} Node.js project(s).`;
+        infoEl.textContent = `${currentProjects.length} projects`;
       }
     }, 2000);
   } catch (err) {
     console.error('Error saving settings:', err);
-    infoEl.textContent = 'Error saving settings. Please try again.';
   }
 }
 
-/**
- * Show settings modal
- */
 async function showSettingsModal() {
-  // Show current settings
+  // Update current displays
   if (defaultIDE) {
-    currentIdeDisplay.textContent = `Current: ${defaultIDE.name}`;
+    currentIdeDisplay.textContent = defaultIDE.name;
     currentIdeDisplay.classList.remove('hidden');
   } else {
     currentIdeDisplay.classList.add('hidden');
   }
   
   if (defaultTerminal) {
-    currentTerminalDisplay.textContent = `Current: ${defaultTerminal.name}`;
+    currentTerminalDisplay.textContent = defaultTerminal.name;
     currentTerminalDisplay.classList.remove('hidden');
   } else {
-    currentTerminalDisplay.textContent = 'Current: System Default';
+    currentTerminalDisplay.textContent = 'System Default';
     currentTerminalDisplay.classList.remove('hidden');
   }
   
-  // Refresh IDE list
+  // Refresh lists
   try {
     installedIDEs = await window.electronAPI.getInstalledIDEs();
+    installedTerminals = await window.electronAPI.getInstalledTerminals();
   } catch (err) {
-    console.error('Error refreshing IDEs:', err);
+    console.error('Error refreshing:', err);
   }
   
   // Populate IDE list
@@ -460,345 +356,94 @@ async function showSettingsModal() {
   } else {
     noIdeMessage.classList.add('hidden');
     
-    // Add "None" option
-    const noneIdeOption = document.createElement('label');
-    noneIdeOption.className = 'flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-gray-700/50 to-gray-800/50 hover:from-purple-600/20 hover:to-purple-700/20 rounded-xl cursor-pointer transition-all duration-200 border-2 border-transparent hover:border-purple-500/30 group';
-    noneIdeOption.innerHTML = `
-      <input type="radio" name="defaultIDE" value="-1" ${!defaultIDE ? 'checked' : ''} class="w-5 h-5 text-purple-500 focus:ring-2 focus:ring-purple-500">
-      <i class="fas fa-question-circle text-2xl text-gray-400 group-hover:text-purple-400 transition-colors"></i>
-      <span class="flex-1 text-white font-medium group-hover:text-purple-300 transition-colors">None (Always ask)</span>
-      ${!defaultIDE ? '<i class="fas fa-check-circle text-purple-500"></i>' : ''}
-    `;
-    defaultIdeList.appendChild(noneIdeOption);
+    // None option
+    const noneOption = createSettingsOption(-1, 'defaultIDE', '❓', 'None (Always ask)', !defaultIDE);
+    defaultIdeList.appendChild(noneOption);
     
-    // Add IDE options
     installedIDEs.forEach((ide, index) => {
-      const ideOption = document.createElement('label');
       const isSelected = defaultIDE && defaultIDE.command === ide.command;
-      ideOption.className = `flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-gray-700/50 to-gray-800/50 hover:from-purple-600/20 hover:to-purple-700/20 rounded-xl cursor-pointer transition-all duration-200 border-2 ${isSelected ? 'border-purple-500/50 bg-purple-500/10' : 'border-transparent hover:border-purple-500/30'} group`;
-      ideOption.innerHTML = `
-        <input type="radio" name="defaultIDE" value="${index}" ${isSelected ? 'checked' : ''} class="w-5 h-5 text-purple-500 focus:ring-2 focus:ring-purple-500">
-        <span class="text-3xl">${ide.icon}</span>
-        <span class="flex-1 text-white font-medium group-hover:text-purple-300 transition-colors">${escapeHtml(ide.name)}</span>
-        ${isSelected ? '<i class="fas fa-check-circle text-purple-500"></i>' : ''}
-      `;
-      defaultIdeList.appendChild(ideOption);
+      const option = createSettingsOption(index, 'defaultIDE', ide.icon, ide.name, isSelected);
+      defaultIdeList.appendChild(option);
     });
   }
   
-  // Populate Terminal list - Refresh from backend
+  // Populate Terminal list
   defaultTerminalList.innerHTML = '';
+  const isSystemDefault = !defaultTerminal;
+  const systemOption = createSettingsOption('system-default', 'defaultTerminal', '🖥️', 'System Default', isSystemDefault);
+  defaultTerminalList.appendChild(systemOption);
   
-  try {
-    installedTerminals = await window.electronAPI.getInstalledTerminals();
-    console.log(`Refreshed terminal list: ${installedTerminals.length} terminals detected`);
-  } catch (err) {
-    console.error('Error refreshing terminals:', err);
-  }
-  
-  // Add "System Default" option first
-  const systemDefaultOption = document.createElement('label');
-  const isSystemDefault = !defaultTerminal || defaultTerminal.command === 'system-default';
-  systemDefaultOption.className = `flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-gray-700/50 to-gray-800/50 hover:from-green-600/20 hover:to-green-700/20 rounded-xl cursor-pointer transition-all duration-200 border-2 ${isSystemDefault ? 'border-green-500/50 bg-green-500/10' : 'border-transparent hover:border-green-500/30'} group`;
-  systemDefaultOption.innerHTML = `
-    <input type="radio" name="defaultTerminal" value="system-default" ${isSystemDefault ? 'checked' : ''} class="w-5 h-5 text-green-500 focus:ring-2 focus:ring-green-500">
-    <span class="text-3xl">🖥️</span>
-    <span class="flex-1 text-white font-medium group-hover:text-green-300 transition-colors">System Default (Auto-detect)</span>
-    ${isSystemDefault ? '<i class="fas fa-check-circle text-green-500"></i>' : ''}
-  `;
-  defaultTerminalList.appendChild(systemDefaultOption);
-  
-  // Add detected terminals
-  if (installedTerminals.length > 0) {
-    installedTerminals.forEach((terminal) => {
-      const terminalOption = document.createElement('label');
-      const isSelected = defaultTerminal && defaultTerminal.command === terminal.command;
-      terminalOption.className = `flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-gray-700/50 to-gray-800/50 hover:from-green-600/20 hover:to-green-700/20 rounded-xl cursor-pointer transition-all duration-200 border-2 ${isSelected ? 'border-green-500/50 bg-green-500/10' : 'border-transparent hover:border-green-500/30'} group`;
-      terminalOption.innerHTML = `
-        <input type="radio" name="defaultTerminal" value="${terminal.command}" ${isSelected ? 'checked' : ''} class="w-5 h-5 text-green-500 focus:ring-2 focus:ring-green-500">
-        <span class="text-3xl">${terminal.icon}</span>
-        <span class="flex-1 text-white font-medium group-hover:text-green-300 transition-colors">${escapeHtml(terminal.name)}</span>
-        ${isSelected ? '<i class="fas fa-check-circle text-green-500"></i>' : ''}
-      `;
-      defaultTerminalList.appendChild(terminalOption);
-    });
-  } else {
-    const noTerminalsMsg = document.createElement('p');
-    noTerminalsMsg.className = 'text-sm text-gray-500 mt-2';
-    noTerminalsMsg.textContent = 'No additional terminals detected. Using system default.';
-    defaultTerminalList.appendChild(noTerminalsMsg);
-  }
+  installedTerminals.forEach((terminal) => {
+    const isSelected = defaultTerminal && defaultTerminal.command === terminal.command;
+    const option = createSettingsOption(terminal.command, 'defaultTerminal', terminal.icon, terminal.name, isSelected);
+    defaultTerminalList.appendChild(option);
+  });
   
   settingsModal.classList.remove("hidden");
 }
 
-/**
- * Show dependency modal
- */
-function showDependencyModal(projectPath) {
-  pendingActionProject = projectPath;
-  dependencyModal.classList.remove("hidden");
+function createSettingsOption(value, name, icon, label, isSelected) {
+  const option = document.createElement('label');
+  option.className = `settings-option ${isSelected ? 'selected' : ''}`;
+  option.innerHTML = `
+    <input type="radio" name="${name}" value="${value}" ${isSelected ? 'checked' : ''} />
+    <span class="settings-option-icon">${icon}</span>
+    <span class="settings-option-name">${escapeHtml(label)}</span>
+    ${isSelected ? Icons.check : ''}
+  `;
+  return option;
 }
 
-/**
- * Show custom port modal
- */
-async function showCustomPortModal(projectPath) {
-  pendingPortProject = projectPath;
-  
-  // Get project info to show default port
-  const projectInfo = currentProjects.find(p => p.path === projectPath);
-  const defaultPort = projectInfo?.defaultPort || 3000;
-  
-  defaultPortDisplay.textContent = defaultPort;
-  customPortInput.value = '';
-  customPortInput.placeholder = `Default: ${defaultPort}`;
-  
-  customPortModal.classList.remove("hidden");
-  setTimeout(() => customPortInput.focus(), 100);
-}
-
-/**
- * Show IDE selector modal
- */
-async function showIDEModal(projectPath) {
-  pendingIdeProject = projectPath;
-  
-  // Show loading state
-  ideList.innerHTML = '<p class="text-gray-400 text-center">Detecting IDEs...</p>';
-  ideModal.classList.remove("hidden");
-  
-  // Refresh IDE list to ensure we have the latest
-  try {
-    installedIDEs = await window.electronAPI.getInstalledIDEs();
-    console.log(`Refreshed IDE list: ${installedIDEs.length} IDEs detected`);
-    
-    // Update IDE count display
-    if (installedIDEs.length > 0) {
-      ideCountNum.textContent = installedIDEs.length;
-      ideCountEl.style.display = 'block';
-    }
-  } catch (err) {
-    console.error('Error refreshing installed IDEs:', err);
-  }
-  
-  // Populate IDE list
-  ideList.innerHTML = '';
-  
-  if (installedIDEs.length === 0) {
-    ideList.innerHTML = '<p class="text-gray-400 text-center">No IDEs detected. Opening in file manager...</p>';
-    setTimeout(() => {
-      hideModals();
-      window.electronAPI.openInEditor(projectPath);
-    }, 1500);
-    return;
-  }
-  
-  installedIDEs.forEach(ide => {
-    const button = document.createElement('button');
-    button.className = 'w-full px-4 py-3 bg-gray-700 hover:bg-gray-600 rounded-lg text-white font-medium transition flex items-center gap-3';
-    button.innerHTML = `
-      <span class="text-2xl">${ide.icon}</span>
-      <span class="flex-1 text-left">${escapeHtml(ide.name)}</span>
-      <i class="fas fa-arrow-right text-gray-400"></i>
-    `;
-    button.addEventListener('click', () => handleIDESelection(ide.command));
-    ideList.appendChild(button);
-  });
-}
-
-/**
- * Handle IDE selection
- */
-async function handleIDESelection(ideCommand) {
-  if (pendingIdeProject) {
-    // Save project path before hiding modal (which clears pendingIdeProject)
-    const projectPath = pendingIdeProject;
-    
-    // Find IDE name for better user feedback
-    const ide = installedIDEs.find(i => i.command === ideCommand);
-    const ideName = ide ? ide.name : ideCommand;
-    
-    hideModals();
-    setCardStatus(projectPath, `Opening in ${ideName}...`, 'info');
-    updateSingleCard(projectPath); // Show status immediately
-    await window.electronAPI.openInEditor(projectPath, ideCommand);
-    setTimeout(() => {
-      clearCardStatus(projectPath);
-      updateSingleCard(projectPath);
-    }, 2000);
-  }
-}
-
-/**
- * Handle use default port
- */
-async function handleUseDefaultPort() {
-  if (pendingPortProject) {
-    const projectPath = pendingPortProject; // Save before hiding modal
-    hideModals();
-    await runProjectWithPort(projectPath, null);
-  }
-}
-
-/**
- * Handle use custom port
- */
-async function handleUseCustomPort() {
-  const customPort = parseInt(customPortInput.value, 10);
-  
-  if (!customPortInput.value || isNaN(customPort)) {
-    customPortInput.classList.add('border-red-500');
-    setTimeout(() => customPortInput.classList.remove('border-red-500'), 500);
-    return;
-  }
-  
-  if (customPort < 1000 || customPort > 65535) {
-    if (pendingPortProject) {
-      setCardStatus(pendingPortProject, 'Port must be between 1000 and 65535', 'error');
-    }
-    customPortInput.classList.add('border-red-500');
-    setTimeout(() => customPortInput.classList.remove('border-red-500'), 500);
-    return;
-  }
-  
-  if (pendingPortProject) {
-    const projectPath = pendingPortProject; // Save before hiding modal
-    hideModals();
-    await runProjectWithPort(projectPath, customPort);
-  }
-}
-
-/**
- * Run project with specified port (or auto)
- */
-async function runProjectWithPort(projectPath, customPort = null) {
-  setCardStatus(projectPath, customPort 
-    ? `Starting on custom port ${customPort}...`
-    : `Starting project...`, 'info');
-  updateSingleCard(projectPath); // Show loading status immediately
-  
-  try {
-    const result = await window.electronAPI.playProject(projectPath, customPort);
-    if (result.error) {
-      setCardStatus(projectPath, `Error: ${result.error}`, 'error');
-      updateSingleCard(projectPath);
-    } else if (result.message) {
-      setCardStatus(projectPath, result.message, 'success');
-      updateSingleCard(projectPath);
-      setTimeout(() => clearCardStatus(projectPath), 3000);
-    }
-  } catch (err) {
-    console.error("Error running project:", err);
-    setCardStatus(projectPath, `Error: ${err.message}`, 'error');
-    updateSingleCard(projectPath);
-  }
-}
-
-/**
- * Show confirmation dialog
- */
-function showConfirmDialog(title, message, projectPath) {
-  document.getElementById("confirmTitle").textContent = title;
-  document.getElementById("confirmMessage").textContent = message;
-  pendingRemoveProject = projectPath;
-  confirmDialog.classList.remove("hidden");
-}
-
-/**
- * Handle modal install button
- */
-async function handleModalInstall() {
-  if (pendingActionProject) {
-    hideModals();
-    await installProjectDependencies(pendingActionProject);
-  }
-}
-
-/**
- * Handle confirm remove button
- */
-async function handleConfirmRemove() {
-  if (pendingRemoveProject) {
-    const projectPath = pendingRemoveProject;
-    hideModals();
-    await actuallyRemoveModules(projectPath);
-  }
-}
-
-/**
- * Handle search input - Instant search with debouncing
- */
+// Search
 let searchTimeout = null;
 function handleSearch(e) {
   const searchTerm = e.target.value.toLowerCase().trim();
   
-  // Clear previous timeout
-  if (searchTimeout) {
-    clearTimeout(searchTimeout);
-  }
-  
-  // Instant search (no debounce for better UX)
   if (!searchTerm) {
     filteredProjects = [];
     renderProjectCards(currentProjects);
-    infoEl.textContent = `Showing ${currentProjects.length} project(s).`;
+    infoEl.textContent = `${currentProjects.length} projects`;
     return;
   }
   
-  // Enhanced search - search in name, path, and git branch
   filteredProjects = currentProjects.filter(project => {
     const nameMatch = project.name.toLowerCase().includes(searchTerm);
     const pathMatch = project.path.toLowerCase().includes(searchTerm);
-    const branchMatch = project.message && 
-      project.message.toLowerCase().includes(searchTerm) &&
-      !['no commits yet', 'no git history', 'git error'].includes(project.message.toLowerCase());
-    
+    const branchMatch = project.message?.toLowerCase().includes(searchTerm);
     return nameMatch || pathMatch || branchMatch;
   });
   
   renderProjectCards(filteredProjects);
   infoEl.textContent = filteredProjects.length > 0 
-    ? `Found ${filteredProjects.length} project(s) matching "${e.target.value}"`
-    : `No projects found matching "${e.target.value}"`;
+    ? `${filteredProjects.length} results for "${e.target.value}"`
+    : `No results for "${e.target.value}"`;
 }
 
-/**
- * Toggle dark mode
- */
+// Dark mode
 function toggleDarkMode() {
   isDarkMode = !isDarkMode;
   document.body.classList.toggle('light-mode', !isDarkMode);
-  
-  // Save preference
   localStorage.setItem('darkMode', isDarkMode ? 'true' : 'false');
   
-  // Update icon
-  const icon = darkModeToggle.querySelector('i');
-  icon.className = isDarkMode ? 'fas fa-moon' : 'fas fa-sun';
+  moonIcon.classList.toggle('hidden', !isDarkMode);
+  sunIcon.classList.toggle('hidden', isDarkMode);
 }
 
-/**
- * Load dark mode preference
- */
 function loadDarkModePreference() {
   const saved = localStorage.getItem('darkMode');
   if (saved !== null) {
     isDarkMode = saved === 'true';
     document.body.classList.toggle('light-mode', !isDarkMode);
-    const icon = darkModeToggle.querySelector('i');
-    icon.className = isDarkMode ? 'fas fa-moon' : 'fas fa-sun';
+    moonIcon.classList.toggle('hidden', !isDarkMode);
+    sunIcon.classList.toggle('hidden', isDarkMode);
   }
 }
 
-/**
- * Soft refresh - calls scanAllProjects, merges new results in, updates UI.
- */
+// Projects
 async function softRefreshProjects() {
   try {
     const projects = await window.electronAPI.scanAllProjects();
     if (!projects) return;
-
     currentProjects = mergeProjectLists(currentProjects, projects);
     updateProjectCards(currentProjects);
   } catch (err) {
@@ -806,451 +451,261 @@ async function softRefreshProjects() {
   }
 }
 
-/**
- * Merges new project list with the old list, preserving existing order
- */
 function mergeProjectLists(oldList, newList) {
   const merged = [...oldList];
   const oldPaths = new Set(oldList.map((p) => p.path));
-
   for (const project of newList) {
-    if (!oldPaths.has(project.path)) {
-      merged.push(project);
-    }
+    if (!oldPaths.has(project.path)) merged.push(project);
   }
   return merged;
 }
 
-/**
- * Render the full list of projects (after the user clicks "Scan Projects").
- */
 async function renderProjects() {
-  projectListEl.innerHTML =
-    '<p class="text-gray-300">Scanning for projects...</p>';
+  projectListEl.innerHTML = '<div class="empty-state"><div class="empty-state-icon">⏳</div><p class="empty-state-title">Scanning...</p></div>';
+  
   try {
     const projects = await window.electronAPI.scanAllProjects();
-    console.log("Scanned Projects:", projects);
-
+    
     if (!projects || projects.length === 0) {
-      projectListEl.innerHTML =
-        '<p class="text-gray-400">No Node.js projects found. Try scanning again.</p>';
-      infoEl.textContent = 'No projects found. Try scanning a different location.';
+      projectListEl.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📁</div><p class="empty-state-title">No projects found</p><p class="empty-state-desc">Try scanning a different location</p></div>';
+      infoEl.textContent = 'No projects found';
       return;
     }
 
     currentProjects = projects;
     filteredProjects = [];
     searchInput.value = '';
-    infoEl.textContent = `Found ${projects.length} Node.js project(s).`;
+    infoEl.textContent = `${projects.length} projects`;
     renderProjectCards(projects);
   } catch (err) {
-    console.error("Error scanning projects:", err);
-    projectListEl.innerHTML =
-      '<p class="text-red-500">Failed to scan projects. Check console for details.</p>';
-    infoEl.textContent = `Error: ${err.message || 'Failed to scan projects'}`;
+    console.error("Error scanning:", err);
+    projectListEl.innerHTML = '<div class="empty-state"><div class="empty-state-icon">❌</div><p class="empty-state-title">Scan failed</p></div>';
   }
 }
 
-/**
- * Scan custom folder
- */
 async function renderCustomProjects() {
-  projectListEl.innerHTML =
-    '<p class="text-gray-300">Select a folder to scan...</p>';
   try {
     const projects = await window.electronAPI.scanCustomFolder();
     
     if (!projects) {
-      // User cancelled
-      projectListEl.innerHTML = currentProjects.length > 0
-        ? ''
-        : '<p class="text-gray-400">No projects scanned yet.</p>';
-      infoEl.textContent = 'Scan cancelled.';
-      if (currentProjects.length > 0) {
-        renderProjectCards(currentProjects);
-      }
+      infoEl.textContent = 'Scan cancelled';
       return;
     }
 
-    console.log("Scanned Custom Projects:", projects);
-
     if (projects.length === 0) {
-      projectListEl.innerHTML =
-        '<p class="text-gray-400">No Node.js projects found in selected folder.</p>';
-      infoEl.textContent = 'No projects found in selected folder.';
+      projectListEl.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📁</div><p class="empty-state-title">No projects in folder</p></div>';
+      infoEl.textContent = 'No projects found';
       return;
     }
 
     currentProjects = projects;
     filteredProjects = [];
     searchInput.value = '';
-    infoEl.textContent = `Found ${projects.length} Node.js project(s) in selected folder.`;
+    infoEl.textContent = `${projects.length} projects`;
     renderProjectCards(projects);
   } catch (err) {
-    console.error("Error scanning custom folder:", err);
-    projectListEl.innerHTML =
-      '<p class="text-red-500">Failed to scan folder. Check console for details.</p>';
-    infoEl.textContent = `Error: ${err.message || 'Failed to scan folder'}`;
+    console.error("Error scanning folder:", err);
   }
 }
 
-/**
- * Render the project cards from scratch
- */
 async function renderProjectCards(projects) {
   projectListEl.innerHTML = "";
-
   for (const project of projects) {
-    const card = await createOrUpdateCard(project);
+    const card = await createProjectCard(project);
     projectListEl.appendChild(card);
   }
 }
 
-/**
- * Update only cards that are missing or changed
- */
 async function updateProjectCards(projects) {
   for (const project of projects) {
-    const existingCard = document.querySelector(
-      `[data-project-path="${project.path}"]`
-    );
+    const existingCard = document.querySelector(`[data-project-path="${CSS.escape(project.path)}"]`);
     if (existingCard) {
-      // We'll just re-build the inner HTML to ensure up-to-date data
       await populateCardContent(existingCard, project);
     } else {
-      // Card not found, create a new one
-      const newCard = await createOrUpdateCard(project);
+      const newCard = await createProjectCard(project);
       projectListEl.appendChild(newCard);
     }
   }
 }
 
-/**
- * Update a single card without re-rendering the entire list
- */
 async function updateSingleCard(projectPath) {
   const project = currentProjects.find(p => p.path === projectPath);
   if (!project) return;
   
-  const card = document.querySelector(`[data-project-path="${projectPath}"]`);
-  if (card) {
-    await populateCardContent(card, project);
-  }
+  const card = document.querySelector(`[data-project-path="${CSS.escape(projectPath)}"]`);
+  if (card) await populateCardContent(card, project);
 }
 
-/**
- * Creates a new project card (or updates an existing DOM element)
- */
-async function createOrUpdateCard(project) {
-  let card = document.querySelector(`[data-project-path="${project.path}"]`);
-  if (!card) {
-    card = document.createElement("div");
-    card.className =
-      "bg-gray-800 rounded-lg shadow-md p-4 hover:shadow-lg transition relative";
-    card.dataset.projectPath = project.path;
-  }
+async function createProjectCard(project) {
+  const card = document.createElement("div");
+  card.className = "project-card";
+  card.dataset.projectPath = project.path;
   await populateCardContent(card, project);
   return card;
 }
 
-/**
- * Remove node_modules - Show confirmation first
- */
-async function removeModulesFromProject(projectPath) {
-  const projectName = projectPath.split('/').pop() || projectPath;
-  showConfirmDialog(
-    "Remove node_modules",
-    `Are you sure you want to remove node_modules from "${projectName}"? This will free up disk space but you'll need to reinstall dependencies.`,
-    projectPath
-  );
-}
-
-/**
- * Actually remove node_modules after confirmation
- */
-async function actuallyRemoveModules(projectPath) {
-  setCardStatus(projectPath, 'Removing node_modules...', 'info');
-  try {
-    const result = await window.electronAPI.removeNodeModules(projectPath);
-    if (result.success) {
-      setCardStatus(projectPath, 'node_modules removed successfully', 'success');
-      // Update only this card
-      updateSingleCard(projectPath);
-      setTimeout(() => clearCardStatus(projectPath), 3000);
-    } else {
-      setCardStatus(projectPath, `Failed to remove node_modules: ${result.message}`, 'error');
-      updateSingleCard(projectPath);
-    }
-  } catch (err) {
-    console.error("Error removing node_modules:", err);
-    setCardStatus(projectPath, `Error removing node_modules: ${err.message}`, 'error');
-    updateSingleCard(projectPath);
-  }
-}
-
-/**
- * View logs for a project
- */
-function viewProjectLogs(projectPath) {
-  const logs = projectLogs.get(projectPath) || [];
-  const projectName = projectPath.split('/').pop() || projectPath;
-  
-  document.getElementById("logsProjectName").textContent = `${projectName} - Logs`;
-  
-  const logsContent = document.getElementById("logsContent");
-  if (logs.length === 0) {
-    logsContent.innerHTML = '<p class="text-gray-400">No logs available yet. Logs will appear here when the project is running.</p>';
-  } else {
-    logsContent.innerHTML = `<pre class="text-xs whitespace-pre-wrap">${logs.map(log => escapeHtml(log)).join('\n')}</pre>`;
-    // Scroll to bottom
-    logsContent.scrollTop = logsContent.scrollHeight;
-  }
-  
-  logsModal.classList.remove("hidden");
-}
-
-/**
- * Set status message for a project card
- */
-function setCardStatus(projectPath, message, type = 'info') {
-  if (!message) {
-    projectStatuses.delete(projectPath);
-  } else {
-    projectStatuses.set(projectPath, { message, type });
-  }
-  updateCardStatusDisplay(projectPath);
-}
-
-/**
- * Clear status message for a project card
- */
-function clearCardStatus(projectPath) {
-  projectStatuses.delete(projectPath);
-  updateCardStatusDisplay(projectPath);
-}
-
-/**
- * Update the status display on a specific card
- */
-function updateCardStatusDisplay(projectPath) {
-  const card = document.querySelector(`[data-project-path="${projectPath}"]`);
-  if (!card) return;
-  
-  const statusEl = card.querySelector('.card-status');
-  if (!statusEl) return;
-  
-  const status = projectStatuses.get(projectPath);
-  if (status) {
-    const typeClasses = {
-      info: 'bg-blue-500/20 text-blue-400',
-      success: 'bg-green-500/20 text-green-400',
-      error: 'bg-red-500/20 text-red-400',
-      warning: 'bg-yellow-500/20 text-yellow-400'
-    };
-    const icons = {
-      info: 'fa-info-circle',
-      success: 'fa-check-circle',
-      error: 'fa-exclamation-circle',
-      warning: 'fa-exclamation-triangle'
-    };
-    
-    statusEl.className = `card-status px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 ${typeClasses[status.type] || typeClasses.info}`;
-    statusEl.innerHTML = `<i class="fas ${icons[status.type] || icons.info}"></i><span>${escapeHtml(status.message)}</span>`;
-    statusEl.style.display = 'flex';
-  } else {
-    statusEl.style.display = 'none';
-  }
-}
-
-/**
- * Populates a card's inner HTML and attaches event listeners
- */
 async function populateCardContent(card, project) {
   const isRunning = runningProjects.has(project.path);
   const runningInfo = isRunning ? runningProjects.get(project.path) : null;
   const dependenciesInstalled = await areDependenciesInstalled(project.path);
-  const projLog = projectLogs.get(project.path) || [];
-  const stats = projectStats.get(project.path);
-  const projectName = project.name || project.path.split('/').pop();
+  const projectName = project.name || path.basename(project.path);
   const cardStatus = projectStatuses.get(project.path);
+  
+  // Truncate path
+  const shortPath = project.path.length > 45 
+    ? '...' + project.path.slice(-42) 
+    : project.path;
+  
+  // Format timestamp
+  const timeStr = project.timestamp 
+    ? formatRelativeTime(project.timestamp * 1000)
+    : 'No commits';
 
+  card.className = `project-card ${isRunning ? 'is-running' : ''}`;
+  card.style.backgroundColor = '#111113';
+  card.style.color = '#fafafa';
+  card.style.border = '1px solid rgba(255, 255, 255, 0.06)';
+  card.style.borderRadius = '12px';
+  card.style.padding = '14px 16px';
+  
   card.innerHTML = `
-    <div class="flex justify-between items-start mb-2">
-      <div class="flex-1">
-        <h4 class="text-lg font-semibold text-white">${escapeHtml(projectName)}</h4>
-        ${project.message && project.message !== 'No commits yet' && project.message !== 'No Git history' && project.message !== 'Git Error'
-          ? `<p class="text-xs text-gray-500 mt-1"><i class="fas fa-code-branch mr-1"></i>${escapeHtml(project.message)}</p>`
+    <div class="flex items-start justify-between gap-2 mb-2">
+      <div class="min-w-0 flex-1">
+        <h4 class="card-title truncate" style="color: #fafafa; font-weight: 600; font-size: 0.875rem;">${escapeHtml(projectName)}</h4>
+        ${project.message && !['No commits yet', 'No Git history', 'Git Error'].includes(project.message) 
+          ? `<p class="card-subtitle truncate" style="color: #71717a; font-size: 0.75rem;">${Icons.gitBranch} ${escapeHtml(project.message)}</p>` 
           : ''
         }
       </div>
-      <div class="flex flex-col items-end gap-1">
-      ${
-        isRunning
-            ? '<span class="px-2 py-1 text-xs font-medium rounded-full bg-green-500/20 text-green-400 flex items-center gap-1"><span class="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>Running</span>'
-            : ""
+      <div class="flex flex-col items-end gap-1 flex-shrink-0">
+        ${isRunning 
+          ? `<span class="status-badge running" style="background: rgba(16, 185, 129, 0.15); color: #10b981; padding: 2px 8px; border-radius: 9999px; font-size: 0.6875rem;"><span class="status-dot pulse"></span>Running</span>` 
+          : ''
         }
-        ${
-          isRunning && runningInfo?.framework
-            ? `<span class="px-2 py-1 text-xs font-medium rounded-full bg-blue-500/20 text-blue-400">${escapeHtml(runningInfo.framework)}</span>`
-            : ''
+        ${isRunning && runningInfo?.framework 
+          ? `<span class="framework-badge" style="background: rgba(139, 92, 246, 0.15); color: #8b5cf6; padding: 2px 6px; border-radius: 4px; font-size: 0.625rem; text-transform: uppercase;">${escapeHtml(runningInfo.framework)}</span>` 
+          : ''
         }
       </div>
     </div>
-    <div class="card-status mb-2" style="display: ${cardStatus ? 'flex' : 'none'}"></div>
-    <p class="text-sm text-gray-400">
-      <i class="far fa-clock mr-1"></i>Last Commit: ${
-        project.timestamp
-          ? new Date(project.timestamp * 1000).toLocaleString()
-          : "No commits yet"
-      }
-    </p>
-    <p class="text-sm text-gray-400 truncate" title="${escapeHtml(project.path)}">
-      <i class="far fa-folder mr-1"></i>${escapeHtml(project.path)}
-    </p>
-    ${
-      isRunning && runningInfo?.port
-        ? `<p class="text-sm text-green-400 mt-1"><i class="fas fa-server mr-1"></i>Port: ${runningInfo.port}</p>`
-        : '<p class="text-sm text-gray-400 mt-1"><i class="fas fa-stop-circle mr-1"></i>Stopped</p>'
-    }
-
-    ${
-      stats
-        ? `<div class="mt-2 text-sm flex gap-4">
-            <p class="text-blue-400"><i class="fas fa-memory mr-1"></i>${formatBytes(
-              stats.memory || 0
-            )}</p>
-            <p class="text-blue-400"><i class="fas fa-microchip mr-1"></i>${(stats.cpu || 0).toFixed(1)}%</p>
-          </div>`
-        : ""
-    }
-
-    ${projLog.length > 0 ? `
-    <div class="mt-2 bg-gray-900 rounded p-2 max-h-20 overflow-hidden relative">
-      <pre class="text-xs text-gray-400">${projLog
-        .slice(-2)
-        .map(log => escapeHtml(log))
-        .join("\n")}</pre>
-      <div class="absolute bottom-0 right-0 p-1">
-        <button class="view-logs-button text-xs text-blue-400 hover:text-blue-300 underline">
-          <i class="fas fa-external-link-alt mr-1"></i>View All
-        </button>
-      </div>
+    
+    <div class="card-status-message ${cardStatus ? cardStatus.type : ''}" style="display: ${cardStatus ? 'flex' : 'none'}; color: #fafafa;">
+      ${cardStatus ? `${getStatusIcon(cardStatus.type)}<span>${escapeHtml(cardStatus.message)}</span>` : ''}
     </div>
-    ` : ''}
-
-    <div class="flex items-center gap-2 mt-4 flex-wrap">
-      ${
-        dependenciesInstalled
-          ? `<button
-               class="play-button px-3 py-2 bg-green-500 rounded-lg hover:bg-green-600 text-white font-medium ${
-                 isRunning ? "hidden" : ""
-               } transition flex items-center gap-1"
-             >
-               <i class="fas fa-play"></i>
-               <span>Run</span>
-             </button>`
-          : `<button
-               class="install-button px-3 py-2 bg-yellow-500 rounded-lg hover:bg-yellow-600 text-white font-medium transition flex items-center gap-1"
-             >
-               <i class="fas fa-download"></i>
-               <span>Install</span>
-             </button>`
+    
+    <div class="card-meta" style="color: #52525b; font-size: 0.6875rem; margin-top: 8px;">
+      <span class="card-meta-item">${Icons.clock} ${timeStr}</span>
+      ${isRunning && runningInfo?.port 
+        ? `<span class="port-badge" style="background: rgba(14, 165, 233, 0.15); color: #0ea5e9; padding: 2px 6px; border-radius: 4px; font-size: 0.6875rem;">${Icons.server} :${runningInfo.port}</span>` 
+        : ''
       }
-      <button
-        class="stop-button px-3 py-2 bg-red-500 rounded-lg hover:bg-red-600 text-white font-medium ${
-          !isRunning ? "hidden" : ""
-        } transition flex items-center gap-1"
-      >
-        <i class="fas fa-stop"></i>
-        <span>Stop</span>
-      </button>
-      ${
-        isRunning
-          ? `<button
-               class="browser-button px-3 py-2 bg-blue-500 rounded-lg hover:bg-blue-600 text-white font-medium transition flex items-center gap-1"
-             >
-               <i class="fas fa-globe"></i>
-               <span>Browser</span>
-             </button>`
-          : ""
+    </div>
+    
+    <p class="card-path" style="color: #52525b; font-size: 0.6875rem; margin-top: 4px;" title="${escapeHtml(project.path)}">${escapeHtml(shortPath)}</p>
+    
+    <div class="card-actions" style="margin-top: 12px; display: flex; gap: 6px; flex-wrap: wrap;">
+      ${dependenciesInstalled 
+        ? `<button class="action-btn action-btn-run play-button" style="background: #10b981; color: white; padding: 5px 8px; border-radius: 6px; font-size: 0.6875rem; border: none; cursor: pointer; display: ${isRunning ? 'none' : 'inline-flex'}; align-items: center; gap: 4px;">
+            ${Icons.play} Run
+          </button>`
+        : `<button class="action-btn action-btn-default install-button" style="background: #27272a; color: #a1a1aa; padding: 5px 8px; border-radius: 6px; font-size: 0.6875rem; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
+            ${Icons.download} Install
+          </button>`
       }
-      <button
-        class="editor-button px-3 py-2 bg-purple-500 rounded-lg hover:bg-purple-600 text-white font-medium transition flex items-center gap-1"
-        title="${installedIDEs.length > 0 ? `${installedIDEs.length} editors available` : 'Open in editor'}"
-      >
-        <i class="fas fa-code"></i>
-        <span>Editor</span>
-        ${installedIDEs.length > 1 ? `<span class="text-xs bg-purple-700 px-1 rounded">${installedIDEs.length}</span>` : ''}
+      <button class="action-btn action-btn-stop stop-button" style="background: #f43f5e; color: white; padding: 5px 8px; border-radius: 6px; font-size: 0.6875rem; border: none; cursor: pointer; display: ${!isRunning ? 'none' : 'inline-flex'}; align-items: center; gap: 4px;">
+        ${Icons.stop} Stop
       </button>
-      <button
-        class="terminal-button px-3 py-2 bg-gray-600 rounded-lg hover:bg-gray-500 text-white font-medium transition flex items-center gap-1"
-        title="Open terminal here"
-      >
-        <i class="fas fa-terminal"></i>
-        <span>Terminal</span>
+      ${isRunning 
+        ? `<button class="action-btn action-btn-default browser-button" style="background: #27272a; color: #a1a1aa; padding: 5px 8px; border-radius: 6px; font-size: 0.6875rem; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
+            ${Icons.globe} Open
+          </button>`
+        : ''
+      }
+      <button class="action-btn action-btn-default editor-button" style="background: #27272a; color: #a1a1aa; padding: 5px 8px; border-radius: 6px; font-size: 0.6875rem; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;" title="${installedIDEs.length} editors">
+        ${Icons.code} Editor
       </button>
-      ${
-        dependenciesInstalled
-          ? `<button
-               class="remove-modules-button px-3 py-2 bg-red-400 rounded-lg hover:bg-red-500 text-white font-medium transition flex items-center gap-1"
-             >
-               <i class="fas fa-trash"></i>
-               <span>Clean</span>
-             </button>`
-          : ""
+      <button class="action-btn action-btn-default terminal-button" style="background: #27272a; color: #a1a1aa; padding: 5px 8px; border-radius: 6px; font-size: 0.6875rem; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
+        ${Icons.terminal}
+      </button>
+      ${dependenciesInstalled 
+        ? `<button class="action-btn action-btn-default remove-modules-button" style="background: #27272a; color: #a1a1aa; padding: 5px 8px; border-radius: 6px; font-size: 0.6875rem; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;" title="Remove node_modules">
+            ${Icons.trash}
+          </button>`
+        : ''
       }
     </div>
   `;
 
-  // Attach event listeners
+  // Event listeners
   const playButton = card.querySelector(".play-button");
   const stopButton = card.querySelector(".stop-button");
   const installButton = card.querySelector(".install-button");
   const browserButton = card.querySelector(".browser-button");
   const editorButton = card.querySelector(".editor-button");
   const terminalButton = card.querySelector(".terminal-button");
-  const removeButtonEl = card.querySelector(".remove-modules-button");
-  const viewLogsButton = card.querySelector(".view-logs-button");
+  const removeButton = card.querySelector(".remove-modules-button");
 
-  // Bind actions
-  removeButtonEl?.addEventListener("click", () =>
-    removeModulesFromProject(project.path)
-  );
+  removeButton?.addEventListener("click", () => removeModulesFromProject(project.path));
   playButton?.addEventListener("click", () => attemptRunProject(project.path));
   stopButton?.addEventListener("click", () => stopProject(project.path));
-  installButton?.addEventListener("click", () =>
-    installProjectDependencies(project.path)
-  );
-  browserButton?.addEventListener("click", () => {
-    if (runningInfo) openInBrowser(runningInfo.port);
-  });
+  installButton?.addEventListener("click", () => installProjectDependencies(project.path));
+  browserButton?.addEventListener("click", () => { if (runningInfo) openInBrowser(runningInfo.port); });
   editorButton?.addEventListener("click", () => openInEditor(project.path));
   terminalButton?.addEventListener("click", () => openInTerminal(project.path));
-  viewLogsButton?.addEventListener("click", () => viewProjectLogs(project.path));
-  
-  // Initialize status display
-  updateCardStatusDisplay(project.path);
 }
 
-/**
- * Attempt to run/play a project - with automatic port selection
- */
-async function attemptRunProject(projectPath, customPort = null) {
-  // Check if dependencies are installed first
+function getStatusIcon(type) {
+  switch(type) {
+    case 'success': return Icons.check;
+    case 'error': return Icons.alertCircle;
+    case 'warning': return Icons.alertCircle;
+    default: return Icons.info;
+  }
+}
+
+function formatRelativeTime(timestamp) {
+  const now = Date.now();
+  const diff = now - timestamp;
+  const minutes = Math.floor(diff / 60000);
+  const hours = Math.floor(diff / 3600000);
+  const days = Math.floor(diff / 86400000);
+  
+  if (minutes < 1) return 'Just now';
+  if (minutes < 60) return `${minutes}m ago`;
+  if (hours < 24) return `${hours}h ago`;
+  if (days < 7) return `${days}d ago`;
+  return new Date(timestamp).toLocaleDateString();
+}
+
+// Actions
+async function attemptRunProject(projectPath) {
   const depsInstalled = await areDependenciesInstalled(projectPath);
   if (!depsInstalled) {
     showDependencyModal(projectPath);
     return;
   }
-  
-  // Run directly with automatic port selection (no modal)
-  // The backend will handle finding an available port
-  await runProjectWithPort(projectPath, customPort);
+  await runProjectWithPort(projectPath, null);
 }
 
-/**
- * Stop a running project
- */
+async function runProjectWithPort(projectPath, customPort = null) {
+  setCardStatus(projectPath, customPort ? `Starting on :${customPort}...` : 'Starting...', 'info');
+  updateSingleCard(projectPath);
+  
+  try {
+    const result = await window.electronAPI.playProject(projectPath, customPort);
+    if (result.error) {
+      setCardStatus(projectPath, result.error, 'error');
+    } else if (result.message) {
+      setCardStatus(projectPath, result.message, 'success');
+      setTimeout(() => clearCardStatus(projectPath), 3000);
+    }
+    updateSingleCard(projectPath);
+  } catch (err) {
+    setCardStatus(projectPath, err.message, 'error');
+    updateSingleCard(projectPath);
+  }
+}
+
 async function stopProject(projectPath) {
   if (!runningProjects.has(projectPath)) return;
 
@@ -1262,26 +717,21 @@ async function stopProject(projectPath) {
       updateSingleCard(projectPath);
       return;
     }
-    setCardStatus(projectPath, 'Stopping project...', 'info');
+    setCardStatus(projectPath, 'Stopping...', 'info');
     const result = await window.electronAPI.stopProject(projectPath);
     if (!result.success) {
-      console.error("Stop project failed:", result.message);
-      setCardStatus(projectPath, `Error stopping project: ${result.message}`, 'error');
+      setCardStatus(projectPath, result.message || 'Failed to stop', 'error');
     } else {
-      setCardStatus(projectPath, 'Project stopped successfully', 'success');
+      setCardStatus(projectPath, 'Stopped', 'success');
       setTimeout(() => clearCardStatus(projectPath), 2000);
     }
     updateSingleCard(projectPath);
   } catch (err) {
-    console.error("Error stopping project:", err);
-    setCardStatus(projectPath, `Error stopping project: ${err.message}`, 'error');
+    setCardStatus(projectPath, err.message, 'error');
     updateSingleCard(projectPath);
   }
 }
 
-/**
- * Verify if the process for a given project is alive
- */
 async function verifyProcessStatus(projectPath) {
   try {
     const pid = projectProcesses.get(projectPath);
@@ -1290,160 +740,224 @@ async function verifyProcessStatus(projectPath) {
     if (!isRunning) {
       runningProjects.delete(projectPath);
       projectProcesses.delete(projectPath);
-      // Also remove from activeConnections if needed
       for (const [p, path] of activeConnections.entries()) {
-        if (path === projectPath) {
-          activeConnections.delete(p);
-        }
+        if (path === projectPath) activeConnections.delete(p);
       }
       updateSingleCard(projectPath);
     }
     return isRunning;
   } catch (err) {
-    console.error("Error checking process status:", err);
     return false;
   }
 }
 
-/**
- * Open running project in browser
- */
 async function openInBrowser(port) {
   try {
-    const projectPath = activeConnections.get(port);
-    if (projectPath) {
-      const stillAlive = await verifyProcessStatus(projectPath);
-      if (!stillAlive) {
-        setCardStatus(projectPath, "Project is no longer running. Please start again.", 'warning');
-        return;
-      }
-    }
     await window.electronAPI.openInBrowser(port);
   } catch (err) {
-    console.error("Error opening in browser:", err);
-    const projectPath = activeConnections.get(port);
-    if (projectPath) {
-      setCardStatus(projectPath, `Error: ${err.message}`, 'error');
-    }
+    console.error("Error opening browser:", err);
   }
 }
 
-/**
- * Open project in Editor - with IDE selection
- */
 async function openInEditor(projectPath) {
-  // Check if default IDE is set
   if (defaultIDE) {
-    // Use default IDE
     setCardStatus(projectPath, `Opening in ${defaultIDE.name}...`, 'info');
     updateSingleCard(projectPath);
     await window.electronAPI.openInEditor(projectPath, defaultIDE.command);
-    setTimeout(() => {
-      clearCardStatus(projectPath);
-      updateSingleCard(projectPath);
-    }, 2000);
+    setTimeout(() => { clearCardStatus(projectPath); updateSingleCard(projectPath); }, 2000);
     return;
   }
   
-  // No default IDE, show selector
   if (installedIDEs.length > 1) {
-    // Show IDE selector modal
     showIDEModal(projectPath);
   } else if (installedIDEs.length === 1) {
-    // Only one IDE, use it directly
     await window.electronAPI.openInEditor(projectPath, installedIDEs[0].command);
   } else {
-    // No IDEs detected, use default
     await window.electronAPI.openInEditor(projectPath);
   }
 }
 
-/**
- * Open project in Terminal
- */
 async function openInTerminal(projectPath) {
   try {
     setCardStatus(projectPath, 'Opening terminal...', 'info');
     updateSingleCard(projectPath);
     
-    // Use default terminal preference if set (use command, not name)
     const terminalPreference = defaultTerminal ? defaultTerminal.command : null;
-    console.log(`Opening terminal with preference: ${terminalPreference}`);
     const result = await window.electronAPI.openInTerminal(projectPath, terminalPreference);
     
     if (result.success) {
-      const termName = defaultTerminal ? defaultTerminal.name : 'default terminal';
-      setCardStatus(projectPath, `Opened in ${termName}`, 'success');
-      setTimeout(() => {
-        clearCardStatus(projectPath);
-        updateSingleCard(projectPath);
-      }, 2000);
+      setCardStatus(projectPath, 'Terminal opened', 'success');
+      setTimeout(() => { clearCardStatus(projectPath); updateSingleCard(projectPath); }, 2000);
     } else {
-      setCardStatus(projectPath, `Error: ${result.error || 'Failed to open terminal'}`, 'error');
+      setCardStatus(projectPath, result.error || 'Failed', 'error');
       updateSingleCard(projectPath);
     }
   } catch (err) {
-    console.error("Error opening terminal:", err);
-    setCardStatus(projectPath, `Error: ${err.message}`, 'error');
+    setCardStatus(projectPath, err.message, 'error');
     updateSingleCard(projectPath);
   }
 }
 
-/**
- * Check if node_modules is present => dependencies installed
- */
 async function areDependenciesInstalled(projectPath) {
   try {
-    const packageJsonPath = `${projectPath}/package.json`;
-    const nodeModulesPath = `${projectPath}/node_modules`;
-
-    const hasPackageJson = await window.electronAPI.fileExists(packageJsonPath);
-    const hasNodeModules = await window.electronAPI.fileExists(nodeModulesPath);
-
+    const hasPackageJson = await window.electronAPI.fileExists(`${projectPath}/package.json`);
+    const hasNodeModules = await window.electronAPI.fileExists(`${projectPath}/node_modules`);
     return hasPackageJson && hasNodeModules;
   } catch (err) {
-    console.error(`Error checking dependencies: ${projectPath}`, err);
     return false;
   }
 }
 
-/**
- * Install dependencies
- */
 async function installProjectDependencies(projectPath) {
-  setCardStatus(projectPath, 'Installing dependencies...', 'info');
-  updateSingleCard(projectPath); // Show loading status immediately
+  setCardStatus(projectPath, 'Installing...', 'info');
+  updateSingleCard(projectPath);
+  
   try {
     const result = await window.electronAPI.installDependencies(projectPath);
     if (result.success) {
-      setCardStatus(projectPath, 'Dependencies installed successfully', 'success');
-      // Update only this card to reflect new dependency status
+      setCardStatus(projectPath, 'Installed', 'success');
       updateSingleCard(projectPath);
       setTimeout(() => clearCardStatus(projectPath), 3000);
     } else {
-      setCardStatus(projectPath, `Failed to install dependencies`, 'error');
+      setCardStatus(projectPath, 'Install failed', 'error');
       updateSingleCard(projectPath);
     }
   } catch (err) {
-    console.error("Error installing dependencies:", err);
-    setCardStatus(projectPath, `Error installing: ${err.message}`, 'error');
+    setCardStatus(projectPath, err.message, 'error');
     updateSingleCard(projectPath);
   }
 }
 
-/**
- * Simple utility to format bytes
- */
-function formatBytes(bytes) {
-  if (bytes === 0) return "0 B";
-  const units = ["B", "KB", "MB", "GB", "TB"];
-  const i = Math.floor(Math.log(bytes) / Math.log(1024));
-  return `${(bytes / Math.pow(1024, i)).toFixed(1)} ${units[i]}`;
+async function removeModulesFromProject(projectPath) {
+  const projectName = path.basename(projectPath);
+  showConfirmDialog("Remove node_modules", `Remove node_modules from "${projectName}"?`, projectPath);
 }
 
-/**
- * Escape HTML to prevent XSS attacks in logs
- */
+async function actuallyRemoveModules(projectPath) {
+  setCardStatus(projectPath, 'Removing...', 'info');
+  try {
+    const result = await window.electronAPI.removeNodeModules(projectPath);
+    if (result.success) {
+      setCardStatus(projectPath, 'Removed', 'success');
+      updateSingleCard(projectPath);
+      setTimeout(() => clearCardStatus(projectPath), 3000);
+    } else {
+      setCardStatus(projectPath, result.message || 'Failed', 'error');
+      updateSingleCard(projectPath);
+    }
+  } catch (err) {
+    setCardStatus(projectPath, err.message, 'error');
+    updateSingleCard(projectPath);
+  }
+}
+
+// Modals
+function showDependencyModal(projectPath) {
+  pendingActionProject = projectPath;
+  dependencyModal.classList.remove("hidden");
+}
+
+async function showIDEModal(projectPath) {
+  pendingIdeProject = projectPath;
+  ideList.innerHTML = '<p class="text-xs text-muted text-center py-4">Loading...</p>';
+  ideModal.classList.remove("hidden");
+  
+  try {
+    installedIDEs = await window.electronAPI.getInstalledIDEs();
+  } catch (err) {
+    console.error('Error:', err);
+  }
+  
+  ideList.innerHTML = '';
+  
+  if (installedIDEs.length === 0) {
+    ideList.innerHTML = '<p class="text-xs text-muted text-center py-4">No IDEs detected</p>';
+    return;
+  }
+  
+  installedIDEs.forEach(ide => {
+    const button = document.createElement('button');
+    button.className = 'settings-option w-full';
+    button.innerHTML = `
+      <span class="settings-option-icon">${ide.icon}</span>
+      <span class="settings-option-name">${escapeHtml(ide.name)}</span>
+      ${Icons.arrowRight}
+    `;
+    button.addEventListener('click', () => handleIDESelection(ide.command));
+    ideList.appendChild(button);
+  });
+}
+
+async function handleIDESelection(ideCommand) {
+  if (pendingIdeProject) {
+    const projectPath = pendingIdeProject;
+    const ide = installedIDEs.find(i => i.command === ideCommand);
+    hideModals();
+    setCardStatus(projectPath, `Opening in ${ide?.name || 'editor'}...`, 'info');
+    updateSingleCard(projectPath);
+    await window.electronAPI.openInEditor(projectPath, ideCommand);
+    setTimeout(() => { clearCardStatus(projectPath); updateSingleCard(projectPath); }, 2000);
+  }
+}
+
+function showConfirmDialog(title, message, projectPath) {
+  document.getElementById("confirmTitle").textContent = title;
+  document.getElementById("confirmMessage").textContent = message;
+  pendingRemoveProject = projectPath;
+  confirmDialog.classList.remove("hidden");
+}
+
+async function handleModalInstall() {
+  if (pendingActionProject) {
+    const projectPath = pendingActionProject;
+    hideModals();
+    await installProjectDependencies(projectPath);
+  }
+}
+
+async function handleConfirmRemove() {
+  if (pendingRemoveProject) {
+    const projectPath = pendingRemoveProject;
+    hideModals();
+    await actuallyRemoveModules(projectPath);
+  }
+}
+
+async function handleUseDefaultPort() {
+  if (pendingPortProject) {
+    const projectPath = pendingPortProject;
+    hideModals();
+    await runProjectWithPort(projectPath, null);
+  }
+}
+
+async function handleUseCustomPort() {
+  const customPort = parseInt(customPortInput.value, 10);
+  
+  if (!customPortInput.value || isNaN(customPort) || customPort < 1000 || customPort > 65535) {
+    customPortInput.style.borderColor = '#f43f5e';
+    setTimeout(() => customPortInput.style.borderColor = '', 500);
+    return;
+  }
+  
+  if (pendingPortProject) {
+    const projectPath = pendingPortProject;
+    hideModals();
+    await runProjectWithPort(projectPath, customPort);
+  }
+}
+
+// Status
+function setCardStatus(projectPath, message, type = 'info') {
+  projectStatuses.set(projectPath, { message, type });
+}
+
+function clearCardStatus(projectPath) {
+  projectStatuses.delete(projectPath);
+  updateSingleCard(projectPath);
+}
+
+// Utils
 function escapeHtml(text) {
   const div = document.createElement('div');
   div.textContent = text;
