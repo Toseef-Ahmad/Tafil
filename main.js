@@ -2376,6 +2376,46 @@ ipcMain.handle('check-port-process', async (_event, port) => {
   }
 });
 
+// Kill an external process by PID
+ipcMain.handle('kill-external-process', async (_event, pid) => {
+  try {
+    console.log(`Attempting to kill external process with PID: ${pid}`);
+    
+    if (isWindows) {
+      // Windows: Use taskkill
+      exec(`taskkill /F /T /PID ${pid}`, (error) => {
+        if (error) {
+          console.warn(`Windows taskkill error: ${error.message}`);
+        }
+      });
+    } else {
+      // Unix-like: Use kill command
+      try {
+        process.kill(parseInt(pid), 'SIGTERM');
+        
+        // Give it a moment, then force kill if still running
+        setTimeout(() => {
+          try {
+            process.kill(parseInt(pid), 'SIGKILL');
+          } catch (e) {
+            // Process already dead, ignore
+          }
+        }, 2000);
+      } catch (e) {
+        if (e.code !== 'ESRCH') { // ESRCH means process doesn't exist
+          throw e;
+        }
+      }
+    }
+    
+    console.log(`✅ Killed external process ${pid}`);
+    return { success: true };
+  } catch (err) {
+    console.error(`Error killing external process ${pid}:`, err);
+    return { success: false, error: err.message };
+  }
+});
+
 // Cleanup on quit
 app.on('before-quit', () => {
   runningProcesses.forEach((childProcess, projectPath) => {

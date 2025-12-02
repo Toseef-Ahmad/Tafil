@@ -28,6 +28,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // ~~~~~~~~~~~~~~ External Process Detection ~~~~~~~~~~~~~~
   detectExternalProcesses: () => ipcRenderer.invoke('detect-external-processes'),
   checkPortProcess: (port) => ipcRenderer.invoke('check-port-process', port),
+  killExternalProcess: (pid) => ipcRenderer.invoke('kill-external-process', pid),
 
   // ~~~~~~~~~~~~~~ From main to renderer ~~~~~~~~~~~~~~
   onProjectStatus: (callback) => ipcRenderer.on('project-status', callback),

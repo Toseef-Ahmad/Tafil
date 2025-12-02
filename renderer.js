@@ -404,6 +404,30 @@ async function scanExternalProcesses() {
   }
 }
 
+async function stopExternalProcess(projectPath) {
+  const externalInfo = externalProjects.get(projectPath);
+  if (!externalInfo || !externalInfo.pid) {
+    showNotification('External process not found', 'error');
+    return;
+  }
+  
+  try {
+    const result = await window.electronAPI.killExternalProcess(externalInfo.pid);
+    
+    if (result.success) {
+      externalProjects.delete(projectPath);
+      updateRunningCount();
+      updateSingleCard(projectPath);
+      showNotification(`Stopped external process on port ${externalInfo.port}`, 'success');
+    } else {
+      showNotification(result.error || 'Failed to stop external process', 'error');
+    }
+  } catch (err) {
+    console.error('Error stopping external process:', err);
+    showNotification('Failed to stop external process', 'error');
+  }
+}
+
 // =====================================================
 // Keyboard Shortcuts
 // =====================================================
@@ -1466,7 +1490,7 @@ async function populateCardContent(card, project) {
     
     <div class="flex items-center gap-1.5 flex-wrap">
       ${dependenciesInstalled 
-        ? `<button class="action-btn play play-button" style="display: ${isRunning ? 'none' : 'flex'};" title="Run project">
+        ? `<button class="action-btn play play-button" style="display: ${(isRunning || isExternal) ? 'none' : 'flex'};" title="Run project">
             ${Icons.play}
           </button>`
         : `<button class="action-btn install-button" title="Install dependencies">
@@ -1476,7 +1500,10 @@ async function populateCardContent(card, project) {
       <button class="action-btn stop stop-button" style="display: ${!isRunning ? 'none' : 'flex'};" title="Stop project">
         ${Icons.stop}
       </button>
-      ${isRunning 
+      <button class="action-btn stop stop-external-button" style="display: ${!isExternal ? 'none' : 'flex'}; background: rgba(59, 130, 246, 0.15); color: #3b82f6;" title="Stop external process">
+        ${Icons.stop}
+      </button>
+      ${(isRunning || isExternal)
         ? `<button class="action-btn browser-button" title="Open in browser">
             ${Icons.globe}
           </button>`
@@ -1506,6 +1533,7 @@ async function populateCardContent(card, project) {
   // Event listeners
   const playButton = card.querySelector(".play-button");
   const stopButton = card.querySelector(".stop-button");
+  const stopExternalButton = card.querySelector(".stop-external-button");
   const installButton = card.querySelector(".install-button");
   const browserButton = card.querySelector(".browser-button");
   const editorButton = card.querySelector(".editor-button");
@@ -1517,6 +1545,7 @@ async function populateCardContent(card, project) {
   removeButton?.addEventListener("click", (e) => { e.stopPropagation(); removeModulesFromProject(project.path); });
   playButton?.addEventListener("click", (e) => { e.stopPropagation(); attemptRunProject(project.path); });
   stopButton?.addEventListener("click", (e) => { e.stopPropagation(); stopProject(project.path); });
+  stopExternalButton?.addEventListener("click", (e) => { e.stopPropagation(); stopExternalProcess(project.path); });
   installButton?.addEventListener("click", (e) => { e.stopPropagation(); installProjectDependencies(project.path); });
   browserButton?.addEventListener("click", (e) => { e.stopPropagation(); if (runningInfo) openInBrowser(runningInfo.port); });
   editorButton?.addEventListener("click", (e) => { e.stopPropagation(); openInEditor(project.path); });
