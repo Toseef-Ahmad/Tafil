@@ -130,6 +130,7 @@ let tray = null;
 
 /**
  * Validate that a project path is legitimate and safe (CROSS-PLATFORM)
+ * Now supports Parallels/VM shared folders (\\Mac\Home\..., \\wsl$\...)
  */
 function isValidProjectPath(projectPath) {
   console.log('Validating project path:', projectPath, 'Type:', typeof projectPath);
@@ -143,16 +144,20 @@ function isValidProjectPath(projectPath) {
   const normalizedPath = path.normalize(projectPath);
   console.log('Normalized path:', normalizedPath);
   
-  // Ensure it's an absolute path
-  if (!path.isAbsolute(normalizedPath)) {
-    console.log('Validation failed: path is not absolute');
+  // Check if it's a UNC/network path (Windows VM shared folders)
+  // Examples: \\Mac\Home\..., \\wsl$\..., \\server\share\...
+  const isUNCPath = isWindows && normalizedPath.startsWith('\\\\');
+  
+  // Ensure it's an absolute path OR a UNC path
+  if (!path.isAbsolute(normalizedPath) && !isUNCPath) {
+    console.log('Validation failed: path is not absolute or UNC');
     return false;
   }
   
   // Check if the path exists
   try {
     const exists = fs.existsSync(normalizedPath);
-    console.log('Path exists:', exists);
+    console.log('Path exists:', exists, '(UNC path:', isUNCPath, ')');
     return exists;
   } catch (err) {
     console.error(`Error checking project path: ${err.message}`);
@@ -1959,14 +1964,18 @@ ipcMain.handle('open-in-editor', async (_event, projectPath, ideCommand = null) 
         // Windows: Use full path with start command for proper window handling
         const cmd = `start "" ${ideCommand} "${normalizedPath}"`;
         console.log(`Windows IDE command: ${cmd}`);
+        
+        let explorerOpened = false; // Prevent multiple explorer windows
+        
         exec(cmd, { shell: true, windowsHide: false }, (error) => {
           if (error) {
             console.error(`Error opening with Windows path:`, error);
             // Fallback: try direct execution
             exec(`${ideCommand} "${normalizedPath}"`, { shell: true }, (fallbackError) => {
-              if (fallbackError) {
+              if (fallbackError && !explorerOpened) {
                 console.error(`Fallback also failed:`, fallbackError);
-                // Last resort: open in explorer
+                // Last resort: open in explorer ONCE
+                explorerOpened = true;
                 exec(`explorer "${normalizedPath}"`);
               }
             });
@@ -1976,13 +1985,17 @@ ipcMain.handle('open-in-editor', async (_event, projectPath, ideCommand = null) 
         // Windows with CLI command (like 'code')
         const cmd = `${ideCommand} "${normalizedPath}"`;
         console.log(`Windows CLI command: ${cmd}`);
+        
+        let explorerOpened = false; // Prevent multiple explorer windows
+        
         exec(cmd, { shell: true }, (error) => {
           if (error) {
             console.error(`Error opening with ${ideCommand}:`, error);
             // Try with start command
             exec(`start "" ${ideCommand} "${normalizedPath}"`, { shell: true }, (startError) => {
-              if (startError) {
+              if (startError && !explorerOpened) {
                 console.error(`Start command also failed:`, startError);
+                explorerOpened = true;
                 exec(`explorer "${normalizedPath}"`);
               }
             });
@@ -2007,6 +2020,8 @@ ipcMain.handle('open-in-editor', async (_event, projectPath, ideCommand = null) 
     } else {
       // Default: try VS Code first, fallback to file manager
       if (isWindows) {
+        let explorerOpened = false; // Prevent multiple explorer windows
+        
         // Try code command first
         exec(`code "${normalizedPath}"`, { shell: true }, (error) => {
           if (error) {
@@ -2014,13 +2029,15 @@ ipcMain.handle('open-in-editor', async (_event, projectPath, ideCommand = null) 
             const vscodePath = `${process.env['LOCALAPPDATA']}\\Programs\\Microsoft VS Code\\Code.exe`;
             if (fs.existsSync(vscodePath)) {
               exec(`start "" "${vscodePath}" "${normalizedPath}"`, { shell: true }, (pathError) => {
-                if (pathError) {
+                if (pathError && !explorerOpened) {
                   console.log('VS Code not found, opening in Explorer...');
+                  explorerOpened = true;
                   exec(`explorer "${normalizedPath}"`);
                 }
               });
-            } else {
+            } else if (!explorerOpened) {
               console.log('VS Code not found, opening in Explorer...');
+              explorerOpened = true;
               exec(`explorer "${normalizedPath}"`);
             }
           }
