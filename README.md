@@ -1,7 +1,7 @@
 # 🚀 Tafil — Modern Project Manager for Node.js Developers
 
 ![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)
-![License](https://img.shields.io/badge/license-MIT-green.svg)
+![License](https://img.shields.io/badge/license-GPL-green.svg)
 ![Electron](https://img.shields.io/badge/Electron-33.0+-purple.svg)
 ![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey.svg)
 
