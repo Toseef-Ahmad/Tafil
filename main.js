@@ -83,38 +83,51 @@ function fixPath() {
     ];
   }
   
-  // Filter to existing paths
-  const existingNewPaths = additionalPaths.filter(p => {
+  // Process paths - expand NVM versions and filter to existing
+  const expandedPaths = [];
+  
+  for (const p of additionalPaths) {
     try {
       // Handle NVM path which has version subdirectories
       if (p.includes('.nvm/versions/node')) {
-        const nvmDir = p;
-        if (fs.existsSync(nvmDir)) {
-          const versions = fs.readdirSync(nvmDir);
+        if (fs.existsSync(p)) {
+          const versions = fs.readdirSync(p).filter(v => v.startsWith('v'));
           if (versions.length > 0) {
-            // Use the latest version
-            const latestVersion = versions.sort().reverse()[0];
-            const binPath = path.join(nvmDir, latestVersion, 'bin');
-            if (fs.existsSync(binPath)) {
-              return true;
+            // Sort versions and use the latest
+            const sortedVersions = versions.sort((a, b) => {
+              const aParts = a.replace('v', '').split('.').map(Number);
+              const bParts = b.replace('v', '').split('.').map(Number);
+              for (let i = 0; i < 3; i++) {
+                if (aParts[i] !== bParts[i]) return bParts[i] - aParts[i];
+              }
+              return 0;
+            });
+            
+            // Add bin paths for available versions
+            for (const version of sortedVersions) {
+              const binPath = path.join(p, version, 'bin');
+              if (fs.existsSync(binPath)) {
+                console.log(`📍 Found NVM Node.js ${version} at: ${binPath}`);
+                expandedPaths.push(binPath);
+              }
             }
           }
         }
-        return false;
+      } else if (fs.existsSync(p)) {
+        expandedPaths.push(p);
       }
-      return fs.existsSync(p);
-    } catch {
-      return false;
+    } catch (err) {
+      // Ignore errors for individual paths
     }
-  });
+  }
   
-  // Merge with existing PATH
+  // Merge with existing PATH (new paths first for priority)
   const existingPath = process.env.PATH || '';
   const pathSeparator = isWindows ? ';' : ':';
-  const allPaths = [...new Set([...existingNewPaths, ...existingPath.split(pathSeparator)])];
+  const allPaths = [...new Set([...expandedPaths, ...existingPath.split(pathSeparator)])];
   
   process.env.PATH = allPaths.filter(Boolean).join(pathSeparator);
-  console.log(`✅ Fixed PATH for ${process.platform}:`, process.env.PATH.substring(0, 200) + '...');
+  console.log(`✅ Fixed PATH for ${process.platform}:`, process.env.PATH.substring(0, 300) + '...');
 }
 
 // Apply PATH fix for packaged apps
@@ -176,12 +189,15 @@ function getNpmCommand() {
     return isWindows ? 'npm.cmd' : 'npm';
   }
   
+  const home = process.env.HOME || process.env.USERPROFILE || '';
+  
   // In production, try to find npm's full path
   if (isWindows) {
     const npmPaths = [
       'C:\\Program Files\\nodejs\\npm.cmd',
       'C:\\Program Files (x86)\\nodejs\\npm.cmd',
       process.env.APPDATA + '\\npm\\npm.cmd',
+      home + '\\.volta\\bin\\npm.cmd',
     ];
     
     for (const npmPath of npmPaths) {
@@ -193,33 +209,54 @@ function getNpmCommand() {
     return 'npm.cmd'; // Fallback
   } else {
     // Unix-like systems
-    try {
-      // Try to use 'which' to find npm
-const { execSync } = require('child_process');
-      const npmPath = execSync('which npm', { encoding: 'utf8' }).trim();
-      if (npmPath && fs.existsSync(npmPath)) {
-        console.log('Found npm at:', npmPath);
-        return npmPath;
-      }
-    } catch (err) {
-      console.warn('Could not find npm with which:', err.message);
-    }
     
-    // Try common locations
-    const npmPaths = [
-      '/usr/local/bin/npm',
-      '/opt/homebrew/bin/npm',
-      '/usr/bin/npm',
-      process.env.HOME + '/.nvm/versions/node/*/bin/npm',
+    // First check common static locations
+    const staticPaths = [
+      '/opt/homebrew/bin/npm',    // M1/M2/M3 Mac Homebrew (most common)
+      '/usr/local/bin/npm',        // Intel Mac Homebrew / standard
+      '/usr/bin/npm',              // System npm
+      home + '/.volta/bin/npm',    // Volta
+      home + '/.fnm/current/bin/npm', // FNM
+      home + '/.asdf/shims/npm',   // ASDF
     ];
     
-    for (const npmPath of npmPaths) {
+    for (const npmPath of staticPaths) {
       if (fs.existsSync(npmPath)) {
         console.log('Found npm at:', npmPath);
         return npmPath;
       }
     }
     
+    // Check NVM - iterate through versions
+    const nvmDir = path.join(home, '.nvm', 'versions', 'node');
+    if (fs.existsSync(nvmDir)) {
+      try {
+        const versions = fs.readdirSync(nvmDir).filter(v => v.startsWith('v')).sort().reverse();
+        for (const version of versions) {
+          const npmPath = path.join(nvmDir, version, 'bin', 'npm');
+          if (fs.existsSync(npmPath)) {
+            console.log('Found npm via NVM at:', npmPath);
+            return npmPath;
+          }
+        }
+      } catch (err) {
+        console.warn('Error scanning NVM directory:', err.message);
+      }
+    }
+    
+    // Try 'which npm' as last resort
+    try {
+      const { execSync } = require('child_process');
+      const npmPath = execSync('which npm 2>/dev/null || echo ""', { encoding: 'utf8' }).trim();
+      if (npmPath && fs.existsSync(npmPath)) {
+        console.log('Found npm via which at:', npmPath);
+        return npmPath;
+      }
+    } catch (err) {
+      console.warn('Could not find npm with which:', err.message);
+    }
+    
+    console.warn('⚠️ npm not found in any known location, falling back to PATH');
     return 'npm'; // Fallback to PATH
   }
 }
@@ -1044,55 +1081,240 @@ ipcMain.handle('remove-node-modules', async (_event, projectPath) => {
 });
 
 
-// Helper to check if we have execution permissions
+// Helper to check if we have execution permissions with detailed diagnostics
 async function checkExecutePermissions(projectPath) {
+  const diagnostics = {
+    canAccessDir: false,
+    canReadPackageJson: false,
+    canAccessNodeModules: true, // Assume true if doesn't exist
+    issues: []
+  };
+  
   try {
-    // Just check if we can read the directory and package.json
-    const stats = await fsPromises.stat(projectPath);
-    if (!stats.isDirectory()) {
-      console.error('Project path is not a directory:', projectPath);
-      return false;
+    // Check 1: Can we access the project directory?
+    try {
+      const stats = await fsPromises.stat(projectPath);
+      if (!stats.isDirectory()) {
+        diagnostics.issues.push('Project path is not a directory');
+        return { success: false, diagnostics };
+      }
+      diagnostics.canAccessDir = true;
+    } catch (err) {
+      diagnostics.issues.push(`Cannot access project directory: ${err.code || err.message}`);
+      return { success: false, diagnostics };
     }
     
-    // Check if we can access package.json
+    // Check 2: Can we read package.json?
     const packageJsonPath = path.join(projectPath, 'package.json');
     try {
       await fsPromises.access(packageJsonPath, fs.constants.R_OK);
-      return true;
+      diagnostics.canReadPackageJson = true;
     } catch (err) {
-      console.error('Cannot read package.json:', err);
-      return false;
+      diagnostics.issues.push(`Cannot read package.json: ${err.code || err.message}`);
     }
+    
+    // Check 3: Can we access node_modules (if it exists)?
+    const nodeModulesPath = path.join(projectPath, 'node_modules');
+    try {
+      if (fs.existsSync(nodeModulesPath)) {
+        await fsPromises.access(nodeModulesPath, fs.constants.R_OK | fs.constants.X_OK);
+        
+        // Check .bin directory specifically (common permission issue spot)
+        const binPath = path.join(nodeModulesPath, '.bin');
+        if (fs.existsSync(binPath)) {
+          await fsPromises.access(binPath, fs.constants.R_OK | fs.constants.X_OK);
+        }
+        diagnostics.canAccessNodeModules = true;
+      }
+    } catch (err) {
+      diagnostics.canAccessNodeModules = false;
+      diagnostics.issues.push(`Cannot access node_modules: ${err.code || err.message}`);
+    }
+    
+    // All critical checks passed?
+    const success = diagnostics.canAccessDir && diagnostics.canReadPackageJson && diagnostics.canAccessNodeModules;
+    
+    if (!success) {
+      console.warn('Permission check failed:', diagnostics);
+    }
+    
+    return { success, diagnostics };
   } catch (err) {
     console.error('Error checking permissions:', err);
-    return false;
+    diagnostics.issues.push(`Unexpected error: ${err.message}`);
+    return { success: false, diagnostics };
   }
 }
 
-// Helper to fix common permission issues
-async function fixProjectPermissions(projectPath) {
+// Helper to fix common permission issues with multiple strategies
+async function fixProjectPermissions(projectPath, aggressive = false) {
   if (isWindows) {
-    // Windows doesn't have the same permission model
-    return true;
+    // Windows: Try to reset permissions using icacls
+    try {
+      const { exec } = require('child_process');
+      const { promisify } = require('util');
+      const execAsync = promisify(exec);
+      
+      // Grant full control to current user
+      const username = process.env.USERNAME || process.env.USER;
+      if (username) {
+        await execAsync(`icacls "${projectPath}" /grant "${username}:F" /T /C /Q`);
+        console.log(`✅ Fixed Windows permissions for: ${projectPath}`);
+        return { success: true };
+      }
+    } catch (err) {
+      console.error('Failed to fix Windows permissions:', err);
+      return { 
+        success: false, 
+        message: 'Could not fix permissions automatically.',
+        manual: `Please run in Command Prompt as Administrator:\nicacls "${projectPath}" /grant "%USERNAME%:F" /T`
+      };
+    }
+    return { success: true };
   }
   
+  // macOS/Linux
+  const { exec } = require('child_process');
+  const { promisify } = require('util');
+  const execAsync = promisify(exec);
+  
+  const nodeModulesPath = path.join(projectPath, 'node_modules');
+  const binPath = path.join(nodeModulesPath, '.bin');
+  
+  const strategies = [
+    {
+      name: 'Remove macOS quarantine attributes',
+      cmd: `xattr -rd com.apple.quarantine "${projectPath}" 2>/dev/null || true`,
+      description: 'Remove quarantine flags that can block execution',
+      condition: () => isMac
+    },
+    {
+      name: 'Fix user permissions',
+      cmd: `chmod -R u+rwX "${projectPath}"`,
+      description: 'Grant read/write/execute to current user'
+    },
+    {
+      name: 'Fix node_modules permissions',
+      cmd: `chmod -R 755 "${nodeModulesPath}"`,
+      description: 'Fix node_modules with standard permissions',
+      condition: () => fs.existsSync(nodeModulesPath)
+    },
+    {
+      name: 'Fix .bin executables',
+      cmd: `chmod -R 755 "${binPath}" && find "${binPath}" -type f -exec chmod +x {} \\;`,
+      description: 'Make all binaries executable',
+      condition: () => fs.existsSync(binPath)
+    },
+    {
+      name: 'Take ownership',
+      cmd: `chown -R $(whoami) "${projectPath}"`,
+      description: 'Take ownership of project files'
+    }
+  ];
+  
+  // Add aggressive strategies if requested
+  if (aggressive) {
+    strategies.push({
+      name: 'Fix npm cache permissions',
+      cmd: `chmod -R u+rwX ~/.npm 2>/dev/null || true`,
+      description: 'Fix npm cache directory'
+    });
+  }
+  
+  const results = [];
+  
+  for (const strategy of strategies) {
+    // Skip if condition function exists and returns false
+    if (strategy.condition && !strategy.condition()) {
+      continue;
+    }
+    
+    try {
+      console.log(`🔧 Trying: ${strategy.name}`);
+      await execAsync(strategy.cmd, { timeout: 30000 }); // 30 second timeout
+      console.log(`✅ ${strategy.name} succeeded`);
+      results.push({ strategy: strategy.name, success: true });
+    } catch (err) {
+      console.warn(`⚠️ ${strategy.name} failed:`, err.message);
+      results.push({ strategy: strategy.name, success: false, error: err.message });
+    }
+  }
+  
+  // Check if most strategies succeeded
+  const successCount = results.filter(r => r.success).length;
+  const totalCount = results.length;
+  
+  if (successCount > 0) {
+    console.log(`✅ Permission fix completed for: ${projectPath} (${successCount}/${totalCount} strategies succeeded)`);
+    return { success: true, results, partial: successCount < totalCount };
+  } else {
+    console.error('All permission fix strategies failed:', results);
+    return { 
+      success: false, 
+      results,
+      message: 'Could not fix permissions automatically.',
+      manual: `Please run these commands in Terminal:\n\nsudo chmod -R 755 "${projectPath}"\nsudo chown -R $(whoami) "${projectPath}"\n\nOr try deleting node_modules:\nrm -rf "${nodeModulesPath}"\nnpm install`
+    };
+  }
+}
+
+// Aggressive permission fix - deletes node_modules and reinstalls
+async function aggressivePermissionFix(projectPath) {
+  const { exec } = require('child_process');
+  const { promisify } = require('util');
+  const execAsync = promisify(exec);
+  
+  const nodeModulesPath = path.join(projectPath, 'node_modules');
+  
+  console.log(`🔧 Starting aggressive fix for: ${projectPath}`);
+  
   try {
-    console.log(`Attempting to fix permissions for: ${projectPath}`);
+    // Step 1: Try to fix permissions first
+    await fixProjectPermissions(projectPath, true);
     
-    // On macOS/Linux, ensure the project directory is readable and executable
-    const { exec } = require('child_process');
-    const { promisify } = require('util');
-    const execAsync = promisify(exec);
+    // Step 2: If node_modules exists, remove it
+    if (fs.existsSync(nodeModulesPath)) {
+      console.log(`🗑️ Removing node_modules...`);
+      
+      if (isWindows) {
+        await execAsync(`rmdir /s /q "${nodeModulesPath}"`, { timeout: 120000 });
+      } else {
+        // First try without sudo
+        try {
+          await execAsync(`rm -rf "${nodeModulesPath}"`, { timeout: 120000 });
+        } catch (rmErr) {
+          // If that fails, try with sudo (will require user's password)
+          console.log(`⚠️ Regular rm failed, trying with elevated permissions...`);
+          await execAsync(`sudo rm -rf "${nodeModulesPath}"`, { timeout: 120000 });
+        }
+      }
+      
+      console.log(`✅ node_modules removed`);
+    }
     
-    // Make sure we have read/write access to the project directory
-    // This won't require sudo if the user owns the directory
-    await execAsync(`chmod -R u+rwX "${projectPath}"`);
+    // Step 3: Reinstall dependencies
+    console.log(`📦 Reinstalling dependencies...`);
     
-    console.log(`✅ Fixed permissions for: ${projectPath}`);
-    return true;
+    const npmCmd = isWindows ? 'npm.cmd' : 'npm';
+    await execAsync(`${npmCmd} install`, { 
+      cwd: projectPath, 
+      timeout: 300000,  // 5 minute timeout for npm install
+      env: { ...process.env, CI: 'true' }
+    });
+    
+    console.log(`✅ Dependencies reinstalled successfully`);
+    
+    return { 
+      success: true, 
+      message: 'node_modules deleted and reinstalled successfully!' 
+    };
   } catch (err) {
-    console.error('Failed to fix permissions:', err);
-    return false;
+    console.error('Aggressive fix failed:', err);
+    return { 
+      success: false, 
+      error: err.message,
+      manual: `Please run manually in Terminal:\n\ncd "${projectPath}"\nsudo rm -rf node_modules\nnpm install`
+    };
   }
 }
 
@@ -1225,27 +1447,49 @@ ipcMain.handle('play-project', async (_event, projectPath, customPort = null) =>
     }
     
     // Check if we have necessary permissions
-    let hasPermissions = await checkExecutePermissions(projectPath);
-    if (!hasPermissions) {
-      console.log(`⚠️ Permission denied for ${projectPath}. Attempting to fix...`);
+    let permCheck = await checkExecutePermissions(projectPath);
+    if (!permCheck.success) {
+      console.log(`⚠️ Permission issues detected for ${projectPath}`);
+      console.log(`   Issues:`, permCheck.diagnostics.issues);
+      
+      // Build a helpful error message based on the specific issues
+      const issues = permCheck.diagnostics.issues;
+      let issueDescription = issues.length > 0 ? issues.join('\n• ') : 'Unknown permission issue';
+      
+      console.log(`🔧 Attempting to fix permissions automatically...`);
       
       // Try to fix permissions automatically
-      const fixed = await fixProjectPermissions(projectPath);
+      const fixResult = await fixProjectPermissions(projectPath);
       
-      if (fixed) {
+      if (fixResult.success) {
         // Check again after fixing
-        hasPermissions = await checkExecutePermissions(projectPath);
-        if (!hasPermissions) {
+        permCheck = await checkExecutePermissions(projectPath);
+        if (!permCheck.success) {
+          // Still failing after fix attempt - give detailed instructions
+          const manualCmd = isWindows 
+            ? `icacls "${projectPath}" /grant "%USERNAME%:F" /T`
+            : `sudo chmod -R u+rwX "${projectPath}" && sudo chown -R $(whoami) "${projectPath}"`;
+          
           return {
             success: false,
-            error: 'Insufficient permissions to access this project.\n\nPlease check folder permissions or try running:\nchmod -R u+rwX "' + projectPath + '"'
+            error: `Permission denied. Auto-fix was attempted but some issues remain.\n\n` +
+                   `Issues detected:\n• ${permCheck.diagnostics.issues.join('\n• ')}\n\n` +
+                   `Please run this command in ${isWindows ? 'Command Prompt (as Admin)' : 'Terminal'}:\n\n${manualCmd}`
           };
         }
         console.log(`✅ Permissions fixed for ${projectPath}`);
       } else {
+        // Fix failed entirely
+        const manualInstructions = fixResult.manual || 
+          (isWindows 
+            ? `icacls "${projectPath}" /grant "%USERNAME%:F" /T`
+            : `sudo chmod -R u+rwX "${projectPath}"`);
+        
         return {
           success: false,
-          error: 'Permission denied. Could not automatically fix permissions.\n\nPlease run this command in terminal:\nchmod -R u+rwX "' + projectPath + '"'
+          error: `Permission denied. Could not fix permissions automatically.\n\n` +
+                 `Issues detected:\n• ${issueDescription}\n\n` +
+                 `Please run this command in ${isWindows ? 'Command Prompt (as Admin)' : 'Terminal'}:\n\n${manualInstructions}`
         };
       }
     }
@@ -1456,12 +1700,228 @@ ipcMain.handle('play-project', async (_event, projectPath, customPort = null) =>
     let spawnCmd, spawnArgs;
     const fullCommand = `${npmCmd} ${args.join(' ')}`;
     
+    // Check if this is a UNC path (Windows network/VM shared folder)
+    // UNC paths start with \\ (which is \\\\ in JS string literal, or just check first 2 chars)
+    const normalizedProjectPath = path.normalize(projectPath);
+    const isUNCPath = isWindows && (
+      normalizedProjectPath.startsWith('\\\\') || 
+      projectPath.startsWith('\\\\') ||
+      /^\\\\[^\\]+\\/.test(projectPath)  // Matches \\server\share pattern
+    );
+    
+    console.log(`🔍 Path analysis: "${projectPath}"`);
+    console.log(`🔍 Normalized: "${normalizedProjectPath}"`);
+    console.log(`🔍 Is UNC path: ${isUNCPath}`);
+    console.log(`🔍 First 4 chars: "${projectPath.substring(0, 4)}"`);
+    console.log(`🔍 Char codes: ${projectPath.charCodeAt(0)}, ${projectPath.charCodeAt(1)}`);
+    
     if (isWindows) {
       // On Windows, use cmd /c
       spawnCmd = process.env.COMSPEC || 'cmd.exe';
-      spawnArgs = ['/c', fullCommand];
+      
+      if (isUNCPath) {
+        // UNC paths (like \\Mac\Home\...) require special handling
+        // Node.js spawn() doesn't support UNC paths in cwd option
+        console.log(`🔧 Detected UNC path: ${projectPath}`);
+        console.log(`🔧 Using exec() approach for Parallels/VM shared folders`);
+        
+        // Ensure the path uses proper Windows backslashes
+        let winPath = normalizedProjectPath.replace(/\//g, '\\');
+        
+        // Remove trailing backslash if present (can cause issues)
+        if (winPath.endsWith('\\') && !winPath.endsWith(':\\')) {
+          winPath = winPath.slice(0, -1);
+        }
+        
+        console.log(`🔧 Windows UNC path: "${winPath}"`);
+        
+        // For UNC paths, use exec() instead of spawn() as it handles paths better
+        // Use pushd which maps UNC path to a temp drive letter (e.g., Z:)
+        const uncCommand = `pushd "${winPath}" && ${fullCommand}`;
+        console.log(`Executing (Windows UNC): ${uncCommand}`);
+        
+        // Use exec for UNC paths - it's more reliable
+        const { execSync } = require('child_process');
+        
+        // First, verify the path is accessible
+        try {
+          execSync(`dir "${winPath}"`, { encoding: 'utf8', windowsHide: true });
+          console.log(`✅ UNC path is accessible`);
+        } catch (dirErr) {
+          console.error(`❌ Cannot access UNC path: ${dirErr.message}`);
+          return {
+            success: false,
+            error: `Cannot access the shared folder.\n\nPath: ${winPath}\n\nPlease check:\n1. Parallels shared folders are enabled\n2. The folder exists on your Mac\n3. Try navigating to the path in Windows Explorer first`
+          };
+        }
+        
+        // Now use exec with a different approach - child_process.exec handles UNC better
+        const child = exec(uncCommand, {
+          env,
+          maxBuffer: 10 * 1024 * 1024, // 10MB buffer for output
+          windowsHide: true,
+        });
+        
+        runningProcesses.set(projectPath, { 
+          process: child, 
+          port: suggestedPort,
+          framework: projectInfo.framework,
+          isExec: true  // Mark as exec for proper cleanup
+        });
+        updateTrayMenu(runningProcesses);
+        
+        let actualPort = suggestedPort;
+        let hasDetectedPort = false;
+        let stdoutBuffer = '';
+        let stderrBuffer = '';
+        
+        // Handle stdout
+        child.stdout.on('data', (data) => {
+          const output = data.toString();
+          stdoutBuffer += output;
+          console.log(`[UNC:stdout] ${output}`);
+          
+          mainWindow?.webContents.send('project-logs', {
+            projectPath,
+            type: 'stdout',
+            log: output,
+          });
+          
+          // Port detection
+          if (!hasDetectedPort) {
+            const portPatterns = [
+              /Local:\s*http:\/\/localhost:(\d+)/i,
+              /http:\/\/localhost:(\d+)/i,
+              /port[:\s]+(\d+)/i,
+            ];
+            for (const pattern of portPatterns) {
+              const match = output.match(pattern);
+              if (match) {
+                const detectedPort = parseInt(match[1], 10);
+                if (detectedPort >= 1000 && detectedPort <= 65535) {
+                  actualPort = detectedPort;
+                  hasDetectedPort = true;
+                  
+                  if (runningProcesses.has(projectPath)) {
+                    const processInfo = runningProcesses.get(projectPath);
+                    processInfo.port = actualPort;
+                    runningProcesses.set(projectPath, processInfo);
+                  }
+                  
+                  console.log(`✅ Detected port: ${actualPort}`);
+                  mainWindow?.webContents.send('project-status', {
+                    projectPath,
+                    status: 'running',
+                    port: actualPort,
+                    pid: child.pid,
+                    framework: projectInfo.framework,
+                  });
+                  break;
+                }
+              }
+            }
+          }
+        });
+        
+        // Handle stderr
+        child.stderr.on('data', (data) => {
+          const error = data.toString();
+          stderrBuffer += error;
+          console.log(`[UNC:stderr] ${error}`);
+          
+          mainWindow?.webContents.send('project-logs', {
+            projectPath,
+            type: 'stderr',
+            log: error,
+          });
+        });
+        
+        // Handle exit
+        child.on('exit', (code, signal) => {
+          console.log(`[UNC] Process exited. Code: ${code}, Signal: ${signal}`);
+          console.log(`[UNC] STDERR: ${stderrBuffer.substring(0, 500)}`);
+          console.log(`[UNC] STDOUT: ${stdoutBuffer.substring(0, 500)}`);
+          
+          runningProcesses.delete(projectPath);
+          updateTrayMenu(runningProcesses);
+          
+          let errorMsg = undefined;
+          if (code !== 0) {
+            errorMsg = `Process exited with code ${code}`;
+            
+            // Provide helpful error messages based on stderr content
+            if (stderrBuffer.includes('ENOENT') || stderrBuffer.includes('not found') || stderrBuffer.includes("'npm' is not recognized")) {
+              errorMsg = 'npm/Node.js not found.\n\nPlease install Node.js in your Windows VM:\n1. Download from https://nodejs.org\n2. Install Node.js\n3. Restart the app';
+            } else if (stderrBuffer.includes('EACCES') || stderrBuffer.includes('permission denied') || stderrBuffer.includes('Permission denied')) {
+              errorMsg = `Permission denied.\n\nTry in Command Prompt (Admin):\nicacls "${winPath}" /grant "%USERNAME%:F" /T\n\nOr delete node_modules and reinstall.`;
+            } else if (stderrBuffer.includes('npm ERR!')) {
+              const npmErrMatch = stderrBuffer.match(/npm ERR! ([^\n]+)/);
+              errorMsg = npmErrMatch ? `npm error: ${npmErrMatch[1]}` : 'npm encountered an error. Check logs for details.';
+            } else if (stderrBuffer.includes('Cannot find module')) {
+              errorMsg = 'Missing module. Try running "npm install" first.';
+            } else if (stderrBuffer.includes('ENOTEMPTY') || stderrBuffer.includes('Directory not empty')) {
+              errorMsg = 'Directory conflict. Try deleting node_modules manually and reinstall.';
+            } else if (stderrBuffer.includes('network') || stderrBuffer.includes('ETIMEDOUT') || stderrBuffer.includes('ECONNREFUSED')) {
+              errorMsg = 'Network error. Check your internet connection.';
+            } else if (stderrBuffer.length > 0) {
+              // Show first meaningful line from stderr
+              const lines = stderrBuffer.split('\n').filter(l => l.trim().length > 0);
+              const firstError = lines.find(l => l.toLowerCase().includes('error') || l.toLowerCase().includes('failed')) || lines[0];
+              if (firstError && firstError.length < 200) {
+                errorMsg = firstError.trim();
+              }
+            }
+          }
+          
+          mainWindow?.webContents.send('project-status', {
+            projectPath,
+            status: code === 0 ? 'stopped' : 'error',
+            code,
+            signal,
+            error: errorMsg,
+          });
+        });
+        
+        // Handle error
+        child.on('error', (err) => {
+          console.error(`[UNC] Error:`, err);
+          runningProcesses.delete(projectPath);
+          
+          mainWindow?.webContents.send('project-status', {
+            projectPath,
+            status: 'error',
+            error: err.message,
+          });
+        });
+        
+        // Fallback status after timeout
+        setTimeout(() => {
+          if (!hasDetectedPort && runningProcesses.has(projectPath)) {
+            console.log(`⚠️ Port not detected, using suggested: ${suggestedPort}`);
+            mainWindow?.webContents.send('project-status', {
+              projectPath,
+              status: 'running',
+              port: suggestedPort,
+              pid: child.pid,
+              framework: projectInfo.framework,
+            });
+          }
+        }, 5000);
+        
+        return {
+          pid: child.pid,
+          port: suggestedPort,
+          framework: projectInfo.framework,
+          success: true,
+          message: `Starting project on UNC path (port ${suggestedPort})...`
+        };
+      } else {
+        // Standard Windows path - use normal approach
+        spawnArgs = ['/c', fullCommand];
+        console.log(`Spawning (Windows): ${spawnCmd} ${spawnArgs.join(' ')}`);
+      }
+      
       spawnOptions.windowsHide = true;
-      console.log(`Spawning (Windows): ${spawnCmd} ${spawnArgs.join(' ')}`);
     } else {
       // On macOS/Linux, use login shell to get proper environment
       // This sources .bashrc/.zshrc to get NVM, Volta, etc.
@@ -1691,8 +2151,11 @@ ipcMain.handle('play-project', async (_event, projectPath, customPort = null) =>
         // Check for common errors
         if (stderrBuffer.includes('ENOENT') || stderrBuffer.includes('not found')) {
           errorMsg += 'A required command or file was not found.';
-        } else if (stderrBuffer.includes('EACCES') || stderrBuffer.includes('permission denied')) {
-          errorMsg += 'Permission denied.';
+        } else if (stderrBuffer.includes('EACCES') || stderrBuffer.includes('permission denied') || stderrBuffer.includes('Permission denied')) {
+          const fixCmd = isWindows 
+            ? `icacls "${projectPath}" /grant "%USERNAME%:F" /T`
+            : `sudo chmod -R u+rwX "${projectPath}"`;
+          errorMsg = `Permission denied during execution.\n\nThis can happen when:\n• node_modules has restricted permissions\n• .bin executables aren't executable\n• npm cache has permission issues\n\nTry running in ${isWindows ? 'Command Prompt (Admin)' : 'Terminal'}:\n${fixCmd}\n\nOr try deleting node_modules and reinstalling.`;
         } else if (stderrBuffer.includes('npm ERR!')) {
           // Extract npm error
           const npmErrMatch = stderrBuffer.match(/npm ERR! ([^\n]+)/);
@@ -2102,6 +2565,12 @@ ipcMain.handle('open-in-terminal', async (_event, projectPath, terminalPreferenc
       // Use 'start' command to open in a new window
       console.log('🚀 Opening Windows terminal...');
       
+      // Check if this is a UNC path (Parallels/VM shared folder)
+      const isUNCPath = normalizedPath.startsWith('\\\\');
+      if (isUNCPath) {
+        console.log('🔧 Detected UNC path - will use pushd for directory change');
+      }
+      
       // Helper function to open Windows Terminal (new modern terminal)
       const openWindowsTerminal = () => {
         console.log('Trying Windows Terminal...');
@@ -2119,7 +2588,11 @@ ipcMain.handle('open-in-terminal', async (_event, projectPath, terminalPreferenc
       const openPowerShell = () => {
         console.log('Opening PowerShell...');
         // Use 'start' to open in a new window
-        const psCommand = `start powershell -NoExit -Command "Set-Location -Path '${normalizedPath.replace(/'/g, "''")}'"`; 
+        // For UNC paths, use Push-Location which handles them properly
+        const cdCommand = isUNCPath 
+          ? `Push-Location -Path '${normalizedPath.replace(/'/g, "''")}'`
+          : `Set-Location -Path '${normalizedPath.replace(/'/g, "''")}'`;
+        const psCommand = `start powershell -NoExit -Command "${cdCommand}"`; 
         exec(psCommand, { windowsHide: false, shell: true }, (error) => {
           if (error) {
             console.error(`PowerShell error: ${error.message}`);
@@ -2134,7 +2607,11 @@ ipcMain.handle('open-in-terminal', async (_event, projectPath, terminalPreferenc
       const openCmd = () => {
         console.log('Opening CMD...');
         // Use 'start' to open in a new window
-        const cmdCommand = `start cmd /k "cd /d "${normalizedPath}""`;
+        // For UNC paths, use pushd which auto-maps to a drive letter
+        const cdCommand = isUNCPath 
+          ? `pushd "${normalizedPath}"`
+          : `cd /d "${normalizedPath}"`;
+        const cmdCommand = `start cmd /k "${cdCommand}"`;
         exec(cmdCommand, { windowsHide: false, shell: true }, (error) => {
           if (error) {
             console.error(`CMD error: ${error.message}`);
@@ -2363,6 +2840,127 @@ EOF`;
   } catch (err) {
     console.error('Error opening in terminal:', err);
     return { success: false, error: err.message };
+  }
+});
+
+// ========================================
+// Permission Fixing
+// ========================================
+
+// Fix permissions for a project
+ipcMain.handle('fix-project-permissions', async (_event, projectPath) => {
+  try {
+    console.log(`🔧 Manual permission fix requested for: ${projectPath}`);
+    
+    if (!isValidProjectPath(projectPath)) {
+      return { 
+        success: false, 
+        error: 'Invalid project path provided.' 
+      };
+    }
+    
+    // Check current permissions
+    const beforeCheck = await checkExecutePermissions(projectPath);
+    console.log('Permissions before fix:', beforeCheck);
+    
+    // Attempt to fix
+    const fixResult = await fixProjectPermissions(projectPath);
+    
+    if (!fixResult.success) {
+      return {
+        success: false,
+        error: 'Could not fix permissions automatically.',
+        manual: fixResult.manual,
+        diagnostics: {
+          before: beforeCheck.diagnostics,
+          fixAttempts: fixResult.results
+        }
+      };
+    }
+    
+    // Verify fix worked
+    const afterCheck = await checkExecutePermissions(projectPath);
+    console.log('Permissions after fix:', afterCheck);
+    
+    if (afterCheck.success) {
+      return {
+        success: true,
+        message: 'Permissions fixed successfully!',
+        diagnostics: {
+          before: beforeCheck.diagnostics,
+          after: afterCheck.diagnostics
+        }
+      };
+    } else {
+      const manualCmd = isWindows 
+        ? `icacls "${projectPath}" /grant "%USERNAME%:F" /T`
+        : `sudo chmod -R u+rwX "${projectPath}" && sudo chown -R $(whoami) "${projectPath}"`;
+      
+      return {
+        success: false,
+        error: 'Permission fix was attempted but some issues remain.',
+        manual: manualCmd,
+        diagnostics: {
+          before: beforeCheck.diagnostics,
+          after: afterCheck.diagnostics,
+          remainingIssues: afterCheck.diagnostics.issues
+        }
+      };
+    }
+  } catch (err) {
+    console.error('Error fixing permissions:', err);
+    return { 
+      success: false, 
+      error: err.message 
+    };
+  }
+});
+
+// Aggressive fix - delete node_modules and reinstall
+ipcMain.handle('aggressive-permission-fix', async (_event, projectPath) => {
+  try {
+    console.log(`🔧 Aggressive permission fix requested for: ${projectPath}`);
+    
+    if (!isValidProjectPath(projectPath)) {
+      return { 
+        success: false, 
+        error: 'Invalid project path provided.' 
+      };
+    }
+    
+    const result = await aggressivePermissionFix(projectPath);
+    return result;
+  } catch (err) {
+    console.error('Error in aggressive fix:', err);
+    return { 
+      success: false, 
+      error: err.message 
+    };
+  }
+});
+
+// Check permissions for a project (diagnostic)
+ipcMain.handle('check-project-permissions', async (_event, projectPath) => {
+  try {
+    if (!isValidProjectPath(projectPath)) {
+      return { 
+        success: false, 
+        error: 'Invalid project path provided.' 
+      };
+    }
+    
+    const check = await checkExecutePermissions(projectPath);
+    return {
+      success: true,
+      hasPermissions: check.success,
+      diagnostics: check.diagnostics
+    };
+  } catch (err) {
+    console.error('Error checking permissions:', err);
+    return { 
+      success: false, 
+      error: err.message 
+    };
   }
 });
 

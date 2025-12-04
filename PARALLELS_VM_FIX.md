@@ -35,7 +35,55 @@ if (!path.isAbsolute(normalizedPath) && !isUNCPath) {
 
 ---
 
-### 2. ✅ **Explorer Opening Twice (Fixed)**
+### 2. ✅ **spawn() with UNC Path Workaround (NEW)**
+
+**Problem:**
+```
+Error: Process failed. '\\Mac\Home\Desktop\projects\...'
+```
+
+Even after fixing path validation, projects couldn't **run** because Node.js's `spawn()` function **does not support UNC paths in the `cwd` option** on Windows.
+
+**Root Cause:**
+```javascript
+// This FAILS with UNC paths!
+spawn('npm', ['run', 'dev'], { 
+  cwd: '\\\\Mac\\Home\\Desktop\\project'  // ❌ Node.js limitation
+});
+```
+
+**Solution:**
+Use Windows `pushd` command which automatically maps UNC paths to a temporary drive letter:
+
+```javascript
+if (isWindows && isUNCPath) {
+  // pushd auto-maps \\Mac\Home\... to Z: (or next available)
+  const uncCommand = `pushd "${projectPath}" && npm run dev && popd`;
+  spawnCmd = 'cmd.exe';
+  spawnArgs = ['/c', uncCommand];
+  
+  // IMPORTANT: Don't set cwd - pushd handles the directory change
+  delete spawnOptions.cwd;
+}
+```
+
+**How `pushd` works:**
+1. `pushd \\Mac\Home\Desktop\project` → Maps to `Z:` and changes to it
+2. `npm run dev` → Runs in the mapped drive
+3. `popd` → Releases the drive letter when done
+
+**Files Updated:**
+- `main.js` - `play-project` handler
+- `utils/projectActions.js` - `installDependencies()`, `runNpmScript()`, `removeNodeModules()`
+
+**Result:**
+✅ Projects on shared folders can now **run** (`npm run dev/start`)
+✅ Dependencies can be installed (`npm install`)
+✅ node_modules can be removed
+
+---
+
+### 3. ✅ **Explorer Opening Twice (Fixed)**
 
 **Problem:**
 When no IDE was installed (like in a fresh VM), clicking "Open in IDE" would open **two** Explorer/Finder windows instead of one.
@@ -82,28 +130,46 @@ exec(cmd, { shell: true }, (error) => {
 
 ### Test Cases:
 
-#### ✅ Test 1: Run Project from Shared Folder
+#### ✅ Test 1: Run Project from Shared Folder (pushd workaround)
 ```
 Path: \\Mac\Home\Desktop\projects\my-app
-Expected: Project starts successfully
+Action: Click "Run" button
+Expected: Project starts successfully using pushd workaround
+Console: "🔧 Detected UNC path... Using pushd workaround"
 Result: ✅ PASS
 ```
 
-#### ✅ Test 2: Open IDE (No IDE Installed)
+#### ✅ Test 2: Install Dependencies on Shared Folder
+```
+Path: \\Mac\Home\Desktop\projects\my-app
+Action: Click "Install Dependencies"
+Expected: npm install completes successfully
+Result: ✅ PASS
+```
+
+#### ✅ Test 3: Open IDE (No IDE Installed)
 ```
 Action: Click "Open in IDE"
 Expected: Opens Explorer once
 Result: ✅ PASS (Previously opened twice)
 ```
 
-#### ✅ Test 3: Open IDE (VS Code Installed)
+#### ✅ Test 4: Open IDE (VS Code Installed)
 ```
 Action: Click "Open in IDE"
 Expected: Opens VS Code
 Result: ✅ PASS
 ```
 
-#### ✅ Test 4: Scan Shared Folder
+#### ✅ Test 5: Open Terminal on Shared Folder
+```
+Path: \\Mac\Home\Desktop\projects\my-app
+Action: Click "Open in Terminal"
+Expected: CMD opens with pushd to UNC path
+Result: ✅ PASS
+```
+
+#### ✅ Test 6: Scan Shared Folder
 ```
 Path: \\Mac\Home\Desktop\projects
 Expected: Finds all Node.js projects
@@ -235,10 +301,12 @@ npm run build
 ## Summary
 
 ### ✅ What's Fixed:
-1. **Parallels/VM shared folder support** - UNC paths now work
-2. **Explorer opening twice** - Now opens once
-3. **Better error messages** - More specific path validation logs
-4. **Cross-platform compatibility** - Works on all platforms and VMs
+1. **Parallels/VM shared folder support** - UNC paths now validated
+2. **spawn() with UNC paths** - Uses `pushd` workaround to run projects
+3. **Terminal opening with UNC paths** - Uses `pushd` for CMD, `Push-Location` for PowerShell
+4. **Explorer opening twice** - Now opens once
+5. **Better error messages** - More specific path validation logs
+6. **Cross-platform compatibility** - Works on all platforms and VMs
 
 ### 🎉 Result:
 Tafil now works **perfectly** in Windows VMs with macOS shared folders!

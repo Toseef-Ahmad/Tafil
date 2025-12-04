@@ -42,18 +42,55 @@ async function tryMultipleScripts(projectPath) {
 /** Runs `npm run <script>` with environment variables (PORT) */
 function runNpmScript(projectPath, scriptName, port) {
   return new Promise((resolve, reject) => {
-    const cmd = /^win/.test(process.platform) ? "npm.cmd" : "npm";
+    const isWindows = /^win/.test(process.platform);
+    const cmd = isWindows ? "npm.cmd" : "npm";
     const env = {
       ...process.env,
       PORT: port, // Dynamic port assignment
       CI: "true", // Avoid interactive prompts for CRA
     };
 
-    const child = spawn(cmd, ["run", scriptName], {
-      cwd: projectPath,
-      detached: true,
-      shell: true,
-      env,
+    // Check if this is a UNC path (Windows network/VM shared folder)
+    const normalizedPath = path.normalize(projectPath);
+    const isUNCPath = isWindows && (
+      normalizedPath.startsWith('\\\\') || 
+      projectPath.startsWith('\\\\')
+    );
+    
+    if (isWindows && isUNCPath) {
+      // UNC paths require exec() with pushd workaround
+      console.log(`🔧 Running script on UNC path: ${projectPath}`);
+      let winPath = normalizedPath.replace(/\//g, '\\');
+      if (winPath.endsWith('\\') && !winPath.endsWith(':\\')) {
+        winPath = winPath.slice(0, -1);
+      }
+      const uncCommand = `pushd "${winPath}" && npm run ${scriptName}`;
+      console.log(`🔧 UNC Command: ${uncCommand}`);
+      
+      // Use exec for UNC paths
+      const child = exec(uncCommand, { 
+        env, 
+        maxBuffer: 10 * 1024 * 1024 
+      });
+      
+      child.stdout?.on("data", (data) => {
+        console.log(`[${scriptName} STDOUT] ${data}`);
+      });
+      child.stderr?.on("data", (data) => {
+        console.error(`[${scriptName} STDERR] ${data}`);
+      });
+      child.on("error", (err) => reject(err));
+      
+      resolve({ pid: child.pid, port, scriptName });
+      return;
+    }
+    
+    // Standard path
+    const child = spawn(cmd, ["run", scriptName], { 
+      cwd: projectPath, 
+      detached: true, 
+      shell: true, 
+      env 
     });
 
     child.stdout.on("data", (data) => {
@@ -74,11 +111,44 @@ function runNpmScript(projectPath, scriptName, port) {
 /** Install dependencies (`npm install`) */
 function installDependencies(projectPath) {
   return new Promise((resolve, reject) => {
-    const cmd = /^win/.test(process.platform) ? "npm.cmd" : "npm";
-    const child = spawn(cmd, ["install"], {
-      cwd: projectPath,
-      shell: true,
-    });
+    const isWindows = /^win/.test(process.platform);
+    const cmd = isWindows ? "npm.cmd" : "npm";
+    
+    // Check if this is a UNC path (Windows network/VM shared folder)
+    const normalizedPath = path.normalize(projectPath);
+    const isUNCPath = isWindows && (
+      normalizedPath.startsWith('\\\\') || 
+      projectPath.startsWith('\\\\')
+    );
+    
+    if (isWindows && isUNCPath) {
+      // UNC paths require exec() with pushd workaround
+      console.log(`🔧 Installing dependencies on UNC path: ${projectPath}`);
+      let winPath = normalizedPath.replace(/\//g, '\\');
+      if (winPath.endsWith('\\') && !winPath.endsWith(':\\')) {
+        winPath = winPath.slice(0, -1);
+      }
+      const uncCommand = `pushd "${winPath}" && npm install`;
+      console.log(`🔧 UNC Command: ${uncCommand}`);
+      
+      // Use exec for UNC paths - more reliable
+      exec(uncCommand, { maxBuffer: 10 * 1024 * 1024 }, (error, stdout, stderr) => {
+        if (stdout) console.log(`[INSTALL:stdout] ${stdout}`);
+        if (stderr) console.error(`[INSTALL:stderr] ${stderr}`);
+        
+        if (error) {
+          console.error("Error installing dependencies:", error);
+          reject(error);
+        } else {
+          console.log(`✅ Dependencies installed for ${projectPath}`);
+          resolve({ success: true });
+        }
+      });
+      return;
+    }
+    
+    // Standard path
+    const child = spawn(cmd, ["install"], { cwd: projectPath, shell: true });
 
     child.stdout.on("data", (data) => {
       console.log(`[INSTALL:stdout] ${data}`);
@@ -110,6 +180,7 @@ function installDependencies(projectPath) {
 function removeNodeModules(projectPath) {
   return new Promise((resolve, reject) => {
     const nodeModulesPath = path.join(projectPath, "node_modules");
+    const isWindows = /^win/.test(process.platform);
     
     if (!fs.existsSync(nodeModulesPath)) {
       return resolve({
@@ -118,22 +189,78 @@ function removeNodeModules(projectPath) {
       });
     }
 
-    // Try to set permissions first (silently fail if not needed)
-    exec(`chmod -R 777 "${nodeModulesPath}"`, (chmodErr) => {
-      // Proceed with removal regardless of chmod result
-      exec(`rm -rf "${nodeModulesPath}"`, (rmErr) => {
-        if (rmErr) {
-          console.error("Error removing node_modules:", rmErr);
+    console.log(`🗑️ Attempting to remove: ${nodeModulesPath}`);
+
+    if (isWindows) {
+      // Windows: Use rmdir /s /q which works with UNC paths
+      exec(`rmdir /s /q "${nodeModulesPath}"`, { timeout: 120000 }, (rmErr) => {
+        // Verify deletion
+        if (fs.existsSync(nodeModulesPath)) {
+          console.error("❌ node_modules still exists after rmdir");
           return reject({
             success: false,
-            message: `Error removing node_modules: ${rmErr.message}`,
+            message: "Failed to delete node_modules. Try running as Administrator or delete manually.",
           });
+        }
+        
+        if (rmErr) {
+          console.warn("rmdir reported error but folder may be gone:", rmErr.message);
         }
 
         console.log(`✅ node_modules removed from ${projectPath}`);
         resolve({ success: true });
       });
-    });
+    } else {
+      // Unix: Multiple deletion strategies
+      const deleteStrategies = [
+        // Strategy 1: Direct rm -rf
+        () => new Promise((res, rej) => {
+          exec(`rm -rf "${nodeModulesPath}"`, { timeout: 120000 }, (err) => {
+            if (err) rej(err); else res();
+          });
+        }),
+        // Strategy 2: Fix permissions then delete
+        () => new Promise((res, rej) => {
+          exec(`chmod -R 777 "${nodeModulesPath}" && rm -rf "${nodeModulesPath}"`, { timeout: 120000 }, (err) => {
+            if (err) rej(err); else res();
+          });
+        }),
+        // Strategy 3: Use find to delete files first
+        () => new Promise((res, rej) => {
+          exec(`find "${nodeModulesPath}" -type f -delete && find "${nodeModulesPath}" -type d -empty -delete && rm -rf "${nodeModulesPath}"`, { timeout: 180000 }, (err) => {
+            if (err) rej(err); else res();
+          });
+        }),
+      ];
+      
+      // Try strategies in order
+      (async () => {
+        for (let i = 0; i < deleteStrategies.length; i++) {
+          try {
+            await deleteStrategies[i]();
+            
+            // Verify deletion
+            if (!fs.existsSync(nodeModulesPath)) {
+              console.log(`✅ node_modules removed (strategy ${i + 1})`);
+              return resolve({ success: true });
+            }
+          } catch (err) {
+            console.warn(`Strategy ${i + 1} failed:`, err.message);
+          }
+        }
+        
+        // All strategies failed
+        if (fs.existsSync(nodeModulesPath)) {
+          console.error("❌ All deletion strategies failed");
+          return reject({
+            success: false,
+            message: `Could not delete node_modules. Please run manually:\nsudo rm -rf "${nodeModulesPath}"`,
+          });
+        }
+        
+        resolve({ success: true });
+      })();
+    }
   });
 }
 

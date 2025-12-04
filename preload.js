@@ -30,6 +30,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   checkPortProcess: (port) => ipcRenderer.invoke('check-port-process', port),
   killExternalProcess: (pid) => ipcRenderer.invoke('kill-external-process', pid),
 
+  // ~~~~~~~~~~~~~~ Permission Management ~~~~~~~~~~~~~~
+  fixProjectPermissions: (projectPath) => ipcRenderer.invoke('fix-project-permissions', projectPath),
+  checkProjectPermissions: (projectPath) => ipcRenderer.invoke('check-project-permissions', projectPath),
+  aggressivePermissionFix: (projectPath) => ipcRenderer.invoke('aggressive-permission-fix', projectPath),
+
   // ~~~~~~~~~~~~~~ From main to renderer ~~~~~~~~~~~~~~
   onProjectStatus: (callback) => ipcRenderer.on('project-status', callback),
 

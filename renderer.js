@@ -1597,6 +1597,13 @@ async function runProjectWithPort(projectPath, customPort = null) {
     const result = await window.electronAPI.playProject(projectPath, customPort);
     if (result.error) {
       setCardStatus(projectPath, result.error, 'error');
+      
+      // Check if it's a permission error - offer to fix
+      const isPermissionError = result.error.toLowerCase().includes('permission') || 
+                                result.error.toLowerCase().includes('eacces');
+      if (isPermissionError) {
+        showPermissionErrorModal(projectPath, result.error);
+      }
     } else if (result.message) {
       setCardStatus(projectPath, result.message, 'success');
     }
@@ -1604,6 +1611,188 @@ async function runProjectWithPort(projectPath, customPort = null) {
     console.error("Error running project:", err);
     setCardStatus(projectPath, 'Failed to start', 'error');
   }
+}
+
+// Show permission error modal with options to fix
+function showPermissionErrorModal(projectPath, errorMessage) {
+  const modal = document.getElementById('confirm-modal');
+  const title = modal?.querySelector('h2');
+  const message = modal?.querySelector('p');
+  const confirmBtn = modal?.querySelector('.confirm-yes');
+  const cancelBtn = modal?.querySelector('.confirm-no');
+  
+  if (!modal || !title || !message || !confirmBtn || !cancelBtn) return;
+  
+  title.textContent = '🔒 Permission Error';
+  message.innerHTML = `
+    <div style="text-align: left; max-height: 350px; overflow-y: auto;">
+      <p style="margin-bottom: 12px;">The project couldn't start due to permission issues.</p>
+      <details style="margin-bottom: 12px;">
+        <summary style="cursor: pointer; color: var(--text-muted);">Show error details</summary>
+        <pre style="background: var(--bg-secondary); padding: 12px; border-radius: 8px; font-size: 11px; overflow-x: auto; white-space: pre-wrap; word-break: break-word; margin-top: 8px;">${escapeHtml(errorMessage)}</pre>
+      </details>
+      <p style="margin-bottom: 12px;"><strong>Choose a fix option:</strong></p>
+      <div style="display: flex; flex-direction: column; gap: 8px;">
+        <button id="fix-quick" class="modal-fix-btn" style="padding: 10px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-secondary); cursor: pointer; text-align: left;">
+          <strong>🔧 Quick Fix</strong><br>
+          <span style="font-size: 12px; color: var(--text-muted);">Try to fix file permissions (fast)</span>
+        </button>
+        <button id="fix-reinstall" class="modal-fix-btn" style="padding: 10px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-secondary); cursor: pointer; text-align: left;">
+          <strong>🔄 Delete & Reinstall</strong><br>
+          <span style="font-size: 12px; color: var(--text-muted);">Delete node_modules and reinstall (slower but thorough)</span>
+        </button>
+      </div>
+    </div>
+  `;
+  
+  // Hide default buttons, we'll use custom ones
+  confirmBtn.style.display = 'none';
+  cancelBtn.textContent = 'Cancel';
+  
+  modal.classList.remove('hidden');
+  
+  // Clone cancel button to remove old event listeners
+  const newCancelBtn = cancelBtn.cloneNode(true);
+  cancelBtn.parentNode.replaceChild(newCancelBtn, cancelBtn);
+  
+  // Add event listeners to custom buttons
+  const quickFixBtn = document.getElementById('fix-quick');
+  const reinstallBtn = document.getElementById('fix-reinstall');
+  
+  quickFixBtn?.addEventListener('click', async () => {
+    modal.classList.add('hidden');
+    confirmBtn.style.display = ''; // Restore for future modals
+    await fixProjectPermissions(projectPath);
+  });
+  
+  reinstallBtn?.addEventListener('click', async () => {
+    modal.classList.add('hidden');
+    confirmBtn.style.display = ''; // Restore for future modals
+    await aggressiveFixProject(projectPath);
+  });
+  
+  newCancelBtn.addEventListener('click', () => {
+    modal.classList.add('hidden');
+    confirmBtn.style.display = ''; // Restore for future modals
+  });
+}
+
+// Fix project permissions
+async function fixProjectPermissions(projectPath) {
+  setCardStatus(projectPath, 'Fixing permissions...', 'info');
+  showNotification('Attempting to fix permissions...', 'info');
+  
+  try {
+    const result = await window.electronAPI.fixProjectPermissions(projectPath);
+    
+    if (result.success) {
+      setCardStatus(projectPath, 'Permissions fixed!', 'success');
+      showNotification('Permissions fixed! Try running the project again.', 'success');
+      setTimeout(() => clearCardStatus(projectPath), 3000);
+    } else {
+      setCardStatus(projectPath, 'Could not fix permissions', 'error');
+      
+      // Show the manual command they need to run
+      if (result.manual) {
+        showManualFixModal(result.manual);
+      } else {
+        showNotification('Could not fix permissions automatically. Please check folder access.', 'error');
+      }
+    }
+  } catch (err) {
+    console.error('Error fixing permissions:', err);
+    setCardStatus(projectPath, 'Fix failed', 'error');
+    showNotification('Failed to fix permissions', 'error');
+  }
+}
+
+// Aggressive fix - delete node_modules and reinstall
+async function aggressiveFixProject(projectPath) {
+  setCardStatus(projectPath, 'Deleting node_modules...', 'info');
+  showNotification('This may take a few minutes. Please wait...', 'info');
+  
+  try {
+    const result = await window.electronAPI.aggressivePermissionFix(projectPath);
+    
+    if (result.success) {
+      setCardStatus(projectPath, 'Fixed & reinstalled!', 'success');
+      showNotification(result.message || 'Dependencies reinstalled! Try running now.', 'success');
+      updateSingleCard(projectPath);
+      setTimeout(() => clearCardStatus(projectPath), 5000);
+    } else {
+      setCardStatus(projectPath, 'Fix failed', 'error');
+      
+      if (result.manual) {
+        showManualFixModal(result.manual);
+      } else {
+        showNotification(result.error || 'Failed to fix. Please try manually.', 'error');
+      }
+    }
+  } catch (err) {
+    console.error('Error in aggressive fix:', err);
+    setCardStatus(projectPath, 'Fix failed', 'error');
+    showNotification('Failed to reinstall. Please try manually.', 'error');
+  }
+}
+
+// Show modal with manual fix command
+function showManualFixModal(command) {
+  const modal = document.getElementById('confirm-modal');
+  const title = modal?.querySelector('h2');
+  const message = modal?.querySelector('p');
+  const confirmBtn = modal?.querySelector('.confirm-yes');
+  const cancelBtn = modal?.querySelector('.confirm-no');
+  
+  if (!modal || !title || !message || !confirmBtn || !cancelBtn) return;
+  
+  title.textContent = '📋 Manual Fix Required';
+  message.innerHTML = `
+    <div style="text-align: left;">
+      <p style="margin-bottom: 12px;">Automatic fix failed. Please run this command in Terminal:</p>
+      <pre id="fix-command" style="background: var(--bg-secondary); padding: 12px; border-radius: 8px; font-size: 12px; overflow-x: auto; user-select: all; cursor: text;">${escapeHtml(command)}</pre>
+      <p style="margin-top: 12px; font-size: 12px; color: var(--text-muted);">Click the command to select it, then copy and paste into Terminal.</p>
+    </div>
+  `;
+  
+  confirmBtn.textContent = 'Copy Command';
+  cancelBtn.textContent = 'Close';
+  
+  modal.classList.remove('hidden');
+  
+  // Clone buttons to remove old event listeners
+  const newConfirmBtn = confirmBtn.cloneNode(true);
+  const newCancelBtn = cancelBtn.cloneNode(true);
+  confirmBtn.parentNode.replaceChild(newConfirmBtn, confirmBtn);
+  cancelBtn.parentNode.replaceChild(newCancelBtn, cancelBtn);
+  
+  newConfirmBtn.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(command);
+      showNotification('Command copied to clipboard!', 'success');
+    } catch (err) {
+      // Fallback: select the text
+      const pre = document.getElementById('fix-command');
+      if (pre) {
+        const selection = window.getSelection();
+        const range = document.createRange();
+        range.selectNodeContents(pre);
+        selection.removeAllRanges();
+        selection.addRange(range);
+        showNotification('Command selected - press Cmd+C to copy', 'info');
+      }
+    }
+  });
+  
+  newCancelBtn.addEventListener('click', () => {
+    modal.classList.add('hidden');
+  });
+}
+
+// Helper to escape HTML
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
 }
 
 async function stopProject(projectPath) {

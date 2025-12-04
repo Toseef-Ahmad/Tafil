@@ -1,0 +1,18 @@
+{
+  "name": "tafil-docs",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "homepage": "https://Toseef-Ahmad.github.io/Tafil/docs",
+  "scripts": {
+    "dev": "vitepress dev",
+    "build": "vitepress build",
+    "preview": "vitepress preview",
+    "predeploy": "npm run build",
+    "deploy": "bash deploy.sh"
+  },
+  "devDependencies": {
+    "gh-pages": "^6.3.0",
+    "vitepress": "^1.5.0"
+  }
+}
