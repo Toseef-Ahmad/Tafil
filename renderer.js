@@ -121,6 +121,10 @@ let activeCollection = 'all';
 let defaultIDE = null;
 let defaultTerminal = null;
 
+// Search/Filter state
+let lastSearchQuery = '';
+let scanPaths = []; // Saved scan paths
+
 const REFRESH_INTERVAL = 60000;
 const REFRESH_THROTTLE = 5000;
 
@@ -162,6 +166,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     loadCollections();
     loadDarkModePreference();
     loadSettings();
+    loadAppState();
+    loadScanPaths();
   } catch (err) {
     console.error('Error loading saved data:', err);
   }
@@ -183,6 +189,30 @@ document.addEventListener("DOMContentLoaded", async () => {
     console.log(`✅ Loaded ${installedTerminals.length} Terminals`);
   } catch (err) {
     console.error('Error loading Terminals:', err);
+  }
+  
+  // AUTO-LOAD PROJECTS: Load saved projects first, then background refresh
+  const hasProjects = loadSavedProjects();
+  if (hasProjects) {
+    console.log('📂 Displaying saved projects...');
+    allProjectsCountEl.textContent = currentProjects.length;
+    renderProjectCards(currentProjects);
+    
+    // Apply saved search query if any
+    if (lastSearchQuery && commandInput) {
+      commandInput.value = lastSearchQuery;
+    }
+    
+    // Background refresh to check for changes (silent)
+    setTimeout(() => {
+      silentRefreshProjects();
+    }, 2000);
+  } else {
+    // No saved projects - auto scan home directory
+    console.log('📂 No saved projects, auto-scanning...');
+    setTimeout(() => {
+      autoScanProjects();
+    }, 500);
   }
   
   // Render collections
@@ -229,10 +259,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   
   // Event listeners - Header
   if (commandTrigger) commandTrigger.addEventListener("click", showCommandPalette);
-  if (refreshBtn) refreshBtn.addEventListener("click", () => {
-    renderProjectCards(currentProjects);
-    showNotification('Projects refreshed', 'success');
-  });
+  if (refreshBtn) refreshBtn.addEventListener("click", fullRefreshProjects);
   if (darkModeToggle) darkModeToggle.addEventListener("click", toggleDarkMode);
   
   // Event listeners - Settings
@@ -377,17 +404,31 @@ async function scanExternalProcesses() {
       // Clear previous external projects
       externalProjects.clear();
       
-      // Add new external projects
+      // Add new external projects with path normalization
       result.processes.forEach(proc => {
         if (proc.projectPath) {
-          // Only track external processes that have a detectable project path
-          externalProjects.set(proc.projectPath, {
-            port: proc.port,
-            pid: proc.pid,
-            command: proc.command,
-            status: 'external',
-            external: true
+          // Normalize path for matching
+          let normalizedPath = proc.projectPath.replace(/\/$/, '').replace(/\\$/, '');
+          
+          // Try to match with current projects
+          const matchedProject = currentProjects.find(p => {
+            const projectPathNorm = p.path.replace(/\/$/, '').replace(/\\$/, '');
+            return projectPathNorm === normalizedPath || 
+                   projectPathNorm.toLowerCase() === normalizedPath.toLowerCase();
           });
+          
+          const pathToUse = matchedProject ? matchedProject.path : normalizedPath;
+          
+          // Don't add if already tracked by Tafil
+          if (!runningProjects.has(pathToUse)) {
+            externalProjects.set(pathToUse, {
+              port: proc.port,
+              pid: proc.pid,
+              command: proc.command,
+              status: 'external',
+              external: true
+            });
+          }
         }
       });
       
@@ -630,6 +671,109 @@ function saveCollections() {
   }
 }
 
+// =====================================================
+// Projects Persistence - Auto-save/load
+// =====================================================
+function saveProjects() {
+  try {
+    localStorage.setItem('savedProjects', JSON.stringify(currentProjects));
+    localStorage.setItem('lastScanTime', Date.now().toString());
+    console.log(`💾 Saved ${currentProjects.length} projects to storage`);
+  } catch (err) {
+    console.error('Error saving projects:', err);
+  }
+}
+
+function loadSavedProjects() {
+  try {
+    const saved = localStorage.getItem('savedProjects');
+    const lastScan = localStorage.getItem('lastScanTime');
+    
+    if (saved) {
+      const projects = JSON.parse(saved);
+      if (projects && projects.length > 0) {
+        currentProjects = projects;
+        console.log(`📂 Loaded ${projects.length} saved projects`);
+        
+        // Show last scan time
+        if (lastScan) {
+          const scanTime = new Date(parseInt(lastScan));
+          const timeAgo = getTimeAgo(scanTime);
+          viewSubtitleEl.textContent = `${projects.length} projects • Last scan: ${timeAgo}`;
+        }
+        
+        return true;
+      }
+    }
+    return false;
+  } catch (err) {
+    console.error('Error loading saved projects:', err);
+    return false;
+  }
+}
+
+function getTimeAgo(date) {
+  const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
+  
+  if (seconds < 60) return 'Just now';
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+  return `${Math.floor(seconds / 86400)}d ago`;
+}
+
+function saveScanPaths(paths) {
+  try {
+    scanPaths = paths;
+    localStorage.setItem('scanPaths', JSON.stringify(paths));
+  } catch (err) {
+    console.error('Error saving scan paths:', err);
+  }
+}
+
+function loadScanPaths() {
+  try {
+    const saved = localStorage.getItem('scanPaths');
+    if (saved) {
+      scanPaths = JSON.parse(saved);
+      return scanPaths;
+    }
+    return [];
+  } catch (err) {
+    console.error('Error loading scan paths:', err);
+    return [];
+  }
+}
+
+function saveAppState() {
+  try {
+    const state = {
+      activeCollection,
+      currentView,
+      lastSearchQuery,
+    };
+    localStorage.setItem('appState', JSON.stringify(state));
+  } catch (err) {
+    console.error('Error saving app state:', err);
+  }
+}
+
+function loadAppState() {
+  try {
+    const saved = localStorage.getItem('appState');
+    if (saved) {
+      const state = JSON.parse(saved);
+      activeCollection = state.activeCollection || 'all';
+      currentView = state.currentView || 'all';
+      lastSearchQuery = state.lastSearchQuery || '';
+      return true;
+    }
+    return false;
+  } catch (err) {
+    console.error('Error loading app state:', err);
+    return false;
+  }
+}
+
 function renderCollections() {
   const userCollections = collections.filter(c => !c.isSystem || c.id === 'uncategorized');
   
@@ -779,6 +923,8 @@ function handleCreateCollection() {
 
 function switchToCollection(colId) {
   activeCollection = colId;
+  currentView = 'collection';
+  saveAppState(); // Persist for next launch
   
   // Update active state
   collectionsList.querySelectorAll('.collection-item').forEach(item => {
@@ -800,7 +946,6 @@ function switchToCollection(colId) {
   viewTitleEl.textContent = collection?.name || 'Collection';
   viewSubtitleEl.textContent = `${filtered.length} projects`;
   
-  currentView = 'collection';
   insightsPanelEl.classList.add('hidden');
   renderProjectCards(filtered);
 }
@@ -840,6 +985,7 @@ function handleCollectionDrop(e, collectionId) {
 function switchView(view) {
   currentView = view;
   activeCollection = view === 'all' ? 'all' : null;
+  saveAppState(); // Persist for next launch
   
   // Update sidebar active states
   navAllProjects.classList.toggle('active', view === 'all');
@@ -858,7 +1004,10 @@ function switchView(view) {
     renderProjectCards(currentProjects);
   } else if (view === 'running') {
     viewTitleEl.textContent = 'Running Projects';
-    const runningList = currentProjects.filter(p => runningProjects.has(p.path));
+    // Include both Tafil-managed AND external running projects
+    const runningList = currentProjects.filter(p => 
+      runningProjects.has(p.path) || externalProjects.has(p.path)
+    );
     viewSubtitleEl.textContent = `${runningList.length} running`;
     renderProjectCards(runningList);
   } else if (view === 'insights') {
@@ -1263,11 +1412,112 @@ function loadDarkModePreference() {
 // =====================================================
 // Projects
 // =====================================================
+
+// Silent refresh - updates in background without notifications
+async function silentRefreshProjects() {
+  try {
+    console.log('🔄 Silent background refresh...');
+    const projects = await window.electronAPI.scanAllProjects();
+    if (!projects || projects.length === 0) return;
+    
+    const oldCount = currentProjects.length;
+    currentProjects = mergeProjectLists(currentProjects, projects);
+    const newCount = currentProjects.length;
+    
+    // Save updated projects
+    saveProjects();
+    
+    // Update UI
+    updateProjectCards(currentProjects);
+    updateRunningCount();
+    renderCollections();
+    
+    // Show notification only if new projects found
+    if (newCount > oldCount) {
+      showNotification(`Found ${newCount - oldCount} new project(s)`, 'success');
+    }
+    
+    // Update subtitle
+    const lastScan = localStorage.getItem('lastScanTime');
+    if (lastScan) {
+      const scanTime = new Date(parseInt(lastScan));
+      viewSubtitleEl.textContent = `${currentProjects.length} projects • Updated ${getTimeAgo(scanTime)}`;
+    }
+  } catch (err) {
+    console.error("Error in silent refresh:", err);
+  }
+}
+
+// Auto scan on first launch - no prompts
+async function autoScanProjects() {
+  try {
+    console.log('🔍 Auto-scanning for projects...');
+    viewSubtitleEl.textContent = 'Scanning for projects...';
+    
+    const projects = await window.electronAPI.scanAllProjects();
+    
+    if (!projects || projects.length === 0) {
+      updateEmptyState();
+      viewSubtitleEl.textContent = 'No projects found';
+      return;
+    }
+    
+    currentProjects = projects;
+    saveProjects();
+    
+    allProjectsCountEl.textContent = projects.length;
+    viewSubtitleEl.textContent = `${projects.length} projects`;
+    
+    renderProjectCards(projects);
+    renderCollections();
+    
+    showNotification(`Found ${projects.length} projects`, 'success');
+  } catch (err) {
+    console.error("Error in auto scan:", err);
+    viewSubtitleEl.textContent = 'Scan failed';
+  }
+}
+
+// Manual full refresh - with loading state
+async function fullRefreshProjects() {
+  try {
+    console.log('🔄 Full refresh...');
+    viewSubtitleEl.textContent = 'Refreshing...';
+    
+    const projects = await window.electronAPI.scanAllProjects();
+    
+    if (!projects || projects.length === 0) {
+      updateEmptyState();
+      viewSubtitleEl.textContent = 'No projects found';
+      return;
+    }
+    
+    currentProjects = projects;
+    saveProjects();
+    
+    allProjectsCountEl.textContent = projects.length;
+    const lastScan = localStorage.getItem('lastScanTime');
+    if (lastScan) {
+      const scanTime = new Date(parseInt(lastScan));
+      viewSubtitleEl.textContent = `${projects.length} projects • Updated ${getTimeAgo(scanTime)}`;
+    }
+    
+    renderProjectCards(projects);
+    renderCollections();
+    
+    showNotification(`Refreshed: ${projects.length} projects`, 'success');
+  } catch (err) {
+    console.error("Error in full refresh:", err);
+    showNotification('Refresh failed', 'error');
+  }
+}
+
 async function softRefreshProjects() {
   try {
     const projects = await window.electronAPI.scanAllProjects();
     if (!projects) return;
     currentProjects = mergeProjectLists(currentProjects, projects);
+    saveProjects();
     updateProjectCards(currentProjects);
     updateRunningCount();
     renderCollections();
@@ -1312,6 +1562,7 @@ async function renderProjects() {
     }
 
     currentProjects = projects;
+    saveProjects(); // Persist for next launch
     filteredProjects = [];
     allProjectsCountEl.textContent = projects.length;
     viewSubtitleEl.textContent = `${projects.length} projects`;
@@ -1340,6 +1591,7 @@ async function renderCustomProjects() {
     }
 
     currentProjects = projects;
+    saveProjects(); // Persist for next launch
     filteredProjects = [];
     allProjectsCountEl.textContent = projects.length;
     viewSubtitleEl.textContent = `${projects.length} projects`;
