@@ -54,7 +54,9 @@
       {
         "from": "assets/",
         "to": "assets/",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       }
     ],
     "mac": {
@@ -69,11 +71,17 @@
       "target": [
         {
           "target": "dmg",
-          "arch": ["x64", "arm64"]
+          "arch": [
+            "x64",
+            "arm64"
+          ]
         },
         {
           "target": "zip",
-          "arch": ["x64", "arm64"]
+          "arch": [
+            "x64",
+            "arm64"
+          ]
         }
       ],
       "extendInfo": {
@@ -104,11 +112,16 @@
       "target": [
         {
           "target": "nsis",
-          "arch": ["x64", "ia32"]
+          "arch": [
+            "x64",
+            "ia32"
+          ]
         },
         {
           "target": "portable",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ],
       "requestedExecutionLevel": "asInvoker",
@@ -137,15 +150,21 @@
       "target": [
         {
           "target": "AppImage",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         },
         {
           "target": "deb",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         },
         {
           "target": "rpm",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ],
       "desktop": {
@@ -159,7 +178,11 @@
       "artifactName": "${productName}-${version}.${ext}"
     },
     "deb": {
-      "depends": ["libnotify4", "libxtst6", "libnss3"],
+      "depends": [
+        "libnotify4",
+        "libxtst6",
+        "libnss3"
+      ],
       "artifactName": "${productName}-${version}-${arch}.${ext}"
     },
     "rpm": {
@@ -173,13 +196,18 @@
   "devDependencies": {
     "concurrently": "^9.1.0",
     "cross-env": "^7.0.3",
-    "electron": "^33.2.1",
+    "electron": "^33.4.11",
     "electron-builder": "^25.1.8",
     "rimraf": "^5.0.5",
     "tailwindcss": "^3.4.17"
   },
   "dependencies": {
+    "monaco-editor": "^0.55.1",
     "portfinder": "^1.0.32",
-    "ps-tree": "^1.2.0"
+    "ps-tree": "^1.2.0",
+    "ssh2": "^1.17.0",
+    "xterm": "^5.3.0",
+    "xterm-addon-fit": "^0.8.0",
+    "xterm-addon-web-links": "^0.9.0"
   }
 }

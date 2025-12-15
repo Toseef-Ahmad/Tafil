@@ -30,6 +30,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
   checkPortProcess: (port) => ipcRenderer.invoke('check-port-process', port),
   killExternalProcess: (pid) => ipcRenderer.invoke('kill-external-process', pid),
 
+  // ~~~~~~~~~~~~~~ JavaScript Playground ~~~~~~~~~~~~~~
+  executeJS: (code) => ipcRenderer.invoke('execute-js', code),
+
+  // ~~~~~~~~~~~~~~ SSH Module ~~~~~~~~~~~~~~
+  selectSSHKeyFile: () => ipcRenderer.invoke('select-ssh-key-file'),
+  saveSSHHost: (host) => ipcRenderer.invoke('save-ssh-host', host),
+  connectSSHHost: (host) => ipcRenderer.invoke('connect-ssh-host', host),
+  disconnectSSH: (sessionId) => ipcRenderer.invoke('disconnect-ssh', sessionId),
+  sendSSHInput: (sessionId, data) => ipcRenderer.invoke('send-ssh-input', sessionId, data),
+  onSSHData: (callback) => ipcRenderer.on('ssh-data', callback),
+
   // ~~~~~~~~~~~~~~ Permission Management ~~~~~~~~~~~~~~
   fixProjectPermissions: (projectPath) => ipcRenderer.invoke('fix-project-permissions', projectPath),
   checkProjectPermissions: (projectPath) => ipcRenderer.invoke('check-project-permissions', projectPath),

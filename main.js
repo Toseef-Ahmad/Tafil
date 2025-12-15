@@ -9,6 +9,7 @@ const { exec, spawn } = require('child_process');
 const portfinder = require('portfinder');
 const { detectExternalNodeProcesses, getProcessOnPort } = require('./utils/externalProcessDetector');
 const { scanNodeProjects } = require('./utils/gitScanner');
+const { Client } = require('ssh2');
 
 const {
   installDependencies,
@@ -22,7 +23,9 @@ const isLinux = process.platform === 'linux';
 
 console.log(`Running on: ${process.platform} (${os.type()} ${os.release()})`);
 
-const isDev = !app.isPackaged;
+// Delay isDev check until app is ready
+let isDev = false;
+
 if (process.env.NODE_ENV !== 'development') {
   process.env.NODE_ENV = 'production';
 }
@@ -246,7 +249,7 @@ function getNpmCommand() {
     
     // Try 'which npm' as last resort
     try {
-      const { execSync } = require('child_process');
+const { execSync } = require('child_process');
       const npmPath = execSync('which npm 2>/dev/null || echo ""', { encoding: 'utf8' }).trim();
       if (npmPath && fs.existsSync(npmPath)) {
         console.log('Found npm via which at:', npmPath);
@@ -787,6 +790,10 @@ function checkFullDiskAccess() {
 // ensureAdminPrivileges();
 // Once app is ready, create the tray
 app.whenReady().then(() => {
+  // Now we can safely check if dev
+  isDev = !app.isPackaged;
+  console.log(`Is Development: ${isDev}`);
+  
   // Set dock icon on macOS
   if (isMac && app.dock) {
     const dockIconPath = path.join(__dirname, 'build', 'icon.png');
@@ -1045,6 +1052,292 @@ ipcMain.handle('get-installed-terminals', async () => {
   } catch (err) {
     console.error('Error detecting Terminals:', err);
     return [];
+  }
+});
+
+// 1d) Execute JavaScript in sandbox (Playground)
+ipcMain.handle('execute-js', async (_event, code) => {
+  try {
+    const logs = [];
+    
+    // Create a custom console that captures logs
+    const customConsole = {
+      log: (...args) => logs.push({ type: 'log', message: args.map(a => formatValue(a)).join(' ') }),
+      error: (...args) => logs.push({ type: 'error', message: args.map(a => formatValue(a)).join(' ') }),
+      warn: (...args) => logs.push({ type: 'warn', message: args.map(a => formatValue(a)).join(' ') }),
+      info: (...args) => logs.push({ type: 'info', message: args.map(a => formatValue(a)).join(' ') }),
+      dir: (obj) => logs.push({ type: 'log', message: formatValue(obj) }),
+      table: (data) => logs.push({ type: 'log', message: JSON.stringify(data, null, 2) }),
+      clear: () => logs.length = 0,
+    };
+    
+    // Helper to format values
+    function formatValue(val) {
+      if (val === null) return 'null';
+      if (val === undefined) return 'undefined';
+      if (typeof val === 'object') {
+        try {
+          return JSON.stringify(val, null, 2);
+        } catch {
+          return String(val);
+        }
+      }
+      return String(val);
+    }
+    
+    // Wrap code to capture result and provide console
+    const wrappedCode = `
+      (async () => {
+        const console = customConsole;
+        ${code}
+      })()
+    `;
+    
+    // Execute with limited context
+    const vm = require('vm');
+    const context = vm.createContext({
+      customConsole,
+      setTimeout,
+      setInterval,
+      clearTimeout,
+      clearInterval,
+      Promise,
+      JSON,
+      Math,
+      Date,
+      Array,
+      Object,
+      String,
+      Number,
+      Boolean,
+      RegExp,
+      Error,
+      Map,
+      Set,
+      Buffer,
+      require: (mod) => {
+        // Allow only safe modules
+        const allowedModules = ['path', 'url', 'querystring', 'util', 'crypto'];
+        if (allowedModules.includes(mod)) {
+          return require(mod);
+        }
+        throw new Error(`Module '${mod}' is not allowed in playground`);
+      },
+      fetch: global.fetch || require('node-fetch'),
+    });
+    
+    const script = new vm.Script(wrappedCode, { timeout: 10000 });
+    let result;
+    
+    try {
+      result = await script.runInContext(context, { timeout: 10000 });
+    } catch (execError) {
+      return { success: false, error: execError.message, logs };
+    }
+    
+    return { success: true, result: formatValue(result), logs };
+  } catch (err) {
+    return { success: false, error: err.message, logs: [] };
+  }
+});
+
+// SSH Module IPC Handlers
+ipcMain.handle('select-ssh-key-file', async () => {
+  try {
+    const result = await dialog.showOpenDialog(mainWindow, {
+      title: 'Select SSH Key File',
+      filters: [
+        { name: 'SSH Keys', extensions: ['pem', 'ppk', 'key'] },
+        { name: 'All Files', extensions: ['*'] }
+      ],
+      properties: ['openFile']
+    });
+    
+    if (result.canceled || result.filePaths.length === 0) {
+      return { success: false };
+    }
+    
+    return { success: true, filePath: result.filePaths[0] };
+  } catch (err) {
+    console.error('Error selecting SSH key file:', err);
+    return { success: false, error: err.message };
+  }
+});
+
+ipcMain.handle('save-ssh-host', async (_event, host) => {
+  try {
+    // Validate host data
+    if (!host.hostname || !host.username) {
+      return { success: false, error: 'Hostname and username are required' };
+    }
+    
+    // TODO: Encrypt password before storing
+    // For now, just save to a secure location
+    const userDataPath = app.getPath('userData');
+    const sshHostsPath = path.join(userDataPath, 'ssh-hosts.json');
+    
+    let hosts = [];
+    if (fs.existsSync(sshHostsPath)) {
+      try {
+        hosts = JSON.parse(fs.readFileSync(sshHostsPath, 'utf8'));
+      } catch (err) {
+        console.error('Error reading SSH hosts file:', err);
+      }
+    }
+    
+    // Update or add host
+    const existingIndex = hosts.findIndex(h => h.id === host.id);
+    if (existingIndex >= 0) {
+      hosts[existingIndex] = host;
+    } else {
+      hosts.push(host);
+    }
+    
+    // Write back
+    fs.writeFileSync(sshHostsPath, JSON.stringify(hosts, null, 2), 'utf8');
+    
+    return { success: true };
+  } catch (err) {
+    console.error('Error saving SSH host:', err);
+    return { success: false, error: err.message };
+  }
+});
+
+// SSH Sessions tracking
+const sshSessions = new Map();
+
+ipcMain.handle('connect-ssh-host', async (_event, host) => {
+  try {
+    console.log('Connecting to SSH host:', host.hostname);
+    
+    const sessionId = `ssh-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const conn = new Client();
+    
+    // Prepare connection config
+    const config = {
+      host: host.hostname,
+      port: host.port || 22,
+      username: host.username,
+      readyTimeout: 20000,
+    };
+    
+    // Add authentication
+    if (host.authMethod === 'key' && host.keyPath) {
+      try {
+        const keyData = fs.readFileSync(host.keyPath, 'utf8');
+        config.privateKey = keyData;
+        // Try to detect if it's a passphrase-protected key
+        if (keyData.includes('ENCRYPTED')) {
+          // TODO: Prompt for passphrase
+          console.warn('Encrypted key detected - passphrase support coming soon');
+        }
+      } catch (keyErr) {
+        return { success: false, error: `Failed to read key file: ${keyErr.message}` };
+      }
+    } else if (host.authMethod === 'password' && host.password) {
+      config.password = host.password;
+    } else {
+      return { success: false, error: 'No authentication method provided' };
+    }
+    
+    return new Promise((resolve, reject) => {
+      conn.on('ready', () => {
+        console.log('SSH connection established:', host.hostname);
+        
+        // Create shell session
+        conn.shell((err, stream) => {
+          if (err) {
+            conn.end();
+            return reject({ success: false, error: `Failed to create shell: ${err.message}` });
+          }
+          
+          // Store session
+          sshSessions.set(sessionId, {
+            id: sessionId,
+            hostId: host.id,
+            host: host,
+            connection: conn,
+            stream: stream
+          });
+          
+          // Handle stream data
+          stream.on('data', (data) => {
+            if (mainWindow && mainWindow.webContents) {
+              mainWindow.webContents.send('ssh-data', {
+                sessionId,
+                type: 'stdout',
+                data: data.toString()
+              });
+            }
+          });
+          
+          stream.stderr.on('data', (data) => {
+            if (mainWindow && mainWindow.webContents) {
+              mainWindow.webContents.send('ssh-data', {
+                sessionId,
+                type: 'stderr',
+                data: data.toString()
+              });
+            }
+          });
+          
+          stream.on('close', () => {
+            console.log('SSH stream closed:', sessionId);
+            sshSessions.delete(sessionId);
+            if (mainWindow && mainWindow.webContents) {
+              mainWindow.webContents.send('ssh-data', {
+                sessionId,
+                type: 'close',
+                data: '\n\rConnection closed.\r\n'
+              });
+            }
+          });
+          
+          resolve({ success: true, sessionId });
+        });
+      });
+      
+      conn.on('error', (err) => {
+        console.error('SSH connection error:', err);
+        reject({ success: false, error: err.message });
+      });
+      
+      conn.connect(config);
+    });
+  } catch (err) {
+    console.error('Error connecting to SSH host:', err);
+    return { success: false, error: err.message };
+  }
+});
+
+ipcMain.handle('disconnect-ssh', async (_event, sessionId) => {
+  try {
+    const session = sshSessions.get(sessionId);
+    if (session) {
+      if (session.stream) session.stream.end();
+      if (session.connection) session.connection.end();
+      sshSessions.delete(sessionId);
+      console.log('SSH session disconnected:', sessionId);
+      return { success: true };
+    }
+    return { success: false, error: 'Session not found' };
+  } catch (err) {
+    console.error('Error disconnecting SSH:', err);
+    return { success: false, error: err.message };
+  }
+});
+
+ipcMain.handle('send-ssh-input', async (_event, sessionId, data) => {
+  try {
+    const session = sshSessions.get(sessionId);
+    if (session && session.stream) {
+      session.stream.write(data);
+      return { success: true };
+    }
+    return { success: false, error: 'Session not found or stream not available' };
+  } catch (err) {
+    console.error('Error sending SSH input:', err);
+    return { success: false, error: err.message };
   }
 });
 
@@ -1553,57 +1846,40 @@ ipcMain.handle('play-project', async (_event, projectPath, customPort = null) =>
       console.log(`Default port ${projectInfo.defaultPort} available: ${isDefaultAvailable}`);
       
       if (!isDefaultAvailable) {
-        // Port is occupied - check if it's by Tafil or an external process
-        const ownership = checkPortOwnership(projectInfo.defaultPort);
+        // Port is occupied - AUTO-FIND an available port instead of erroring
+        console.log(`⚠️ Port ${projectInfo.defaultPort} is not available. Auto-finding an alternative...`);
         
+        // Check what's using it (for logging)
+        const ownership = checkPortOwnership(projectInfo.defaultPort);
         if (ownership.isTafil) {
-          // Another Tafil-managed project is using this port
-          console.log(`⚠️ Port ${projectInfo.defaultPort} is used by Tafil project: ${ownership.projectPath}`);
-          return {
-            success: false,
-            error: `Port ${projectInfo.defaultPort} is already in use by another project managed by Tafil:\n${path.basename(ownership.projectPath)}\n\nPlease stop that project first, or use a custom port.`
-          };
+          console.log(`  → Used by Tafil project: ${path.basename(ownership.projectPath)}`);
         } else {
-          // External process is using the port - check if it's this same project
-          console.log(`⚠️ Port ${projectInfo.defaultPort} is occupied by an external process (not managed by Tafil)`);
-          
           const externalProcess = await getProcessOnPort(projectInfo.defaultPort);
-          let errorMessage = `Port ${projectInfo.defaultPort} is already in use by another application (not managed by Tafil).`;
-          
-          if (externalProcess && externalProcess.projectPath) {
-            // Check if it's the same project
-            if (externalProcess.projectPath === projectPath) {
-              errorMessage = `This project is already running on port ${projectInfo.defaultPort} in an external terminal!\n\n` +
-                           `Command: ${externalProcess.command}\n` +
-                           `PID: ${externalProcess.pid}\n\n` +
-                           `Please:\n` +
-                           `- Stop the external process first, or\n` +
-                           `- Use this port to monitor it (coming soon!)`;
-            } else {
-              errorMessage = `Port ${projectInfo.defaultPort} is in use by another project:\n\n` +
-                           `Project: ${path.basename(externalProcess.projectPath)}\n` +
-                           `Command: ${externalProcess.command}\n` +
-                           `PID: ${externalProcess.pid}\n\n` +
-                           `Please:\n` +
-                           `- Stop that project, or\n` +
-                           `- Use a custom port for this project.`;
-            }
-          } else if (externalProcess) {
-            errorMessage = `Port ${projectInfo.defaultPort} is in use by:\n\n` +
-                         `Command: ${externalProcess.command}\n` +
-                         `PID: ${externalProcess.pid}\n\n` +
-                         `Please:\n` +
-                         `- Stop the external application, or\n` +
-                         `- Click "Custom Port" to specify a different port.`;
-          } else {
-            errorMessage += `\n\nPlease:\n` +
-                          `- Stop the external application using port ${projectInfo.defaultPort}, or\n` +
-                          `- Click "Custom Port" to specify a different port for this project.`;
+          if (externalProcess) {
+            console.log(`  → Used by external process: ${externalProcess.command} (PID: ${externalProcess.pid})`);
           }
+        }
+        
+        // Find next available port
+        const alternativePort = await findAvailablePort(projectInfo.defaultPort + 1);
+        
+        if (alternativePort) {
+          console.log(`✅ Auto-selected alternative port: ${alternativePort}`);
+          suggestedPort = alternativePort;
           
+          // Send notification to renderer about port change
+          if (mainWindow && mainWindow.webContents) {
+            mainWindow.webContents.send('project-status', {
+              projectPath,
+              status: 'info',
+              message: `Port ${projectInfo.defaultPort} was busy, using port ${alternativePort} instead`
+            });
+          }
+        } else {
+          console.error(`❌ No available ports found starting from ${projectInfo.defaultPort}`);
           return {
             success: false,
-            error: errorMessage
+            error: `No available ports found. Please free up some ports and try again.`
           };
         }
       } else {
@@ -1635,7 +1911,7 @@ ipcMain.handle('play-project', async (_event, projectPath, customPort = null) =>
 
     // Prepare environment variables based on framework
     const env = {
-      ...process.env,
+        ...process.env,
       FORCE_COLOR: '1',
       // Ensure HOME is set (needed for npm config)
       HOME: process.env.HOME || process.env.USERPROFILE || '',
@@ -1687,7 +1963,34 @@ ipcMain.handle('play-project', async (_event, projectPath, customPort = null) =>
     const npmCmd = getNpmCommand();
     const scriptParts = startScript.split(' ');
     const command = scriptParts[0];  // 'npm'
-    const args = scriptParts.slice(1); // ['run', 'dev']
+    let args = scriptParts.slice(1); // ['run', 'dev']
+    
+    // Add port argument for frameworks that need CLI flags (when port differs from default)
+    let portArgs = [];
+    if (suggestedPort !== projectInfo.defaultPort) {
+      console.log(`📌 Port changed from ${projectInfo.defaultPort} to ${suggestedPort}, adding CLI port args`);
+      
+      if (projectInfo.framework === 'vite') {
+        // Vite: npm run dev -- --port 3001
+        portArgs = ['--', '--port', suggestedPort.toString()];
+      } else if (projectInfo.framework === 'nextjs') {
+        // Next.js: npm run dev -- -p 3001
+        portArgs = ['--', '-p', suggestedPort.toString()];
+      } else if (projectInfo.framework === 'nuxt') {
+        // Nuxt: npm run dev -- --port 3001
+        portArgs = ['--', '--port', suggestedPort.toString()];
+      } else if (projectInfo.framework === 'angular') {
+        // Angular: npm run start -- --port 3001
+        portArgs = ['--', '--port', suggestedPort.toString()];
+      } else if (projectInfo.framework === 'express' || projectInfo.framework === 'node') {
+        // Express/Node usually read from PORT env var, but we set it anyway
+      }
+      
+      if (portArgs.length > 0) {
+        args = [...args, ...portArgs];
+        console.log(`📌 Command args updated: ${args.join(' ')}`);
+      }
+    }
     
     // Build spawn options - Cross-platform compatible
     const spawnOptions = {
@@ -1774,10 +2077,10 @@ ipcMain.handle('play-project', async (_event, projectPath, customPort = null) =>
         let hasDetectedPort = false;
         let stdoutBuffer = '';
         let stderrBuffer = '';
-        
-        // Handle stdout
-        child.stdout.on('data', (data) => {
-          const output = data.toString();
+
+    // Handle stdout
+    child.stdout.on('data', (data) => {
+      const output = data.toString();
           stdoutBuffer += output;
           console.log(`[UNC:stdout] ${output}`);
           
@@ -1789,14 +2092,14 @@ ipcMain.handle('play-project', async (_event, projectPath, customPort = null) =>
           
           // Port detection
           if (!hasDetectedPort) {
-            const portPatterns = [
+      const portPatterns = [
               /Local:\s*http:\/\/localhost:(\d+)/i,
               /http:\/\/localhost:(\d+)/i,
               /port[:\s]+(\d+)/i,
             ];
-            for (const pattern of portPatterns) {
-              const match = output.match(pattern);
-              if (match) {
+      for (const pattern of portPatterns) {
+        const match = output.match(pattern);
+        if (match) {
                 const detectedPort = parseInt(match[1], 10);
                 if (detectedPort >= 1000 && detectedPort <= 65535) {
                   actualPort = detectedPort;
@@ -1809,30 +2112,30 @@ ipcMain.handle('play-project', async (_event, projectPath, customPort = null) =>
                   }
                   
                   console.log(`✅ Detected port: ${actualPort}`);
-                  mainWindow?.webContents.send('project-status', {
-                    projectPath,
-                    status: 'running',
-                    port: actualPort,
-                    pid: child.pid,
+          mainWindow?.webContents.send('project-status', {
+            projectPath,
+            status: 'running',
+            port: actualPort,
+            pid: child.pid,
                     framework: projectInfo.framework,
-                  });
-                  break;
+          });
+          break;
                 }
               }
-            }
-          }
-        });
-        
-        // Handle stderr
-        child.stderr.on('data', (data) => {
-          const error = data.toString();
+        }
+      }
+    });
+
+    // Handle stderr
+    child.stderr.on('data', (data) => {
+      const error = data.toString();
           stderrBuffer += error;
           console.log(`[UNC:stderr] ${error}`);
           
-          mainWindow?.webContents.send('project-logs', {
-            projectPath,
-            type: 'stderr',
-            log: error,
+      mainWindow?.webContents.send('project-logs', {
+        projectPath,
+        type: 'stderr',
+        log: error,
           });
         });
         
@@ -1887,9 +2190,9 @@ ipcMain.handle('play-project', async (_event, projectPath, customPort = null) =>
           console.error(`[UNC] Error:`, err);
           runningProcesses.delete(projectPath);
           
-          mainWindow?.webContents.send('project-status', {
-            projectPath,
-            status: 'error',
+        mainWindow?.webContents.send('project-status', {
+          projectPath,
+          status: 'error',
             error: err.message,
           });
         });
