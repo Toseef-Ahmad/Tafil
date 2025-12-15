@@ -3275,7 +3275,10 @@ ipcMain.handle('check-project-permissions', async (_event, projectPath) => {
 ipcMain.handle('detect-external-processes', async () => {
   try {
     const externalProcesses = await detectExternalNodeProcesses();
-    console.log(`Found ${externalProcesses.length} external Node.js processes`);
+    // Only log if processes found to reduce console spam
+    if (externalProcesses.length > 0) {
+      console.log(`Found ${externalProcesses.length} external Node.js processes`);
+    }
     return { success: true, processes: externalProcesses };
   } catch (err) {
     console.error('Error detecting external processes:', err);

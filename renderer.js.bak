@@ -169,9 +169,8 @@ let activeModule = 'projects'; // 'projects' | 'playground' | 'ssh'
 
 // Playground state
 let monacoEditor = null;
-let isAutoRunEnabled = false; // Disabled by default to prevent infinite scrolling
+let isAutoRunEnabled = true;
 let autoRunTimeout = null;
-let lastRunTime = 0;
 
 // SSH state
 let sshHosts = [];
@@ -231,11 +230,27 @@ document.addEventListener("DOMContentLoaded", async () => {
     loadAppState();
     loadScanPaths();
     
-    // Initialize modules
-    initModuleTabs();
-    initPlayground();
-    initSSH();
-    loadSSHHosts();
+    // Wait a bit for DOM to be fully ready
+    setTimeout(() => {
+      console.log('🔄 Initializing modules...');
+      initModuleTabs();
+      
+      // Initialize playground and SSH after a short delay
+      setTimeout(() => {
+        if (codeEditor) {
+          initPlayground();
+        } else {
+          console.error('❌ codeEditor element not found!');
+        }
+        
+        if (sshHostList) {
+          initSSH();
+          loadSSHHosts();
+        } else {
+          console.error('❌ SSH elements not found!');
+        }
+      }, 100);
+    }, 50);
   } catch (err) {
     console.error('Error loading saved data:', err);
   }
@@ -455,7 +470,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   
   // Scan for external processes periodically
   scanExternalProcesses();
-  setInterval(scanExternalProcesses, 30000); // Every 30 seconds (reduced from 10s)
+  setInterval(scanExternalProcesses, 10000); // Every 10 seconds
   
   // Show empty state
   updateEmptyState();
@@ -2290,53 +2305,129 @@ function escapeHtml(text) {
 // MODULE SWITCHING
 // =====================================================
 function initModuleTabs() {
+  console.log('🔄 Initializing module tabs...');
+  
+  // Re-query elements in case they weren't ready before
+  const projectsTab = document.getElementById('moduleProjects');
+  const playgroundTab = document.getElementById('modulePlayground');
+  const sshTab = document.getElementById('moduleSSH');
+  
+  console.log('moduleProjects:', !!projectsTab);
+  console.log('modulePlayground:', !!playgroundTab);
+  console.log('moduleSSH:', !!sshTab);
+  
   // Module tab switching
-  [moduleProjects, modulePlayground, moduleSSH].forEach(tab => {
-    if (!tab) return;
-    tab.addEventListener('click', () => {
-      const moduleName = tab.dataset.module;
+  const tabs = [
+    { el: projectsTab, name: 'projects' },
+    { el: playgroundTab, name: 'playground' },
+    { el: sshTab, name: 'ssh' }
+  ];
+  
+  tabs.forEach((tab) => {
+    if (!tab.el) {
+      console.error(`❌ Tab ${tab.name} not found!`);
+      return;
+    }
+    
+    console.log(`✅ Setting up tab: ${tab.name}`);
+    
+    // Clear any existing handlers
+    tab.el.onclick = null;
+    
+    // Add click handler
+    tab.el.addEventListener('click', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      const moduleName = this.dataset.module || tab.name;
+      console.log(`🖱️ Tab clicked: ${moduleName}`);
       switchModule(moduleName);
-    });
+      return false;
+    }, true);
+    
+    // Also set onclick as backup
+    tab.el.onclick = function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      const moduleName = this.dataset.module || tab.name;
+      console.log(`🖱️ Tab onclick: ${moduleName}`);
+      switchModule(moduleName);
+      return false;
+    };
   });
 
   // Load saved module
   const savedModule = localStorage.getItem('activeModule');
   if (savedModule && ['projects', 'playground', 'ssh'].includes(savedModule)) {
+    console.log(`📂 Loading saved module: ${savedModule}`);
     switchModule(savedModule);
+  } else {
+    console.log('📂 No saved module, defaulting to projects');
+    switchModule('projects');
   }
 }
 
 function switchModule(moduleName) {
+  console.log(`🔄 Switching to module: ${moduleName}`);
+  
+  if (!['projects', 'playground', 'ssh'].includes(moduleName)) {
+    console.error(`❌ Invalid module name: ${moduleName}`);
+    return;
+  }
+  
   activeModule = moduleName;
   localStorage.setItem('activeModule', moduleName);
 
   // Update tab states
   [moduleProjects, modulePlayground, moduleSSH].forEach(tab => {
-    if (!tab) return;
+    if (!tab) {
+      console.warn('⚠️ Tab element is null');
+      return;
+    }
     if (tab.dataset.module === moduleName) {
       tab.classList.add('active');
+      console.log(`✅ Activated tab: ${moduleName}`);
     } else {
       tab.classList.remove('active');
     }
   });
 
   // Update navigation visibility
-  if (projectsNav) projectsNav.classList.toggle('hidden', moduleName !== 'projects');
-  if (playgroundNav) playgroundNav.classList.toggle('hidden', moduleName !== 'playground');
-  if (sshNav) sshNav.classList.toggle('hidden', moduleName !== 'ssh');
+  console.log('Updating navigation visibility...');
+  console.log('projectsNav:', !!projectsNav);
+  console.log('playgroundNav:', !!playgroundNav);
+  console.log('sshNav:', !!sshNav);
+  
+  if (projectsNav) {
+    projectsNav.classList.toggle('hidden', moduleName !== 'projects');
+    console.log(`projectsNav hidden: ${moduleName !== 'projects'}`);
+  }
+  if (playgroundNav) {
+    playgroundNav.classList.toggle('hidden', moduleName !== 'playground');
+    console.log(`playgroundNav hidden: ${moduleName !== 'playground'}`);
+  }
+  if (sshNav) {
+    sshNav.classList.toggle('hidden', moduleName !== 'ssh');
+    console.log(`sshNav hidden: ${moduleName !== 'ssh'}`);
+  }
 
   // Update panel visibility
-  if (projectsPanel) projectsPanel.classList.toggle('active', moduleName === 'projects');
+  console.log('Updating panel visibility...');
+  console.log('projectsPanel:', !!projectsPanel);
+  console.log('playgroundPanel:', !!playgroundPanel);
+  console.log('sshPanel:', !!sshPanel);
+  
+  if (projectsPanel) {
+    projectsPanel.classList.toggle('active', moduleName === 'projects');
+    console.log(`projectsPanel active: ${moduleName === 'projects'}`);
+  }
   if (playgroundPanel) {
     playgroundPanel.classList.toggle('active', moduleName === 'playground');
-    
-    // Reset scroll position when switching to playground
-    if (moduleName === 'playground') {
-      playgroundPanel.scrollTop = 0;
-      if (codeOutput) codeOutput.scrollTop = 0;
-    }
+    console.log(`playgroundPanel active: ${moduleName === 'playground'}`);
   }
-  if (sshPanel) sshPanel.classList.toggle('active', moduleName === 'ssh');
+  if (sshPanel) {
+    sshPanel.classList.toggle('active', moduleName === 'ssh');
+    console.log(`sshPanel active: ${moduleName === 'ssh'}`);
+  }
 
   // Resize Monaco editor when switching to playground
   if (moduleName === 'playground' && monacoEditor) {
@@ -2344,6 +2435,8 @@ function switchModule(moduleName) {
       monacoEditor.layout();
     }, 100);
   }
+  
+  console.log(`✅ Module switch complete: ${moduleName}`);
 }
 
 // =====================================================
@@ -2352,77 +2445,46 @@ function switchModule(moduleName) {
 async function initPlayground() {
   if (!codeEditor || !runCodeBtn) return;
 
-  // Prevent scrolling - simple and effective
-  if (playgroundPanel) {
-    playgroundPanel.style.overflow = 'hidden';
-    playgroundPanel.style.position = 'relative';
-    playgroundPanel.style.height = '100%';
-    playgroundPanel.scrollTop = 0;
-    playgroundPanel.scrollLeft = 0;
-  }
-
-  // Prevent scroll on codeEditor
-  if (codeEditor) {
-    codeEditor.style.overflow = 'hidden';
-    codeEditor.style.position = 'relative';
-    codeEditor.style.height = '100%';
-  }
-
-  // Show loading message (fixed position to prevent scroll)
-  codeEditor.innerHTML = '<div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; display: flex; align-items: center; justify-content: center; color: #a78bfa; font-size: 14px; background: #111113;"><p>⏳ Loading...</p></div>';
+  // Show loading message
+  codeEditor.innerHTML = '<div style="display: flex; align-items: center; justify-content: center; height: 100%; color: #a78bfa; font-size: 14px;"><p>⏳ Loading Monaco Editor...</p></div>';
 
   let monaco = null;
   let useFallback = false;
 
-  // Initialize Monaco Editor with timeout
+  // Initialize Monaco Editor
   try {
-    console.log('🔄 Loading Monaco Editor...');
-    const monacoPromise = loadMonacoEditor();
-    const timeoutPromise = new Promise((_, reject) => 
-      setTimeout(() => reject(new Error('Monaco load timeout')), 5000)
-    );
-    
-    monaco = await Promise.race([monacoPromise, timeoutPromise]);
-    console.log('✅ Monaco loaded successfully');
+    monaco = await loadMonacoEditor();
   } catch (err) {
-    console.warn('⚠️ Monaco failed, using fallback:', err.message);
+    console.error('Failed to load Monaco Editor, using fallback textarea:', err);
     useFallback = true;
   }
 
   if (!monaco) {
-    console.warn('⚠️ Monaco unavailable, switching to fallback textarea');
+    console.warn('Monaco unavailable, switching to fallback textarea');
     useFallback = true;
   }
 
   if (useFallback) {
-    console.log('📝 Using fallback textarea editor');
-    // Fallback plain textarea with run support (fixed position)
-    codeEditor.innerHTML = '<textarea id="fallbackEditor" style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; width: 100%; height: 100%; background: #111113; color: #e4e4e7; border: none; padding: 16px; font-family: \'JetBrains Mono\', monospace; font-size: 13px; outline: none; resize: none; overflow-y: auto;" placeholder="// Write JavaScript here and press ⌘+Enter to run\nconsole.log(\'Hello, World!\');"></textarea>';
-    
-    // Wait for DOM to update
-    setTimeout(() => {
-      const fallbackEditor = document.getElementById('fallbackEditor');
-      if (fallbackEditor) {
-        const savedCode = localStorage.getItem('playgroundCode') || '';
-        fallbackEditor.value = savedCode;
-        
-        fallbackEditor.addEventListener('input', () => {
-          localStorage.setItem('playgroundCode', fallbackEditor.value);
-        });
-        
-        runCodeBtn.onclick = () => runCodeFallback();
-        if (toggleAutoRunBtn) {
-          toggleAutoRunBtn.onclick = () => showNotification('Auto-run requires Monaco. Run manually with ⌘+Enter.', 'warning');
-        }
-        
-        console.log('✅ Fallback editor ready');
-      }
-    }, 100);
-    
+    // Fallback plain textarea with run support
+    codeEditor.innerHTML = '<textarea id="fallbackEditor" style="width:100%;height:100%;background:#111113;color:#e4e4e7;border:none;padding:16px;font-family:monospace;font-size:13px;outline:none;resize:none;" placeholder="// Monaco unavailable\n// Write JavaScript here and press ⌘+Enter to run"></textarea>';
+    const fallbackEditor = document.getElementById('fallbackEditor');
+    if (fallbackEditor) {
+      fallbackEditor.value = localStorage.getItem('playgroundCode') || '';
+      fallbackEditor.addEventListener('input', () => {
+        localStorage.setItem('playgroundCode', fallbackEditor.value);
+      });
+      runCodeBtn.onclick = () => runCodeFallback();
+      if (toggleAutoRunBtn) toggleAutoRunBtn.onclick = () => showNotification('Auto-run requires Monaco. Run manually.', 'warning');
+      // Auto-run fallback: simple debounce run
+      let fbTimeout = null;
+      fallbackEditor.addEventListener('input', () => {
+        clearTimeout(fbTimeout);
+        fbTimeout = setTimeout(() => runCodeFallback(), 600);
+      });
+    }
     return;
   }
 
-  try {
     // Load saved code
     const savedCode = localStorage.getItem('playgroundCode') || `// Write JavaScript here - it runs automatically!
 // Like RunJS/Quokka - just type and see results instantly
@@ -2490,12 +2552,7 @@ console.log('Sum:', sum(5, 3));
       fontLigatures: true,
       minimap: { enabled: false },
       scrollBeyondLastLine: false,
-      automaticLayout: false, // Disabled to prevent scroll issues
-      scrollbar: {
-        vertical: 'visible',
-        horizontal: 'visible',
-        alwaysConsumeMouseWheel: false,
-      },
+      automaticLayout: true,
       tabSize: 2,
       insertSpaces: true,
       wordWrap: 'on',
@@ -2503,7 +2560,7 @@ console.log('Sum:', sum(5, 3));
       renderLineHighlight: 'all',
       cursorBlinking: 'smooth',
       cursorSmoothCaretAnimation: 'on',
-      smoothScrolling: false, // Disabled to prevent auto-scroll
+      smoothScrolling: true,
       formatOnPaste: true,
       formatOnType: true,
       suggestOnTriggerCharacters: true,
@@ -2567,15 +2624,6 @@ console.log('Sum:', sum(5, 3));
       autoIndent: 'full',
     });
 
-    // CRITICAL: Prevent Monaco from scrolling on init
-    setTimeout(() => {
-      if (monacoEditor) {
-        monacoEditor.setScrollTop(0);
-        monacoEditor.setScrollLeft(0);
-        monacoEditor.revealLine(1);
-      }
-    }, 0);
-
     // Auto-save on change with auto-run
     monacoEditor.onDidChangeModelContent(() => {
       const code = monacoEditor.getValue();
@@ -2589,19 +2637,12 @@ console.log('Sum:', sum(5, 3));
           autoRunStatus.style.background = 'rgba(245, 158, 11, 0.15)';
         }
 
-        // Clear any pending execution
         clearTimeout(autoRunTimeout);
         autoRunTimeout = setTimeout(() => {
-          // Double-check auto-run is still enabled before running
-          if (isAutoRunEnabled) {
-            runCode().then(() => {
-              if (isAutoRunEnabled) updateAutoRunStatus();
-            }).catch(err => {
-              console.error('Auto-run error:', err);
-              updateAutoRunStatus();
-            });
-          }
-        }, 800); // Increased debounce from 500ms to 800ms
+          runCode().then(() => {
+            if (isAutoRunEnabled) updateAutoRunStatus();
+          });
+        }, 500);
       }
     });
 
@@ -2637,6 +2678,13 @@ console.log('Sum:', sum(5, 3));
     });
 
     updateAutoRunStatus();
+
+    // Initial run
+    setTimeout(() => {
+      if (monacoEditor.getValue().trim()) {
+        runCode();
+      }
+    }, 1000);
 
     console.log('✅ Monaco Editor initialized');
   } catch (err) {
@@ -2733,14 +2781,6 @@ function updateAutoRunStatus() {
 
 async function runCode() {
   if (!monacoEditor || !codeOutput) return Promise.resolve();
-
-  // Rate limiting: prevent execution more than once every 100ms
-  const now = Date.now();
-  if (now - lastRunTime < 100) {
-    console.log('⚠️ Rate limited: execution too frequent');
-    return Promise.resolve();
-  }
-  lastRunTime = now;
 
   const code = monacoEditor.getValue();
   if (!code.trim()) {
