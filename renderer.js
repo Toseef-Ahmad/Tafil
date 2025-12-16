@@ -164,6 +164,7 @@ let pendingRemoveProject = null;
 let installedIDEs = [];
 let installedTerminals = [];
 let isDarkMode = true;
+let currentTheme = 'midnight';
 let currentView = 'all';
 let commandSelectedIndex = 0;
 let commandItems = [];
@@ -788,6 +789,23 @@ function renderCommandResults(query) {
     { type: 'view', id: 'view-insights', title: 'View Insights', desc: 'Show project insights', icon: Icons.chart, action: () => switchView('insights') },
     { type: 'action', id: 'settings', title: 'Open Settings', desc: 'Configure preferences', icon: Icons.info, action: showSettingsModal },
     { type: 'action', id: 'new-collection', title: 'New Collection', desc: 'Create a new project collection', icon: Icons.plus, action: showNewCollectionModal },
+    // Theme commands
+    { type: 'theme', id: 'theme-midnight', title: 'Theme: Midnight', desc: 'Deep obsidian elegance', icon: '🌑', action: () => setTheme('midnight') },
+    { type: 'theme', id: 'theme-dracula', title: 'Theme: Dracula', desc: 'Classic purple aesthetic', icon: '🧛', action: () => setTheme('dracula') },
+    { type: 'theme', id: 'theme-tokyo', title: 'Theme: Tokyo Night', desc: 'Neon city dreams', icon: '🗼', action: () => setTheme('tokyo-night') },
+    { type: 'theme', id: 'theme-nord', title: 'Theme: Nord', desc: 'Arctic frost clarity', icon: '❄️', action: () => setTheme('nord') },
+    { type: 'theme', id: 'theme-catppuccin', title: 'Theme: Catppuccin', desc: 'Cozy pastel warmth', icon: '☕', action: () => setTheme('catppuccin') },
+    { type: 'theme', id: 'theme-one-dark', title: 'Theme: One Dark', desc: 'Atom inspired classic', icon: '⚛️', action: () => setTheme('one-dark') },
+    { type: 'theme', id: 'theme-synthwave', title: 'Theme: Synthwave', desc: 'Retro neon vibes', icon: '🌆', action: () => setTheme('synthwave') },
+    { type: 'theme', id: 'theme-ayu', title: 'Theme: Ayu Dark', desc: 'Clean modern dark', icon: '🌙', action: () => setTheme('ayu-dark') },
+    { type: 'theme', id: 'theme-github-dark', title: 'Theme: GitHub Dark', desc: 'Developer standard', icon: '🐙', action: () => setTheme('github-dark') },
+    { type: 'theme', id: 'theme-rose-pine', title: 'Theme: Rosé Pine', desc: 'Warm and elegant', icon: '🌹', action: () => setTheme('rose-pine') },
+    { type: 'theme', id: 'theme-monokai', title: 'Theme: Monokai', desc: 'Colorful iconic', icon: '🎨', action: () => setTheme('monokai') },
+    { type: 'theme', id: 'theme-vesper', title: 'Theme: Vesper', desc: 'Sunset warmth', icon: '🌅', action: () => setTheme('vesper') },
+    { type: 'theme', id: 'theme-light', title: 'Theme: Airy Light', desc: 'Clean minimal', icon: '☀️', action: () => setTheme('light') },
+    { type: 'theme', id: 'theme-github-light', title: 'Theme: GitHub Light', desc: 'Familiar bright', icon: '🐱', action: () => setTheme('github-light') },
+    { type: 'theme', id: 'theme-latte', title: 'Theme: Latte', desc: 'Soft pastels', icon: '🥛', action: () => setTheme('catppuccin-latte') },
+    { type: 'theme', id: 'theme-solarized', title: 'Theme: Solarized Light', desc: 'Classic light', icon: '🌤️', action: () => setTheme('solarized-light') },
   ];
   
   // Add projects to command list
@@ -2006,6 +2024,13 @@ async function showSettingsModal() {
     console.error('Error refreshing:', err);
   }
   
+  // Add theme selector at the top of settings
+  const themeSelectorContainer = document.getElementById('themeSelectorContainer');
+  if (themeSelectorContainer) {
+    themeSelectorContainer.innerHTML = createThemeSelector();
+    setupThemeSelectorListeners();
+  }
+  
   // Populate IDE list
   defaultIdeList.innerHTML = '';
   if (installedIDEs.length === 0) {
@@ -2078,75 +2103,198 @@ function createSettingsOption(value, name, icon, label, isSelected) {
 }
 
 // =====================================================
-// Dark Mode
+// Premium Themes System
 // =====================================================
+
+// Theme definitions with metadata
+const THEMES = {
+  // Dark themes
+  midnight: { name: 'Midnight', type: 'dark', accent: '#8b5cf6', description: 'Deep obsidian elegance' },
+  dracula: { name: 'Dracula', type: 'dark', accent: '#bd93f9', description: 'Classic purple aesthetic' },
+  'tokyo-night': { name: 'Tokyo Night', type: 'dark', accent: '#bb9af7', description: 'Neon city dreams' },
+  nord: { name: 'Nord', type: 'dark', accent: '#88c0d0', description: 'Arctic frost clarity' },
+  catppuccin: { name: 'Catppuccin', type: 'dark', accent: '#cba6f7', description: 'Cozy pastel warmth' },
+  'one-dark': { name: 'One Dark', type: 'dark', accent: '#c678dd', description: 'Atom inspired classic' },
+  synthwave: { name: 'Synthwave', type: 'dark', accent: '#ff6ac1', description: 'Retro neon vibes' },
+  'ayu-dark': { name: 'Ayu Dark', type: 'dark', accent: '#ffb454', description: 'Clean modern dark' },
+  'github-dark': { name: 'GitHub Dark', type: 'dark', accent: '#58a6ff', description: 'Developer standard' },
+  'rose-pine': { name: 'Rosé Pine', type: 'dark', accent: '#ebbcba', description: 'Warm and elegant' },
+  monokai: { name: 'Monokai', type: 'dark', accent: '#ff6188', description: 'Colorful iconic' },
+  vesper: { name: 'Vesper', type: 'dark', accent: '#ff874f', description: 'Sunset warmth' },
+  // Light themes
+  light: { name: 'Airy Light', type: 'light', accent: '#8b5cf6', description: 'Clean minimal' },
+  'github-light': { name: 'GitHub Light', type: 'light', accent: '#0969da', description: 'Familiar bright' },
+  'catppuccin-latte': { name: 'Latte', type: 'light', accent: '#8839ef', description: 'Soft pastels' },
+  'solarized-light': { name: 'Solarized', type: 'light', accent: '#268bd2', description: 'Classic light' }
+};
+
 function toggleDarkMode() {
-  isDarkMode = !isDarkMode;
-  applyTheme();
-  localStorage.setItem('darkMode', isDarkMode ? 'true' : 'false');
-  showNotification(`Switched to ${isDarkMode ? 'dark' : 'light'} mode`, 'info');
+  // Toggle between current theme and a light theme
+  const currentType = THEMES[currentTheme]?.type || 'dark';
+  if (currentType === 'dark') {
+    setTheme('light');
+  } else {
+    setTheme('midnight');
+  }
 }
 
-function applyTheme() {
-  // Apply theme class
-  document.body.classList.toggle('light-mode', !isDarkMode);
+function setTheme(themeName) {
+  if (!THEMES[themeName]) {
+    themeName = 'midnight';
+  }
   
-  // Update icons
+  currentTheme = themeName;
+  isDarkMode = THEMES[themeName].type === 'dark';
+  
+  // Apply theme
+  document.body.setAttribute('data-theme', themeName);
+  
+  // Remove old light-mode class (for backwards compatibility)
+  document.body.classList.remove('light-mode');
+  
+  // Update icons for dark/light toggle
   if (moonIcon) moonIcon.classList.toggle('hidden', !isDarkMode);
   if (sunIcon) sunIcon.classList.toggle('hidden', isDarkMode);
   
-  // Update inline styles for elements that need them
+  // Clear any inline styles that might interfere
   const sidebar = document.getElementById('sidebar');
   const header = document.querySelector('header');
   const main = document.querySelector('main');
   
-  if (isDarkMode) {
-    // Dark mode colors
-    if (sidebar) {
-      sidebar.style.backgroundColor = '#111113';
-      sidebar.style.borderColor = 'rgba(255, 255, 255, 0.06)';
-    }
-    if (header) {
-      header.style.backgroundColor = '#0a0a0b';
-      header.style.borderColor = 'rgba(255, 255, 255, 0.06)';
-    }
-    if (main) {
-      main.style.backgroundColor = '#0a0a0b';
-    }
-    document.body.style.backgroundColor = '#0a0a0b';
-    document.body.style.color = '#fafafa';
-  } else {
-    // Light mode colors
-    if (sidebar) {
-      sidebar.style.backgroundColor = '#f8fafc';
-      sidebar.style.borderColor = 'rgba(0, 0, 0, 0.08)';
-    }
-    if (header) {
-      header.style.backgroundColor = '#ffffff';
-      header.style.borderColor = 'rgba(0, 0, 0, 0.08)';
-    }
-    if (main) {
-      main.style.backgroundColor = '#ffffff';
-    }
-    document.body.style.backgroundColor = '#ffffff';
-    document.body.style.color = '#0f172a';
+  if (sidebar) {
+    sidebar.style.backgroundColor = '';
+    sidebar.style.borderColor = '';
   }
+  if (header) {
+    header.style.backgroundColor = '';
+    header.style.borderColor = '';
+  }
+  if (main) {
+    main.style.backgroundColor = '';
+  }
+  document.body.style.backgroundColor = '';
+  document.body.style.color = '';
+  
+  // Save preference
+  localStorage.setItem('theme', themeName);
+  localStorage.setItem('darkMode', isDarkMode ? 'true' : 'false');
   
   // Re-render cards to update their styles
   if (currentProjects.length > 0) {
     renderProjectCards(filteredProjects.length > 0 ? filteredProjects : currentProjects);
   }
+  
+  // Update theme selector if open
+  updateThemeSelector();
+  
+  // Show notification
+  showNotification(`Theme changed to ${THEMES[themeName].name}`, 'success');
+}
+
+// Expose setTheme globally for onclick handlers
+window.setTheme = setTheme;
+
+function applyTheme() {
+  setTheme(currentTheme);
 }
 
 function loadDarkModePreference() {
-  const saved = localStorage.getItem('darkMode');
-  if (saved !== null) {
-    isDarkMode = saved === 'true';
+  // First check for new theme preference
+  const savedTheme = localStorage.getItem('theme');
+  if (savedTheme && THEMES[savedTheme]) {
+    currentTheme = savedTheme;
+    isDarkMode = THEMES[savedTheme].type === 'dark';
   } else {
-    // Default to dark mode, or check system preference
-    isDarkMode = window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? true;
+    // Fall back to old dark mode preference
+    const saved = localStorage.getItem('darkMode');
+    if (saved !== null) {
+      isDarkMode = saved === 'true';
+      currentTheme = isDarkMode ? 'midnight' : 'light';
+    } else {
+      // Default to dark mode, or check system preference
+      isDarkMode = window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? true;
+      currentTheme = isDarkMode ? 'midnight' : 'light';
+    }
   }
   applyTheme();
+}
+
+function updateThemeSelector() {
+  const themeOptions = document.querySelectorAll('.theme-option');
+  themeOptions.forEach(option => {
+    const themeName = option.dataset.theme;
+    option.classList.toggle('active', themeName === currentTheme);
+  });
+}
+
+function createThemeSelector() {
+  const darkThemes = Object.entries(THEMES).filter(([_, t]) => t.type === 'dark');
+  const lightThemes = Object.entries(THEMES).filter(([_, t]) => t.type === 'light');
+  
+  // Theme icons for visual appeal
+  const themeIcons = {
+    midnight: '🌑', dracula: '🧛', 'tokyo-night': '🗼', nord: '❄️',
+    catppuccin: '☕', 'one-dark': '⚛️', synthwave: '🌆', 'ayu-dark': '🌙',
+    'github-dark': '🐙', 'rose-pine': '🌹', monokai: '🎨', vesper: '🌅',
+    light: '☀️', 'github-light': '🐱', 'catppuccin-latte': '🥛', 'solarized-light': '🌤️'
+  };
+  
+  return `
+    <div class="theme-section-title">
+      <span style="display: inline-flex; align-items: center; gap: 6px;">
+        🌙 Dark Themes
+      </span>
+    </div>
+    <div class="theme-grid-new">
+      ${darkThemes.map(([id, theme]) => `
+        <button class="theme-card ${currentTheme === id ? 'active' : ''}" data-theme="${id}" type="button">
+          <div class="theme-card-preview theme-preview-${id}">
+            <span class="theme-card-icon">${themeIcons[id] || '🎨'}</span>
+          </div>
+          <div class="theme-card-info">
+            <div class="theme-card-name">${theme.name}</div>
+            <div class="theme-card-desc">${theme.description}</div>
+          </div>
+          ${currentTheme === id ? '<div class="theme-card-check">✓</div>' : ''}
+        </button>
+      `).join('')}
+    </div>
+    <div class="theme-section-title" style="margin-top: 16px;">
+      <span style="display: inline-flex; align-items: center; gap: 6px;">
+        ☀️ Light Themes
+      </span>
+    </div>
+    <div class="theme-grid-new">
+      ${lightThemes.map(([id, theme]) => `
+        <button class="theme-card ${currentTheme === id ? 'active' : ''}" data-theme="${id}" type="button">
+          <div class="theme-card-preview theme-preview-${id}">
+            <span class="theme-card-icon">${themeIcons[id] || '🎨'}</span>
+          </div>
+          <div class="theme-card-info">
+            <div class="theme-card-name">${theme.name}</div>
+            <div class="theme-card-desc">${theme.description}</div>
+          </div>
+          ${currentTheme === id ? '<div class="theme-card-check">✓</div>' : ''}
+        </button>
+      `).join('')}
+    </div>
+  `;
+}
+
+// Setup theme selector click handlers using event delegation
+function setupThemeSelectorListeners() {
+  const container = document.getElementById('themeSelectorContainer');
+  if (!container) return;
+  
+  container.addEventListener('click', (e) => {
+    const themeCard = e.target.closest('.theme-card');
+    if (themeCard) {
+      const themeName = themeCard.dataset.theme;
+      if (themeName && THEMES[themeName]) {
+        setTheme(themeName);
+      }
+    }
+  });
 }
 
 // =====================================================
@@ -4142,6 +4290,21 @@ function closeBlueprints() {
   if (blueprintModal) {
     blueprintModal.classList.add('hidden');
   }
+  
+  // Reset state
+  blueprintProjectPath = null;
+  blueprintData = null;
+  selectedModule = null;
+  currentBlueprintView = 'goal';
+  excalidrawReady = false;
+  
+  console.log('📦 Blueprints closed');
+}
+
+function closeBlueprints() {
+  if (blueprintModal) {
+    blueprintModal.classList.add('hidden');
+  }
   blueprintProjectPath = null;
   blueprintData = null;
   selectedModule = null;
@@ -4156,21 +4319,20 @@ function renderModuleList() {
     moduleList.innerHTML = `
       <div style="padding: 20px; text-align: center; color: #52525b;">
         <p style="font-size: 12px; margin-bottom: 8px;">No modules yet</p>
-        <button onclick="showAddModuleModal()" style="font-size: 11px; color: #a78bfa; background: none; border: none; cursor: pointer;">
+        <button id="createFirstModuleInList" style="font-size: 11px; color: #a78bfa; background: none; border: none; cursor: pointer;">
           + Create your first module
         </button>
       </div>
     `;
+    const createBtn = document.getElementById('createFirstModuleInList');
+    if (createBtn) {
+      createBtn.addEventListener('click', showAddModuleModal);
+    }
   } else {
     moduleList.innerHTML = modules.map(m => `
       <div class="module-list-item ${selectedModule?.id === m.id ? 'active' : ''}" 
            data-module-id="${m.id}"
-           draggable="true"
-           onclick="selectModule('${m.id}')"
-           ondragstart="onModuleDragStart(event, '${m.id}')"
-           ondragover="onModuleDragOver(event)"
-           ondrop="onModuleDrop(event, '${m.id}')"
-           ondragleave="onModuleDragLeave(event)">
+           draggable="true">
         <div class="module-icon" style="background: ${m.color}20; color: ${m.color};">${m.icon}</div>
         <div class="module-info">
           <div class="module-info-title">${escapeHtml(m.title)}</div>
@@ -4178,6 +4340,53 @@ function renderModuleList() {
         </div>
       </div>
     `).join('');
+    
+    // Add click event listeners to each module item
+    moduleList.querySelectorAll('.module-list-item').forEach(item => {
+      const moduleId = item.dataset.moduleId;
+      
+      item.addEventListener('click', () => {
+        selectModule(moduleId);
+      });
+      
+      item.addEventListener('dragstart', (e) => {
+        draggedModule = moduleId;
+        e.target.classList.add('dragging');
+        e.dataTransfer.effectAllowed = 'move';
+      });
+      
+      item.addEventListener('dragend', (e) => {
+        e.target.classList.remove('dragging');
+        draggedModule = null;
+      });
+      
+      item.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        e.currentTarget.classList.add('drag-over');
+      });
+      
+      item.addEventListener('dragleave', (e) => {
+        e.currentTarget.classList.remove('drag-over');
+      });
+      
+      item.addEventListener('drop', async (e) => {
+        e.preventDefault();
+        e.currentTarget.classList.remove('drag-over');
+        if (draggedModule && draggedModule !== moduleId) {
+          // Reorder modules
+          try {
+            const result = await window.electronAPI.reorderModules(blueprintProjectPath, draggedModule, moduleId);
+            if (result.success) {
+              blueprintData = result.blueprints;
+              renderModuleList();
+            }
+          } catch (err) {
+            console.error('Error reordering modules:', err);
+          }
+        }
+        draggedModule = null;
+      });
+    });
   }
   
   // Update count
@@ -4346,32 +4555,112 @@ function renderKanbanBoard(tasksData) {
         <span class="kanban-column-title">${escapeHtml(column.title)}</span>
         <span class="kanban-column-count">${column.tasks.length}</span>
       </div>
-      <div class="kanban-column-body" 
-           ondragover="onTaskDragOver(event)" 
-           ondrop="onTaskDrop(event, '${column.id}')"
-           ondragleave="onTaskDragLeave(event)">
+      <div class="kanban-column-body" data-column-id="${column.id}">
         ${column.tasks.map(task => renderKanbanTask(task)).join('')}
       </div>
     </div>
   `).join('');
+  
+  // Add event listeners for column drop zones
+  kanbanBoard.querySelectorAll('.kanban-column-body').forEach(columnBody => {
+    const columnId = columnBody.dataset.columnId;
+    
+    columnBody.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      e.currentTarget.classList.add('drag-over');
+    });
+    
+    columnBody.addEventListener('dragleave', (e) => {
+      e.currentTarget.classList.remove('drag-over');
+    });
+    
+    columnBody.addEventListener('drop', async (e) => {
+      e.preventDefault();
+      e.currentTarget.classList.remove('drag-over');
+      
+      if (!draggedTask || !selectedModule || !blueprintProjectPath) return;
+      
+      try {
+        // Find the drop position
+        const tasks = columnBody.querySelectorAll('.kanban-task');
+        let dropIndex = tasks.length;
+        
+        for (let i = 0; i < tasks.length; i++) {
+          const rect = tasks[i].getBoundingClientRect();
+          if (e.clientY < rect.top + rect.height / 2) {
+            dropIndex = i;
+            break;
+          }
+        }
+        
+        const result = await window.electronAPI.moveTask(
+          blueprintProjectPath,
+          selectedModule.id,
+          draggedTask,
+          columnId,
+          dropIndex
+        );
+        
+        if (result.success) {
+          await loadKanbanContent();
+        }
+      } catch (err) {
+        console.error('Error moving task:', err);
+      }
+      
+      draggedTask = null;
+    });
+  });
+  
+  // Add event listeners for tasks
+  kanbanBoard.querySelectorAll('.kanban-task').forEach(taskEl => {
+    const taskId = taskEl.dataset.taskId;
+    
+    taskEl.addEventListener('dragstart', (e) => {
+      draggedTask = taskId;
+      e.target.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+    });
+    
+    taskEl.addEventListener('dragend', (e) => {
+      e.target.classList.remove('dragging');
+      draggedTask = null;
+    });
+    
+    // Edit button
+    const editBtn = taskEl.querySelector('.task-edit-btn');
+    if (editBtn) {
+      editBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        editTask(taskId);
+      });
+    }
+    
+    // Delete button
+    const deleteBtn = taskEl.querySelector('.task-delete-btn');
+    if (deleteBtn) {
+      deleteBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        deleteTaskItem(taskId);
+      });
+    }
+  });
 }
 
 function renderKanbanTask(task) {
   return `
     <div class="kanban-task" 
          data-task-id="${task.id}"
-         draggable="true"
-         ondragstart="onTaskDragStart(event, '${task.id}')"
-         ondragend="onTaskDragEnd(event)">
+         draggable="true">
       <div class="kanban-task-title">${escapeHtml(task.title)}</div>
       ${task.description ? `<div class="kanban-task-desc">${escapeHtml(task.description)}</div>` : ''}
       <div class="kanban-task-meta">
         <span class="kanban-task-priority ${task.priority}">${task.priority}</span>
         <div class="kanban-task-actions">
-          <button class="action-btn" onclick="editTask('${task.id}')" title="Edit" style="width: 22px; height: 22px;">
+          <button class="action-btn task-edit-btn" title="Edit" style="width: 22px; height: 22px;">
             <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
           </button>
-          <button class="action-btn" onclick="deleteTaskItem('${task.id}')" title="Delete" style="width: 22px; height: 22px; color: #f43f5e;">
+          <button class="action-btn task-delete-btn" title="Delete" style="width: 22px; height: 22px; color: #f43f5e;">
             <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/></svg>
           </button>
         </div>
@@ -4453,6 +4742,41 @@ async function deleteTaskItem(taskId) {
   }
 }
 
+function editTask(taskId) {
+  // For now, show a simple prompt to edit the task title
+  // TODO: Create a proper edit modal in the future
+  if (!selectedModule || !blueprintProjectPath) return;
+  
+  const taskCard = document.querySelector(`[data-task-id="${taskId}"]`);
+  if (!taskCard) return;
+  
+  const titleEl = taskCard.querySelector('.kanban-task-title');
+  const currentTitle = titleEl?.textContent || '';
+  
+  const newTitle = prompt('Edit task title:', currentTitle);
+  if (newTitle && newTitle.trim() && newTitle !== currentTitle) {
+    updateTaskTitle(taskId, newTitle.trim());
+  }
+}
+
+async function updateTaskTitle(taskId, newTitle) {
+  try {
+    const result = await window.electronAPI.updateTask(
+      blueprintProjectPath,
+      selectedModule.id,
+      taskId,
+      { title: newTitle }
+    );
+    
+    if (result.success) {
+      await loadKanbanContent();
+      showNotification('Task updated', 'success');
+    }
+  } catch (err) {
+    console.error('Error updating task:', err);
+  }
+}
+
 // =====================================================
 // Canvas View (Excalidraw)
 // =====================================================
@@ -4470,21 +4794,28 @@ async function loadCanvasContent() {
   excalidrawFrame = document.getElementById('excalidrawFrame');
   const loadingOverlay = document.getElementById('canvasLoadingOverlay');
   
+  // Show loading overlay
+  if (loadingOverlay) loadingOverlay.style.display = 'flex';
+  
   try {
     const result = await window.electronAPI.getModuleCanvas(blueprintProjectPath, selectedModule.id);
     pendingCanvasData = result.success ? result.canvas : null;
     
-    // Show loading overlay
-    if (loadingOverlay) loadingOverlay.style.display = 'flex';
-    
     // If frame is already ready, send data immediately
-    if (excalidrawReady && excalidrawFrame) {
+    if (excalidrawReady && excalidrawFrame && excalidrawFrame.contentWindow) {
       sendCanvasData(pendingCanvasData);
+    } else {
+      // Frame not ready - reload it to get fresh state
+      if (excalidrawFrame) {
+        excalidrawReady = false;
+        excalidrawFrame.src = excalidrawFrame.src;
+      }
     }
     // Otherwise, data will be sent when frame signals ready
     
   } catch (err) {
     console.error('Error loading canvas:', err);
+    if (loadingOverlay) loadingOverlay.style.display = 'none';
   }
 }
 
@@ -4608,6 +4939,57 @@ function clearCanvas() {
   }
 }
 
+let isCanvasFullscreen = false;
+
+function toggleCanvasFullscreen() {
+  const canvasViewEl = document.getElementById('canvasView');
+  if (!canvasViewEl) return;
+  
+  isCanvasFullscreen = !isCanvasFullscreen;
+  
+  if (isCanvasFullscreen) {
+    // Enter fullscreen mode
+    canvasViewEl.style.position = 'fixed';
+    canvasViewEl.style.top = '0';
+    canvasViewEl.style.left = '0';
+    canvasViewEl.style.right = '0';
+    canvasViewEl.style.bottom = '0';
+    canvasViewEl.style.width = '100vw';
+    canvasViewEl.style.height = '100vh';
+    canvasViewEl.style.zIndex = '9999';
+    canvasViewEl.style.borderRadius = '0';
+    document.body.style.overflow = 'hidden';
+    showNotification('Press Esc to exit fullscreen', 'info');
+  } else {
+    // Exit fullscreen mode
+    canvasViewEl.style.position = '';
+    canvasViewEl.style.top = '';
+    canvasViewEl.style.left = '';
+    canvasViewEl.style.right = '';
+    canvasViewEl.style.bottom = '';
+    canvasViewEl.style.width = '';
+    canvasViewEl.style.height = '';
+    canvasViewEl.style.zIndex = '';
+    canvasViewEl.style.borderRadius = '';
+    document.body.style.overflow = '';
+  }
+}
+
+// Add Esc key handler for fullscreen
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && isCanvasFullscreen) {
+    toggleCanvasFullscreen();
+  }
+});
+
+function exportCanvas(format) {
+  if (format === 'png') {
+    exportCanvasAsPng();
+  } else if (format === 'svg') {
+    exportCanvasAsSvg();
+  }
+}
+
 async function saveCanvasNotes() {
   // Legacy function - kept for compatibility
   if (!selectedModule || !blueprintProjectPath) return;
@@ -4671,7 +5053,7 @@ function renderResources(resourcesData) {
     links.forEach(link => {
       const iconClass = link.type === 'figma' ? 'figma' : link.type === 'api' ? 'api' : 'link';
       html += `
-        <div class="resource-item" data-resource-id="${link.id}">
+        <div class="resource-item link-item" data-resource-id="${link.id}" data-url="${escapeHtml(link.url)}" data-type="link">
           <div class="resource-icon ${iconClass}">
             ${getResourceIcon(link.type)}
           </div>
@@ -4680,10 +5062,10 @@ function renderResources(resourcesData) {
             <div class="resource-url">${escapeHtml(link.url)}</div>
           </div>
           <div class="resource-actions">
-            <button class="action-btn" onclick="openExternalLink('${escapeHtml(link.url)}')" title="Open" style="width: 24px; height: 24px;">
+            <button class="action-btn resource-open-btn" title="Open" style="width: 24px; height: 24px;">
               <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" x2="21" y1="14" y2="3"/></svg>
             </button>
-            <button class="action-btn" onclick="removeResourceItem('${link.id}', 'link')" title="Remove" style="width: 24px; height: 24px; color: #f43f5e;">
+            <button class="action-btn resource-remove-btn" title="Remove" style="width: 24px; height: 24px; color: #f43f5e;">
               <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/></svg>
             </button>
           </div>
@@ -4700,7 +5082,7 @@ function renderResources(resourcesData) {
     `;
     files.forEach(file => {
       html += `
-        <div class="resource-item file-link-item" data-resource-id="${file.id}" onclick="openFileInIDE('${escapeHtml(file.path)}')">
+        <div class="resource-item file-link-item" data-resource-id="${file.id}" data-path="${escapeHtml(file.path)}" data-type="file">
           <div class="resource-icon file">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
           </div>
@@ -4709,7 +5091,7 @@ function renderResources(resourcesData) {
             <div class="resource-url">${escapeHtml(file.path)}</div>
           </div>
           <div class="resource-actions">
-            <button class="action-btn" onclick="event.stopPropagation(); removeResourceItem('${file.id}', 'file')" title="Remove" style="width: 24px; height: 24px; color: #f43f5e;">
+            <button class="action-btn resource-remove-btn" title="Remove" style="width: 24px; height: 24px; color: #f43f5e;">
               <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/></svg>
             </button>
           </div>
@@ -4720,6 +5102,39 @@ function renderResources(resourcesData) {
   }
   
   resourcesList.innerHTML = html;
+  
+  // Add event listeners for resource items
+  resourcesList.querySelectorAll('.resource-item').forEach(item => {
+    const resourceId = item.dataset.resourceId;
+    const resourceType = item.dataset.type;
+    const url = item.dataset.url;
+    const filePath = item.dataset.path;
+    
+    // Open button for links
+    const openBtn = item.querySelector('.resource-open-btn');
+    if (openBtn) {
+      openBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (url) openExternalLink(url);
+      });
+    }
+    
+    // Remove button
+    const removeBtn = item.querySelector('.resource-remove-btn');
+    if (removeBtn) {
+      removeBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        removeResourceItem(resourceId, resourceType);
+      });
+    }
+    
+    // Click on file item opens in IDE
+    if (resourceType === 'file' && filePath) {
+      item.addEventListener('click', () => {
+        openFileInIDE(filePath);
+      });
+    }
+  });
 }
 
 function getResourceIcon(type) {
@@ -5187,6 +5602,11 @@ function initBlueprintListeners() {
     clearCanvasBtn.addEventListener('click', clearCanvas);
   }
   
+  const fullscreenCanvasBtn = document.getElementById('fullscreenCanvasBtn');
+  if (fullscreenCanvasBtn) {
+    fullscreenCanvasBtn.addEventListener('click', toggleCanvasFullscreen);
+  }
+  
   // Add Module Modal
   if (closeAddModuleBtn) {
     closeAddModuleBtn.addEventListener('click', hideAddModuleModal);
@@ -5301,4 +5721,47 @@ function formatRelativeTime(dateStr) {
   
   return date.toLocaleDateString();
 }
+
+// =====================================================
+// Expose Blueprint Functions Globally for HTML onclick
+// =====================================================
+window.selectModule = selectModule;
+window.showAddModuleModal = showAddModuleModal;
+window.hideAddModuleModal = hideAddModuleModal;
+window.createModule = createModule;
+window.deleteModule = deleteModule;
+window.switchBlueprintView = switchBlueprintView;
+window.onModuleDragStart = onModuleDragStart;
+window.onModuleDragOver = onModuleDragOver;
+window.onModuleDrop = onModuleDrop;
+window.onModuleDragLeave = onModuleDragLeave;
+window.showAddTaskModal = showAddTaskModal;
+window.hideAddTaskModal = hideAddTaskModal;
+window.createTask = createTask;
+window.deleteTask = deleteTask;
+window.updateTaskStatus = updateTaskStatus;
+window.onTaskDragStart = onTaskDragStart;
+window.onTaskDragEnd = onTaskDragEnd;
+window.onTaskDragOver = onTaskDragOver;
+window.onTaskDragLeave = onTaskDragLeave;
+window.onTaskDrop = onTaskDrop;
+window.deleteTaskItem = deleteTaskItem;
+window.editTask = editTask;
+window.showAddLinkModal = showAddLinkModal;
+window.hideAddLinkModal = hideAddLinkModal;
+window.addLink = addLink;
+window.browseLocalFile = browseLocalFile;
+window.openExternalLink = openExternalLink;
+window.openFileInIDE = openFileInIDE;
+window.removeResourceItem = removeResourceItem;
+window.exportCanvas = exportCanvas;
+window.exportCanvasAsPng = exportCanvasAsPng;
+window.exportCanvasAsSvg = exportCanvasAsSvg;
+window.clearCanvas = clearCanvas;
+window.toggleCanvasFullscreen = toggleCanvasFullscreen;
+window.showModuleSearchModal = showModuleSearchModal;
+window.hideModuleSearchModal = hideModuleSearchModal;
+window.searchInModules = searchInModules;
+window.closeBlueprints = closeBlueprints;
+window.openBlueprints = openBlueprints;
 

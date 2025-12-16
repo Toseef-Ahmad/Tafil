@@ -858,9 +858,9 @@
         <button id="refreshBtn" class="action-btn" title="Refresh">
           <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>
         </button>
-        <button id="darkModeToggle" class="action-btn" title="Toggle Theme">
-          <svg id="moonIcon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
-          <svg id="sunIcon" class="hidden" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
+        <button id="darkModeToggle" class="theme-toggle-btn" title="Toggle Theme (Click for quick switch, Settings for more themes)">
+          <svg id="moonIcon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+          <svg id="sunIcon" class="hidden" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
         </button>
       </div>
     </header>
@@ -1145,21 +1145,40 @@
 
   <!-- Modal: Settings -->
   <div id="settingsModal" class="modal-backdrop hidden" style="position: fixed; inset: 0; background: rgba(0, 0, 0, 0.7); z-index: 100; display: flex; align-items: center; justify-content: center;">
-    <div class="modal animate-slide-up" style="background: #18181b; border: 1px solid rgba(255, 255, 255, 0.08); color: #fafafa; border-radius: 12px; width: 480px; max-width: 95vw;">
-      <div class="modal-header" style="display: flex; align-items: center; justify-content: space-between; padding: 16px; border-bottom: 1px solid rgba(255,255,255,0.06);">
-        <h3 class="modal-title" style="display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600;">
-          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+    <div class="modal animate-slide-up" style="background: var(--bg-tertiary, #18181b); border: 1px solid var(--border-default, rgba(255, 255, 255, 0.08)); color: var(--text-primary, #fafafa); border-radius: 12px; width: 560px; max-width: 95vw;">
+      <div class="modal-header" style="display: flex; align-items: center; justify-content: space-between; padding: 16px; border-bottom: 1px solid var(--border-subtle, rgba(255,255,255,0.06));">
+        <h3 class="modal-title" style="display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; color: var(--text-primary, #fafafa);">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent-primary, #8b5cf6)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
           Settings
         </h3>
-        <button id="closeSettingsBtn" class="action-btn">
+        <button id="closeSettingsBtn" class="action-btn" style="background: var(--bg-hover, rgba(255,255,255,0.05)); color: var(--text-secondary, #a1a1aa);">
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
         </button>
       </div>
-      <div class="modal-body" style="padding: 16px; max-height: 60vh; overflow-y: auto;">
+      <div class="modal-body" style="padding: 16px; max-height: 70vh; overflow-y: auto;">
+        <!-- Theme Selector Section -->
+        <div class="mb-5">
+          <h4 class="text-sm font-medium mb-1" style="color: var(--text-primary);">
+            <span style="display: inline-flex; align-items: center; gap: 6px;">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
+              Theme
+            </span>
+          </h4>
+          <p class="text-xs mb-3" style="color: var(--text-tertiary);">Choose your preferred color theme</p>
+          <div id="themeSelectorContainer">
+            <!-- Theme options will be inserted here by JavaScript -->
+          </div>
+        </div>
+
         <!-- Default IDE Section -->
         <div class="mb-4">
-          <h4 class="text-sm font-medium mb-2" style="color: #fafafa;">Default Editor</h4>
-          <p class="text-xs mb-3" style="color: #71717a;">Choose your preferred code editor</p>
+          <h4 class="text-sm font-medium mb-1" style="color: var(--text-primary);">
+            <span style="display: inline-flex; align-items: center; gap: 6px;">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+              Default Editor
+            </span>
+          </h4>
+          <p class="text-xs mb-3" style="color: var(--text-tertiary);">Choose your preferred code editor</p>
           <div id="defaultIdeList" class="space-y-2">
             <!-- IDE options will be inserted here -->
           </div>
@@ -1168,16 +1187,21 @@
 
         <!-- Default Terminal Section -->
         <div>
-          <h4 class="text-sm font-medium mb-2" style="color: #fafafa;">Default Terminal</h4>
-          <p class="text-xs mb-3" style="color: #71717a;">Choose your preferred terminal app</p>
+          <h4 class="text-sm font-medium mb-1" style="color: var(--text-primary);">
+            <span style="display: inline-flex; align-items: center; gap: 6px;">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" x2="20" y1="19" y2="19"/></svg>
+              Default Terminal
+            </span>
+          </h4>
+          <p class="text-xs mb-3" style="color: var(--text-tertiary);">Choose your preferred terminal app</p>
           <div id="defaultTerminalList" class="space-y-2">
             <!-- Terminal options will be inserted here -->
           </div>
         </div>
       </div>
-      <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 8px; padding: 16px; border-top: 1px solid rgba(255,255,255,0.06);">
-        <button id="cancelSettingsBtn" class="px-4 py-2 rounded-lg text-sm font-medium" style="background: rgba(255,255,255,0.05); color: #a1a1aa;">Cancel</button>
-        <button id="saveSettingsBtn" class="px-4 py-2 rounded-lg text-sm font-medium" style="background: linear-gradient(135deg, #8b5cf6, #7c3aed); color: white;">Save Settings</button>
+      <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 8px; padding: 16px; border-top: 1px solid var(--border-subtle, rgba(255,255,255,0.06));">
+        <button id="cancelSettingsBtn" class="px-4 py-2 rounded-lg text-sm font-medium" style="background: var(--bg-hover, rgba(255,255,255,0.05)); color: var(--text-secondary, #a1a1aa);">Cancel</button>
+        <button id="saveSettingsBtn" class="px-4 py-2 rounded-lg text-sm font-medium" style="background: var(--accent-primary, #8b5cf6); color: white;">Save Settings</button>
       </div>
     </div>
   </div>
@@ -1478,6 +1502,9 @@
                   </button>
                   <button id="clearCanvasBtn" class="action-btn" title="Clear Canvas" style="padding: 6px 10px; font-size: 11px; color: #f43f5e;">
                     <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/></svg>
+                  </button>
+                  <button id="fullscreenCanvasBtn" class="action-btn" title="Toggle Fullscreen" style="padding: 6px 10px; font-size: 11px; background: linear-gradient(135deg, #8b5cf6, #7c3aed); color: white;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
                   </button>
                 </div>
               </div>

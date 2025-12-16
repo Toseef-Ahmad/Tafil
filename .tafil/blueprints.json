@@ -2,7 +2,7 @@
   "version": 1,
   "projectPath": "/Users/sodaclick/Desktop/projects/Own Projects/node-project-manager/electron-node-manager",
   "createdAt": "2025-12-16T04:40:55.447Z",
-  "updatedAt": "2025-12-16T04:51:46.451Z",
+  "updatedAt": "2025-12-16T05:49:35.403Z",
   "modules": [
     {
       "id": "1765860073364_d70b3fc2aaca",
@@ -10,7 +10,7 @@
       "description": "",
       "order": 0,
       "createdAt": "2025-12-16T04:41:13.365Z",
-      "updatedAt": "2025-12-16T04:41:40.463Z",
+      "updatedAt": "2025-12-16T05:49:35.403Z",
       "color": "#8b5cf6",
       "icon": "📦"
     },
@@ -21,6 +21,26 @@
       "order": 1,
       "createdAt": "2025-12-16T04:51:46.448Z",
       "updatedAt": "2025-12-16T04:51:46.448Z",
+      "color": "#8b5cf6",
+      "icon": "📦"
+    },
+    {
+      "id": "1765861384494_9c51ae791597",
+      "title": "Love s life",
+      "description": "",
+      "order": 2,
+      "createdAt": "2025-12-16T05:03:04.495Z",
+      "updatedAt": "2025-12-16T05:49:29.421Z",
+      "color": "#8b5cf6",
+      "icon": "📦"
+    },
+    {
+      "id": "1765863327853_2da6535b1077",
+      "title": "asdf",
+      "description": "",
+      "order": 3,
+      "createdAt": "2025-12-16T05:35:27.853Z",
+      "updatedAt": "2025-12-16T05:35:46.760Z",
       "color": "#8b5cf6",
       "icon": "📦"
     }

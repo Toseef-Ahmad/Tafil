@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "columns": [
+    {
+      "id": "todo",
+      "title": "To Do",
+      "tasks": [
+        {
+          "id": "1765863346758_c6333737483c",
+          "title": "asdf",
+          "description": "",
+          "priority": "medium",
+          "createdAt": "2025-12-16T05:35:46.758Z",
+          "updatedAt": "2025-12-16T05:35:46.758Z",
+          "labels": [],
+          "dueDate": null
+        }
+      ]
+    },
+    {
+      "id": "inprogress",
+      "title": "In Progress",
+      "tasks": []
+    },
+    {
+      "id": "done",
+      "title": "Done",
+      "tasks": []
+    }
+  ],
+  "createdAt": "2025-12-16T05:35:27.853Z",
+  "updatedAt": "2025-12-16T05:35:46.758Z"
+}

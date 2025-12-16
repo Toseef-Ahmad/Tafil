@@ -632,6 +632,67 @@ body:not(.light-mode) {
   color: var(--text-primary);
 }
 
+/* Theme Toggle Button */
+.theme-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.1), rgba(249, 115, 22, 0.1));
+  color: var(--text-secondary, #a1a1aa);
+  position: relative;
+  overflow: hidden;
+}
+
+.theme-toggle-btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(249, 115, 22, 0.2));
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.theme-toggle-btn:hover {
+  border-color: var(--accent-primary, #8b5cf6);
+  transform: scale(1.05);
+  color: var(--accent-primary, #8b5cf6);
+}
+
+.theme-toggle-btn:hover::before {
+  opacity: 1;
+}
+
+.theme-toggle-btn:active {
+  transform: scale(0.95);
+}
+
+.theme-toggle-btn svg {
+  width: 16px;
+  height: 16px;
+  position: relative;
+  z-index: 1;
+  transition: transform 0.3s ease;
+}
+
+.theme-toggle-btn:hover svg {
+  transform: rotate(15deg);
+}
+
+/* Light theme specific styling */
+body[data-theme="light"] .theme-toggle-btn,
+body[data-theme="github-light"] .theme-toggle-btn,
+body[data-theme="catppuccin-latte"] .theme-toggle-btn,
+body[data-theme="solarized-light"] .theme-toggle-btn {
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.15), rgba(249, 115, 22, 0.15));
+  border-color: rgba(0, 0, 0, 0.1);
+}
+
 /* ============================================
    STATUS MESSAGES
    ============================================ */
@@ -842,203 +903,873 @@ body:not(.light-mode) {
 }
 
 /* ============================================
-   LIGHT MODE
+   PREMIUM THEMES COLLECTION
+   12 Beautiful, Popular Theme Combos
    ============================================ */
 
-body.light-mode {
+/* Theme transition for smooth switching */
+body, .sidebar, #sidebar, header, main, .project-card, .modal,
+.info-panel, .command-palette-box, .notification {
+  transition: background-color 0.3s ease, 
+              border-color 0.3s ease, 
+              color 0.3s ease,
+              box-shadow 0.3s ease !important;
+}
+
+/* ============================================
+   THEME 1: Midnight (Default) - Deep Obsidian
+   Inspired by Linear, Raycast
+   ============================================ */
+body[data-theme="midnight"],
+body:not([data-theme]) {
+  --bg-primary: #0a0a0b;
+  --bg-secondary: #111113;
+  --bg-tertiary: #18181b;
+  --bg-elevated: #1f1f23;
+  --bg-hover: #27272a;
+  --border-subtle: rgba(255, 255, 255, 0.06);
+  --border-default: rgba(255, 255, 255, 0.08);
+  --border-hover: rgba(255, 255, 255, 0.12);
+  --border-focus: rgba(139, 92, 246, 0.5);
+  --text-primary: #fafafa;
+  --text-secondary: #a1a1aa;
+  --text-tertiary: #71717a;
+  --text-muted: #52525b;
+  --accent-primary: #8b5cf6;
+  --accent-primary-muted: rgba(139, 92, 246, 0.15);
+  --accent-glow: rgba(139, 92, 246, 0.25);
+}
+
+/* ============================================
+   THEME 2: Dracula - The Classic Purple
+   Inspired by Dracula theme
+   ============================================ */
+body[data-theme="dracula"] {
+  --bg-primary: #282a36;
+  --bg-secondary: #1e1f29;
+  --bg-tertiary: #343746;
+  --bg-elevated: #3d4051;
+  --bg-hover: #44475a;
+  --border-subtle: rgba(139, 233, 253, 0.08);
+  --border-default: rgba(139, 233, 253, 0.12);
+  --border-hover: rgba(189, 147, 249, 0.25);
+  --border-focus: rgba(189, 147, 249, 0.5);
+  --text-primary: #f8f8f2;
+  --text-secondary: #bfbfbf;
+  --text-tertiary: #6272a4;
+  --text-muted: #545976;
+  --accent-primary: #bd93f9;
+  --accent-primary-muted: rgba(189, 147, 249, 0.15);
+  --accent-glow: rgba(189, 147, 249, 0.3);
+  --accent-violet: #bd93f9;
+  --accent-emerald: #50fa7b;
+  --accent-rose: #ff5555;
+  --accent-sky: #8be9fd;
+  --accent-amber: #f1fa8c;
+}
+
+/* ============================================
+   THEME 3: Tokyo Night - Neon Dreams
+   Inspired by Tokyo Night theme
+   ============================================ */
+body[data-theme="tokyo-night"] {
+  --bg-primary: #1a1b26;
+  --bg-secondary: #16161e;
+  --bg-tertiary: #1f2335;
+  --bg-elevated: #292e42;
+  --bg-hover: #33384d;
+  --border-subtle: rgba(122, 162, 247, 0.08);
+  --border-default: rgba(122, 162, 247, 0.12);
+  --border-hover: rgba(187, 154, 247, 0.2);
+  --border-focus: rgba(187, 154, 247, 0.5);
+  --text-primary: #c0caf5;
+  --text-secondary: #9aa5ce;
+  --text-tertiary: #565f89;
+  --text-muted: #414868;
+  --accent-primary: #bb9af7;
+  --accent-primary-muted: rgba(187, 154, 247, 0.15);
+  --accent-glow: rgba(187, 154, 247, 0.25);
+  --accent-violet: #bb9af7;
+  --accent-emerald: #9ece6a;
+  --accent-rose: #f7768e;
+  --accent-sky: #7aa2f7;
+  --accent-amber: #e0af68;
+}
+
+/* ============================================
+   THEME 4: Nord - Arctic Frost
+   Inspired by Nord theme
+   ============================================ */
+body[data-theme="nord"] {
+  --bg-primary: #2e3440;
+  --bg-secondary: #272c36;
+  --bg-tertiary: #3b4252;
+  --bg-elevated: #434c5e;
+  --bg-hover: #4c566a;
+  --border-subtle: rgba(136, 192, 208, 0.1);
+  --border-default: rgba(136, 192, 208, 0.15);
+  --border-hover: rgba(136, 192, 208, 0.25);
+  --border-focus: rgba(136, 192, 208, 0.5);
+  --text-primary: #eceff4;
+  --text-secondary: #d8dee9;
+  --text-tertiary: #81a1c1;
+  --text-muted: #5e81ac;
+  --accent-primary: #88c0d0;
+  --accent-primary-muted: rgba(136, 192, 208, 0.15);
+  --accent-glow: rgba(136, 192, 208, 0.25);
+  --accent-violet: #b48ead;
+  --accent-emerald: #a3be8c;
+  --accent-rose: #bf616a;
+  --accent-sky: #88c0d0;
+  --accent-amber: #ebcb8b;
+}
+
+/* ============================================
+   THEME 5: Catppuccin Mocha - Cozy Warmth
+   Inspired by Catppuccin theme
+   ============================================ */
+body[data-theme="catppuccin"] {
+  --bg-primary: #1e1e2e;
+  --bg-secondary: #181825;
+  --bg-tertiary: #313244;
+  --bg-elevated: #45475a;
+  --bg-hover: #585b70;
+  --border-subtle: rgba(203, 166, 247, 0.08);
+  --border-default: rgba(203, 166, 247, 0.12);
+  --border-hover: rgba(203, 166, 247, 0.2);
+  --border-focus: rgba(203, 166, 247, 0.5);
+  --text-primary: #cdd6f4;
+  --text-secondary: #bac2de;
+  --text-tertiary: #6c7086;
+  --text-muted: #585b70;
+  --accent-primary: #cba6f7;
+  --accent-primary-muted: rgba(203, 166, 247, 0.15);
+  --accent-glow: rgba(203, 166, 247, 0.25);
+  --accent-violet: #cba6f7;
+  --accent-emerald: #a6e3a1;
+  --accent-rose: #f38ba8;
+  --accent-sky: #89dceb;
+  --accent-amber: #fab387;
+}
+
+/* ============================================
+   THEME 6: One Dark Pro - Atom Classic
+   Inspired by Atom One Dark
+   ============================================ */
+body[data-theme="one-dark"] {
+  --bg-primary: #282c34;
+  --bg-secondary: #21252b;
+  --bg-tertiary: #2c313a;
+  --bg-elevated: #3a3f4b;
+  --bg-hover: #414858;
+  --border-subtle: rgba(97, 175, 239, 0.08);
+  --border-default: rgba(97, 175, 239, 0.12);
+  --border-hover: rgba(198, 120, 221, 0.2);
+  --border-focus: rgba(198, 120, 221, 0.5);
+  --text-primary: #abb2bf;
+  --text-secondary: #9da5b4;
+  --text-tertiary: #5c6370;
+  --text-muted: #4b5263;
+  --accent-primary: #c678dd;
+  --accent-primary-muted: rgba(198, 120, 221, 0.15);
+  --accent-glow: rgba(198, 120, 221, 0.25);
+  --accent-violet: #c678dd;
+  --accent-emerald: #98c379;
+  --accent-rose: #e06c75;
+  --accent-sky: #61afef;
+  --accent-amber: #e5c07b;
+}
+
+/* ============================================
+   THEME 7: Synthwave '84 - Retro Neon
+   Inspired by Synthwave '84 theme
+   ============================================ */
+body[data-theme="synthwave"] {
+  --bg-primary: #262335;
+  --bg-secondary: #1e1a2e;
+  --bg-tertiary: #34294f;
+  --bg-elevated: #443b62;
+  --bg-hover: #524a70;
+  --border-subtle: rgba(255, 106, 193, 0.1);
+  --border-default: rgba(255, 106, 193, 0.15);
+  --border-hover: rgba(255, 106, 193, 0.25);
+  --border-focus: rgba(255, 106, 193, 0.5);
+  --text-primary: #f5e6d3;
+  --text-secondary: #b6a1c9;
+  --text-tertiary: #8c79a5;
+  --text-muted: #6d5b85;
+  --accent-primary: #ff6ac1;
+  --accent-primary-muted: rgba(255, 106, 193, 0.2);
+  --accent-glow: rgba(255, 106, 193, 0.4);
+  --accent-violet: #f97e72;
+  --accent-emerald: #72f1b8;
+  --accent-rose: #fe4450;
+  --accent-sky: #36f9f6;
+  --accent-amber: #fede5d;
+}
+
+/* Synthwave glow effects */
+body[data-theme="synthwave"] .project-card:hover {
+  box-shadow: 0 0 20px rgba(255, 106, 193, 0.2), 0 4px 12px rgba(0, 0, 0, 0.4) !important;
+}
+
+body[data-theme="synthwave"] .sidebar-item.active {
+  box-shadow: 0 0 15px rgba(255, 106, 193, 0.3);
+}
+
+/* ============================================
+   THEME 8: Ayu Dark - Clean & Modern
+   Inspired by Ayu theme
+   ============================================ */
+body[data-theme="ayu-dark"] {
+  --bg-primary: #0d1017;
+  --bg-secondary: #0b0e14;
+  --bg-tertiary: #131721;
+  --bg-elevated: #1c212b;
+  --bg-hover: #252b37;
+  --border-subtle: rgba(57, 186, 230, 0.08);
+  --border-default: rgba(57, 186, 230, 0.12);
+  --border-hover: rgba(255, 180, 84, 0.2);
+  --border-focus: rgba(255, 180, 84, 0.5);
+  --text-primary: #bfbdb6;
+  --text-secondary: #9da5b4;
+  --text-tertiary: #565b66;
+  --text-muted: #454850;
+  --accent-primary: #ffb454;
+  --accent-primary-muted: rgba(255, 180, 84, 0.15);
+  --accent-glow: rgba(255, 180, 84, 0.25);
+  --accent-violet: #d2a6ff;
+  --accent-emerald: #7fd962;
+  --accent-rose: #f07178;
+  --accent-sky: #39bae6;
+  --accent-amber: #ffb454;
+}
+
+/* ============================================
+   THEME 9: GitHub Dark - Developer Standard
+   Inspired by GitHub Dark theme
+   ============================================ */
+body[data-theme="github-dark"] {
+  --bg-primary: #0d1117;
+  --bg-secondary: #010409;
+  --bg-tertiary: #161b22;
+  --bg-elevated: #21262d;
+  --bg-hover: #30363d;
+  --border-subtle: rgba(48, 54, 61, 0.8);
+  --border-default: rgba(48, 54, 61, 1);
+  --border-hover: rgba(88, 166, 255, 0.3);
+  --border-focus: rgba(88, 166, 255, 0.5);
+  --text-primary: #e6edf3;
+  --text-secondary: #8d96a0;
+  --text-tertiary: #6e7681;
+  --text-muted: #484f58;
+  --accent-primary: #58a6ff;
+  --accent-primary-muted: rgba(88, 166, 255, 0.15);
+  --accent-glow: rgba(88, 166, 255, 0.25);
+  --accent-violet: #a371f7;
+  --accent-emerald: #3fb950;
+  --accent-rose: #f85149;
+  --accent-sky: #58a6ff;
+  --accent-amber: #d29922;
+}
+
+/* ============================================
+   THEME 10: Rosé Pine - Warm & Elegant
+   Inspired by Rosé Pine theme
+   ============================================ */
+body[data-theme="rose-pine"] {
+  --bg-primary: #191724;
+  --bg-secondary: #1f1d2e;
+  --bg-tertiary: #26233a;
+  --bg-elevated: #312e47;
+  --bg-hover: #3c3954;
+  --border-subtle: rgba(235, 188, 186, 0.08);
+  --border-default: rgba(235, 188, 186, 0.12);
+  --border-hover: rgba(235, 188, 186, 0.2);
+  --border-focus: rgba(235, 188, 186, 0.5);
+  --text-primary: #e0def4;
+  --text-secondary: #908caa;
+  --text-tertiary: #6e6a86;
+  --text-muted: #524f67;
+  --accent-primary: #ebbcba;
+  --accent-primary-muted: rgba(235, 188, 186, 0.15);
+  --accent-glow: rgba(235, 188, 186, 0.25);
+  --accent-violet: #c4a7e7;
+  --accent-emerald: #31748f;
+  --accent-rose: #eb6f92;
+  --accent-sky: #9ccfd8;
+  --accent-amber: #f6c177;
+}
+
+/* ============================================
+   THEME 11: Monokai Pro - The Classic
+   Inspired by Monokai Pro theme
+   ============================================ */
+body[data-theme="monokai"] {
+  --bg-primary: #2d2a2e;
+  --bg-secondary: #221f22;
+  --bg-tertiary: #383539;
+  --bg-elevated: #444146;
+  --bg-hover: #525053;
+  --border-subtle: rgba(255, 216, 102, 0.08);
+  --border-default: rgba(255, 216, 102, 0.12);
+  --border-hover: rgba(255, 97, 136, 0.25);
+  --border-focus: rgba(255, 97, 136, 0.5);
+  --text-primary: #fcfcfa;
+  --text-secondary: #c1c0c0;
+  --text-tertiary: #939293;
+  --text-muted: #727072;
+  --accent-primary: #ff6188;
+  --accent-primary-muted: rgba(255, 97, 136, 0.15);
+  --accent-glow: rgba(255, 97, 136, 0.25);
+  --accent-violet: #ab9df2;
+  --accent-emerald: #a9dc76;
+  --accent-rose: #ff6188;
+  --accent-sky: #78dce8;
+  --accent-amber: #ffd866;
+}
+
+/* ============================================
+   THEME 12: Vesper - Warm Orange Sunset
+   Premium exclusive theme
+   ============================================ */
+body[data-theme="vesper"] {
+  --bg-primary: #101010;
+  --bg-secondary: #1a1a1a;
+  --bg-tertiary: #232323;
+  --bg-elevated: #2d2d2d;
+  --bg-hover: #373737;
+  --border-subtle: rgba(255, 135, 79, 0.08);
+  --border-default: rgba(255, 135, 79, 0.12);
+  --border-hover: rgba(255, 135, 79, 0.25);
+  --border-focus: rgba(255, 135, 79, 0.5);
+  --text-primary: #fff5e1;
+  --text-secondary: #b5b5a4;
+  --text-tertiary: #6b6b5c;
+  --text-muted: #4a4a40;
+  --accent-primary: #ff874f;
+  --accent-primary-muted: rgba(255, 135, 79, 0.15);
+  --accent-glow: rgba(255, 135, 79, 0.3);
+  --accent-violet: #a592ff;
+  --accent-emerald: #99d98c;
+  --accent-rose: #ff8fa4;
+  --accent-sky: #8fdfff;
+  --accent-amber: #ffb347;
+}
+
+/* ============================================
+   LIGHT THEMES
+   ============================================ */
+
+/* LIGHT THEME 1: Airy Light - Clean & Minimal */
+body[data-theme="light"] {
   --bg-primary: #ffffff;
   --bg-secondary: #f8fafc;
   --bg-tertiary: #f1f5f9;
   --bg-elevated: #e2e8f0;
   --bg-hover: #e2e8f0;
-  
   --border-subtle: rgba(0, 0, 0, 0.06);
   --border-default: rgba(0, 0, 0, 0.1);
-  --border-hover: rgba(0, 0, 0, 0.15);
-  
+  --border-hover: rgba(139, 92, 246, 0.3);
+  --border-focus: rgba(139, 92, 246, 0.5);
   --text-primary: #0f172a;
   --text-secondary: #475569;
   --text-tertiary: #64748b;
   --text-muted: #94a3b8;
-  
+  --accent-primary: #8b5cf6;
+  --accent-primary-muted: rgba(139, 92, 246, 0.1);
+  --accent-glow: rgba(139, 92, 246, 0.15);
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
   --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.12);
-  
-  background-color: #ffffff !important;
-  color: #0f172a !important;
 }
 
-/* Light mode - Sidebar */
-body.light-mode .sidebar,
-body.light-mode #sidebar {
-  background-color: #f8fafc !important;
-  border-color: rgba(0, 0, 0, 0.08) !important;
+/* LIGHT THEME 2: GitHub Light */
+body[data-theme="github-light"] {
+  --bg-primary: #ffffff;
+  --bg-secondary: #f6f8fa;
+  --bg-tertiary: #eaeef2;
+  --bg-elevated: #d8dee4;
+  --bg-hover: #d0d7de;
+  --border-subtle: rgba(0, 0, 0, 0.08);
+  --border-default: rgba(0, 0, 0, 0.12);
+  --border-hover: rgba(9, 105, 218, 0.3);
+  --border-focus: rgba(9, 105, 218, 0.5);
+  --text-primary: #1f2328;
+  --text-secondary: #57606a;
+  --text-tertiary: #6e7781;
+  --text-muted: #8c959f;
+  --accent-primary: #0969da;
+  --accent-primary-muted: rgba(9, 105, 218, 0.1);
+  --accent-glow: rgba(9, 105, 218, 0.15);
+  --accent-violet: #8250df;
+  --accent-emerald: #1a7f37;
+  --accent-rose: #cf222e;
+  --accent-sky: #0969da;
+  --accent-amber: #bf8700;
 }
 
-body.light-mode .sidebar-item {
-  color: #475569;
+/* LIGHT THEME 3: Catppuccin Latte */
+body[data-theme="catppuccin-latte"] {
+  --bg-primary: #eff1f5;
+  --bg-secondary: #e6e9ef;
+  --bg-tertiary: #dce0e8;
+  --bg-elevated: #ccd0da;
+  --bg-hover: #bcc0cc;
+  --border-subtle: rgba(0, 0, 0, 0.06);
+  --border-default: rgba(0, 0, 0, 0.1);
+  --border-hover: rgba(136, 57, 239, 0.3);
+  --border-focus: rgba(136, 57, 239, 0.5);
+  --text-primary: #4c4f69;
+  --text-secondary: #5c5f77;
+  --text-tertiary: #7c7f93;
+  --text-muted: #9ca0b0;
+  --accent-primary: #8839ef;
+  --accent-primary-muted: rgba(136, 57, 239, 0.1);
+  --accent-glow: rgba(136, 57, 239, 0.15);
+  --accent-violet: #8839ef;
+  --accent-emerald: #40a02b;
+  --accent-rose: #d20f39;
+  --accent-sky: #04a5e5;
+  --accent-amber: #df8e1d;
 }
 
-body.light-mode .sidebar-item:hover {
-  background: rgba(0, 0, 0, 0.05);
-  color: #0f172a;
+/* LIGHT THEME 4: Solarized Light */
+body[data-theme="solarized-light"] {
+  --bg-primary: #fdf6e3;
+  --bg-secondary: #eee8d5;
+  --bg-tertiary: #e5ddc8;
+  --bg-elevated: #d6cfb8;
+  --bg-hover: #c9c2a8;
+  --border-subtle: rgba(0, 0, 0, 0.06);
+  --border-default: rgba(0, 0, 0, 0.1);
+  --border-hover: rgba(38, 139, 210, 0.3);
+  --border-focus: rgba(38, 139, 210, 0.5);
+  --text-primary: #073642;
+  --text-secondary: #586e75;
+  --text-tertiary: #657b83;
+  --text-muted: #93a1a1;
+  --accent-primary: #268bd2;
+  --accent-primary-muted: rgba(38, 139, 210, 0.1);
+  --accent-glow: rgba(38, 139, 210, 0.15);
+  --accent-violet: #6c71c4;
+  --accent-emerald: #859900;
+  --accent-rose: #dc322f;
+  --accent-sky: #268bd2;
+  --accent-amber: #b58900;
 }
 
-body.light-mode .sidebar-item.active {
-  background: rgba(139, 92, 246, 0.1);
-  color: #7c3aed;
+/* ============================================
+   THEME GRID PREVIEW COLORS (for selector)
+   ============================================ */
+.theme-preview-midnight { background: linear-gradient(135deg, #0a0a0b, #18181b) !important; }
+.theme-preview-dracula { background: linear-gradient(135deg, #282a36, #bd93f9) !important; }
+.theme-preview-tokyo-night { background: linear-gradient(135deg, #1a1b26, #bb9af7) !important; }
+.theme-preview-nord { background: linear-gradient(135deg, #2e3440, #88c0d0) !important; }
+.theme-preview-catppuccin { background: linear-gradient(135deg, #1e1e2e, #cba6f7) !important; }
+.theme-preview-one-dark { background: linear-gradient(135deg, #282c34, #c678dd) !important; }
+.theme-preview-synthwave { background: linear-gradient(135deg, #262335, #ff6ac1) !important; }
+.theme-preview-ayu-dark { background: linear-gradient(135deg, #0d1017, #ffb454) !important; }
+.theme-preview-github-dark { background: linear-gradient(135deg, #0d1117, #58a6ff) !important; }
+.theme-preview-rose-pine { background: linear-gradient(135deg, #191724, #ebbcba) !important; }
+.theme-preview-monokai { background: linear-gradient(135deg, #2d2a2e, #ff6188) !important; }
+.theme-preview-vesper { background: linear-gradient(135deg, #101010, #ff874f) !important; }
+.theme-preview-light { background: linear-gradient(135deg, #ffffff, #8b5cf6) !important; }
+.theme-preview-github-light { background: linear-gradient(135deg, #ffffff, #0969da) !important; }
+.theme-preview-catppuccin-latte { background: linear-gradient(135deg, #eff1f5, #8839ef) !important; }
+.theme-preview-solarized-light { background: linear-gradient(135deg, #fdf6e3, #268bd2) !important; }
+
+/* ============================================
+   UNIVERSAL THEME APPLICATIONS
+   Apply CSS variables to all elements
+   ============================================ */
+
+/* Body and base */
+body[data-theme] {
+  background-color: var(--bg-primary) !important;
+  color: var(--text-primary) !important;
 }
 
-/* Light mode - Header */
-body.light-mode header {
-  background-color: #ffffff !important;
-  border-color: rgba(0, 0, 0, 0.08) !important;
+/* Sidebar */
+body[data-theme] .sidebar,
+body[data-theme] #sidebar {
+  background-color: var(--bg-secondary) !important;
+  border-color: var(--border-subtle) !important;
 }
 
-/* Light mode - Main content */
-body.light-mode main {
-  background-color: #ffffff !important;
+body[data-theme] .sidebar-item {
+  color: var(--text-secondary);
 }
 
-/* Light mode - Project cards */
-body.light-mode .project-card {
-  background-color: #f8fafc !important;
-  border-color: rgba(0, 0, 0, 0.08) !important;
-  color: #0f172a !important;
+body[data-theme] .sidebar-item:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
 }
 
-body.light-mode .project-card:hover {
-  border-color: rgba(139, 92, 246, 0.3) !important;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+body[data-theme] .sidebar-item.active {
+  background: var(--accent-primary-muted);
+  color: var(--accent-primary);
 }
 
-body.light-mode .project-card h4 {
-  color: #0f172a !important;
+/* Header */
+body[data-theme] header {
+  background-color: var(--bg-primary) !important;
+  border-color: var(--border-subtle) !important;
 }
 
-body.light-mode .project-card p {
-  color: #64748b !important;
+/* Main content */
+body[data-theme] main {
+  background-color: var(--bg-primary) !important;
 }
 
-/* Light mode - Action buttons */
-body.light-mode .action-btn {
-  background: rgba(0, 0, 0, 0.05);
-  color: #64748b;
+/* Project cards */
+body[data-theme] .project-card {
+  background-color: var(--bg-secondary) !important;
+  border-color: var(--border-subtle) !important;
+  color: var(--text-primary) !important;
 }
 
-body.light-mode .action-btn:hover {
-  background: rgba(0, 0, 0, 0.1);
-  color: #0f172a;
+body[data-theme] .project-card:hover {
+  background-color: var(--bg-tertiary) !important;
+  border-color: var(--border-hover) !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2), 0 0 0 1px var(--border-hover);
 }
 
-/* Light mode - Modals */
-body.light-mode .modal-backdrop {
-  background: rgba(0, 0, 0, 0.4) !important;
+body[data-theme] .project-card h4,
+body[data-theme] .card-title {
+  color: var(--text-primary) !important;
 }
 
-body.light-mode .modal,
-body.light-mode [class*="modal"] > div:not(.modal-backdrop) {
-  background-color: #ffffff !important;
-  border-color: rgba(0, 0, 0, 0.1) !important;
-  color: #0f172a !important;
+body[data-theme] .project-card p,
+body[data-theme] .card-subtitle,
+body[data-theme] .card-path {
+  color: var(--text-tertiary) !important;
 }
 
-/* Light mode - Command Palette */
-body.light-mode .command-palette-box {
-  background: #ffffff !important;
-  border-color: rgba(0, 0, 0, 0.1) !important;
+/* Action buttons */
+body[data-theme] .action-btn-default {
+  background: var(--bg-hover);
+  color: var(--text-secondary);
 }
 
-body.light-mode .command-input {
-  color: #0f172a !important;
-  border-color: rgba(0, 0, 0, 0.08) !important;
+body[data-theme] .action-btn-default:hover {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
 }
 
-body.light-mode .command-input::placeholder {
-  color: #94a3b8 !important;
+/* Modals */
+body[data-theme] .modal-backdrop {
+  background: rgba(0, 0, 0, 0.6) !important;
 }
 
-body.light-mode .command-item:hover,
-body.light-mode .command-item.selected {
-  background: rgba(139, 92, 246, 0.1) !important;
+body[data-theme] .modal,
+body[data-theme] [class*="modal"] > div:not(.modal-backdrop) {
+  background-color: var(--bg-tertiary) !important;
+  border-color: var(--border-default) !important;
+  color: var(--text-primary) !important;
 }
 
-body.light-mode .command-item-title {
-  color: #0f172a !important;
+/* Command Palette */
+body[data-theme] .command-palette-box {
+  background: var(--bg-secondary) !important;
+  border-color: var(--border-default) !important;
 }
 
-body.light-mode .command-item-desc {
-  color: #64748b !important;
+body[data-theme] .command-input {
+  background: var(--bg-tertiary) !important;
+  color: var(--text-primary) !important;
+  border-color: var(--border-subtle) !important;
 }
 
-/* Light mode - Notifications */
-body.light-mode .notification {
-  background: #ffffff !important;
-  border-color: rgba(0, 0, 0, 0.1) !important;
+body[data-theme] .command-input::placeholder {
+  color: var(--text-muted) !important;
 }
 
-/* Light mode - Collection items */
-body.light-mode .collection-item {
-  color: #475569;
+body[data-theme] .command-item:hover,
+body[data-theme] .command-item.selected {
+  background: var(--accent-primary-muted) !important;
 }
 
-body.light-mode .collection-item:hover {
-  background: rgba(0, 0, 0, 0.05);
-  color: #0f172a;
+body[data-theme] .command-item-title {
+  color: var(--text-primary) !important;
 }
 
-body.light-mode .collection-item.active {
-  background: rgba(139, 92, 246, 0.1);
-  color: #7c3aed;
+body[data-theme] .command-item-desc {
+  color: var(--text-tertiary) !important;
 }
 
-body.light-mode .collection-count {
-  background: rgba(0, 0, 0, 0.05);
-  color: #64748b;
+/* Notifications */
+body[data-theme] .notification {
+  background: var(--bg-tertiary) !important;
+  border-color: var(--border-default) !important;
 }
 
-/* Light mode - Insights */
-body.light-mode .insights-panel {
-  background: #f8fafc !important;
-  border-color: rgba(0, 0, 0, 0.08) !important;
+/* Collection items */
+body[data-theme] .collection-item {
+  color: var(--text-secondary);
 }
 
-body.light-mode .insight-item {
-  border-color: rgba(0, 0, 0, 0.06) !important;
+body[data-theme] .collection-item:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
 }
 
-/* Light mode - Empty state */
-body.light-mode #emptyState h3 {
-  color: #0f172a !important;
+body[data-theme] .collection-item.active {
+  background: var(--accent-primary-muted);
+  color: var(--accent-primary);
 }
 
-body.light-mode #emptyState p {
-  color: #64748b !important;
+body[data-theme] .collection-count {
+  background: var(--bg-hover);
+  color: var(--text-tertiary);
 }
 
-/* Light mode - Scrollbar */
-body.light-mode ::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.15);
+/* Insights */
+body[data-theme] .insights-panel {
+  background: var(--bg-secondary) !important;
+  border-color: var(--border-subtle) !important;
 }
 
-body.light-mode ::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 0, 0, 0.25);
+body[data-theme] .insight-item {
+  border-color: var(--border-subtle) !important;
 }
 
-/* Light mode - Info panel */
-body.light-mode .info-panel {
-  background: #f8fafc !important;
-  border-color: rgba(0, 0, 0, 0.08) !important;
+/* Empty state */
+body[data-theme] #emptyState h3 {
+  color: var(--text-primary) !important;
 }
 
-/* Light mode - Search */
-body.light-mode #commandTrigger {
-  background: rgba(0, 0, 0, 0.03) !important;
-  border-color: rgba(0, 0, 0, 0.08) !important;
+body[data-theme] #emptyState p {
+  color: var(--text-tertiary) !important;
 }
 
-body.light-mode .command-shortcut {
-  background: rgba(0, 0, 0, 0.05) !important;
-  color: #64748b !important;
+/* Scrollbar */
+body[data-theme] ::-webkit-scrollbar-thumb {
+  background: var(--border-default);
+}
+
+body[data-theme] ::-webkit-scrollbar-thumb:hover {
+  background: var(--border-hover);
+}
+
+/* Info panel */
+body[data-theme] .info-panel {
+  background: var(--bg-secondary) !important;
+  border-color: var(--border-subtle) !important;
+}
+
+/* Search */
+body[data-theme] #commandTrigger {
+  background: var(--bg-tertiary) !important;
+  border-color: var(--border-subtle) !important;
+}
+
+body[data-theme] .command-shortcut {
+  background: var(--bg-hover) !important;
+  color: var(--text-muted) !important;
+}
+
+/* Inputs */
+body[data-theme] input[type="text"],
+body[data-theme] .input {
+  background: var(--bg-tertiary) !important;
+  border-color: var(--border-subtle) !important;
+  color: var(--text-primary) !important;
+}
+
+body[data-theme] input[type="text"]::placeholder,
+body[data-theme] .input::placeholder {
+  color: var(--text-muted) !important;
+}
+
+body[data-theme] input[type="text"]:focus,
+body[data-theme] .input:focus {
+  border-color: var(--accent-primary) !important;
+  box-shadow: 0 0 0 3px var(--accent-primary-muted) !important;
+}
+
+/* Buttons with accent */
+body[data-theme] .btn-violet,
+body[data-theme] button[style*="8b5cf6"],
+body[data-theme] button[style*="linear-gradient"] {
+  background: var(--accent-primary) !important;
+}
+
+/* Settings option selected state */
+body[data-theme] label[style*="rgba(139, 92, 246"] {
+  background: var(--accent-primary-muted) !important;
+  border-color: var(--accent-primary) !important;
+}
+
+/* Framework badge with theme accent */
+body[data-theme] .framework-badge {
+  background: var(--accent-primary-muted);
+  color: var(--accent-primary);
+}
+
+/* ============================================
+   THEME SELECTOR STYLES
+   ============================================ */
+.theme-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.theme-option {
+  position: relative;
+  padding: 8px;
+  border-radius: 8px;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: center;
+}
+
+.theme-option:hover {
+  border-color: var(--border-hover);
+  transform: translateY(-1px);
+}
+
+.theme-option.active {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 3px var(--accent-primary-muted);
+}
+
+.theme-preview {
+  width: 100%;
+  height: 32px;
+  border-radius: 6px;
+  margin-bottom: 6px;
+}
+
+.theme-name {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.theme-option.active .theme-name {
+  color: var(--accent-primary);
+}
+
+.theme-section-title {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+  margin-top: 12px;
+}
+
+.theme-section-title:first-child {
+  margin-top: 0;
+}
+
+/* New Theme Card Styles */
+.theme-grid-new {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.theme-card {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 2px solid var(--border-subtle, rgba(255, 255, 255, 0.06));
+  background: var(--bg-secondary, rgba(255, 255, 255, 0.03));
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: left;
+  width: 100%;
+}
+
+.theme-card:hover {
+  border-color: var(--border-hover, rgba(255, 255, 255, 0.15));
+  background: var(--bg-hover, rgba(255, 255, 255, 0.05));
+  transform: translateY(-1px);
+}
+
+.theme-card.active {
+  border-color: var(--accent-primary, #8b5cf6);
+  background: var(--accent-primary-muted, rgba(139, 92, 246, 0.1));
+  box-shadow: 0 0 0 3px var(--accent-primary-muted, rgba(139, 92, 246, 0.15));
+}
+
+.theme-card-preview {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.theme-card-icon {
+  font-size: 18px;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3));
+}
+
+.theme-card-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.theme-card-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary, #fafafa);
+  margin-bottom: 2px;
+}
+
+.theme-card-desc {
+  font-size: 11px;
+  color: var(--text-muted, #52525b);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.theme-card.active .theme-card-name {
+  color: var(--accent-primary, #8b5cf6);
+}
+
+.theme-card.active .theme-card-desc {
+  color: var(--text-secondary, #a1a1aa);
+}
+
+.theme-card-check {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  font-size: 12px;
+  color: var(--accent-primary, #8b5cf6);
+  font-weight: bold;
+}
+
+/* Light theme adjustments for specific elements */
+body[data-theme="light"] .project-card,
+body[data-theme="github-light"] .project-card,
+body[data-theme="catppuccin-latte"] .project-card,
+body[data-theme="solarized-light"] .project-card {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+body[data-theme="light"] .project-card:hover,
+body[data-theme="github-light"] .project-card:hover,
+body[data-theme="catppuccin-latte"] .project-card:hover,
+body[data-theme="solarized-light"] .project-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
 }
