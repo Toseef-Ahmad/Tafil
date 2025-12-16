@@ -783,7 +783,7 @@ function renderCommandResults(query) {
   const commands = [
     { type: 'action', id: 'scan-home', title: 'Scan Home Directory', desc: 'Find Node.js projects in home folder', icon: Icons.home, action: renderProjects },
     { type: 'action', id: 'scan-folder', title: 'Scan Custom Folder', desc: 'Choose a folder to scan', icon: Icons.folder, action: renderCustomProjects },
-    { type: 'action', id: 'refresh', title: 'Refresh Projects', desc: 'Reload project list', icon: Icons.check, action: () => renderProjectCards(currentProjects) },
+    { type: 'action', id: 'refresh', title: 'Refresh Projects', desc: 'Reload project list', icon: Icons.check, action: () => refreshCurrentView() },
     { type: 'view', id: 'view-all', title: 'View All Projects', desc: 'Show all projects', icon: Icons.folder, action: () => switchView('all') },
     { type: 'view', id: 'view-running', title: 'View Running Projects', desc: 'Show running projects only', icon: Icons.play, action: () => switchView('running') },
     { type: 'view', id: 'view-insights', title: 'View Insights', desc: 'Show project insights', icon: Icons.chart, action: () => switchView('insights') },
@@ -1287,6 +1287,39 @@ function updateRunningCount() {
   runningNumEl.textContent = count;
   runningCountEl.classList.toggle('hidden', count === 0);
   allProjectsCountEl.textContent = currentProjects.length;
+}
+
+// Helper function to refresh the current view without resetting filters
+function refreshCurrentView() {
+  // If there's an active search filter, use that
+  if (filteredProjects.length > 0) {
+    renderProjectCards(filteredProjects);
+    return;
+  }
+  
+  // Otherwise, respect the current view/collection state
+  if (currentView === 'running') {
+    const runningList = currentProjects.filter(p => 
+      runningProjects.has(p.path) || externalProjects.has(p.path)
+    );
+    viewSubtitleEl.textContent = `${runningList.length} running`;
+    renderProjectCards(runningList);
+  } else if (currentView === 'collection' && activeCollection) {
+    let filtered;
+    if (activeCollection === 'uncategorized') {
+      filtered = currentProjects.filter(p => !projectCollections[p.path] || projectCollections[p.path].length === 0);
+    } else {
+      filtered = currentProjects.filter(p => projectCollections[p.path]?.includes(activeCollection));
+    }
+    viewSubtitleEl.textContent = `${filtered.length} projects`;
+    renderProjectCards(filtered);
+  } else if (currentView === 'insights') {
+    renderProjectCards(currentProjects);
+  } else {
+    // Default: 'all' view
+    viewSubtitleEl.textContent = `${currentProjects.length} projects`;
+    renderProjectCards(currentProjects);
+  }
 }
 
 function updateEmptyState() {
@@ -2179,9 +2212,9 @@ function setTheme(themeName) {
   localStorage.setItem('theme', themeName);
   localStorage.setItem('darkMode', isDarkMode ? 'true' : 'false');
   
-  // Re-render cards to update their styles
+  // Re-render cards to update their styles (respecting current view)
   if (currentProjects.length > 0) {
-    renderProjectCards(filteredProjects.length > 0 ? filteredProjects : currentProjects);
+    refreshCurrentView();
   }
   
   // Update theme selector if open
@@ -2315,21 +2348,14 @@ async function silentRefreshProjects() {
     // Save updated projects
     saveProjects();
     
-    // Update UI
-    updateProjectCards(currentProjects);
+    // Update UI - respect current view filter
+    refreshCurrentView();
     updateRunningCount();
     renderCollections();
     
     // Show notification only if new projects found
     if (newCount > oldCount) {
       showNotification(`Found ${newCount - oldCount} new project(s)`, 'success');
-    }
-    
-    // Update subtitle
-    const lastScan = localStorage.getItem('lastScanTime');
-    if (lastScan) {
-      const scanTime = new Date(parseInt(lastScan));
-      viewSubtitleEl.textContent = `${currentProjects.length} projects • Updated ${getTimeAgo(scanTime)}`;
     }
   } catch (err) {
     console.error("Error in silent refresh:", err);
@@ -2384,13 +2410,9 @@ async function fullRefreshProjects() {
     saveProjects();
     
     allProjectsCountEl.textContent = projects.length;
-    const lastScan = localStorage.getItem('lastScanTime');
-    if (lastScan) {
-      const scanTime = new Date(parseInt(lastScan));
-      viewSubtitleEl.textContent = `${projects.length} projects • Updated ${getTimeAgo(scanTime)}`;
-    }
     
-    renderProjectCards(projects);
+    // Respect current view filter
+    refreshCurrentView();
     renderCollections();
     
     showNotification(`Refreshed: ${projects.length} projects`, 'success');
@@ -2406,7 +2428,8 @@ async function softRefreshProjects() {
     if (!projects) return;
     currentProjects = mergeProjectLists(currentProjects, projects);
     saveProjects();
-    updateProjectCards(currentProjects);
+    // Respect current view filter
+    refreshCurrentView();
     updateRunningCount();
     renderCollections();
   } catch (err) {
