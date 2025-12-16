@@ -2,7 +2,7 @@
   "version": 1,
   "projectPath": "/Users/sodaclick/Desktop/projects/Own Projects/node-project-manager/electron-node-manager",
   "createdAt": "2025-12-16T04:40:55.447Z",
-  "updatedAt": "2025-12-16T04:41:40.463Z",
+  "updatedAt": "2025-12-16T04:51:46.451Z",
   "modules": [
     {
       "id": "1765860073364_d70b3fc2aaca",
@@ -11,6 +11,16 @@
       "order": 0,
       "createdAt": "2025-12-16T04:41:13.365Z",
       "updatedAt": "2025-12-16T04:41:40.463Z",
+      "color": "#8b5cf6",
+      "icon": "📦"
+    },
+    {
+      "id": "1765860706448_90b615c9ae36",
+      "title": "hjkl",
+      "description": "",
+      "order": 1,
+      "createdAt": "2025-12-16T04:51:46.448Z",
+      "updatedAt": "2025-12-16T04:51:46.448Z",
       "color": "#8b5cf6",
       "icon": "📦"
     }

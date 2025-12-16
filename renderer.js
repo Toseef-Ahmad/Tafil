@@ -4459,47 +4459,158 @@ async function deleteTaskItem(taskId) {
 
 let excalidrawInstance = null;
 
+// Excalidraw iframe state
+let excalidrawFrame = null;
+let excalidrawReady = false;
+let pendingCanvasData = null;
+
 async function loadCanvasContent() {
-  if (!selectedModule || !blueprintProjectPath || !excalidrawContainer) return;
+  if (!selectedModule || !blueprintProjectPath) return;
+  
+  excalidrawFrame = document.getElementById('excalidrawFrame');
+  const loadingOverlay = document.getElementById('canvasLoadingOverlay');
   
   try {
     const result = await window.electronAPI.getModuleCanvas(blueprintProjectPath, selectedModule.id);
+    pendingCanvasData = result.success ? result.canvas : null;
     
-    // Initialize or update Excalidraw
-    initExcalidraw(result.success ? result.canvas : null);
+    // Show loading overlay
+    if (loadingOverlay) loadingOverlay.style.display = 'flex';
+    
+    // If frame is already ready, send data immediately
+    if (excalidrawReady && excalidrawFrame) {
+      sendCanvasData(pendingCanvasData);
+    }
+    // Otherwise, data will be sent when frame signals ready
     
   } catch (err) {
     console.error('Error loading canvas:', err);
   }
 }
 
-function initExcalidraw(canvasData) {
-  if (!excalidrawContainer) return;
+function sendCanvasData(canvasData) {
+  if (!excalidrawFrame || !excalidrawFrame.contentWindow) return;
   
-  // Create a simple canvas fallback (full Excalidraw would require React integration)
-  excalidrawContainer.innerHTML = `
-    <div style="width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #71717a;">
-      <div style="width: 64px; height: 64px; border-radius: 16px; background: rgba(139, 92, 246, 0.1); display: flex; align-items: center; justify-content: center; margin-bottom: 16px;">
-        <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="1.5"><path d="M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.375 2.625a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4Z"/></svg>
-      </div>
-      <h4 style="font-size: 14px; font-weight: 600; color: #fafafa; margin-bottom: 8px;">Brainstorm Canvas</h4>
-      <p style="font-size: 12px; text-align: center; max-width: 300px; margin-bottom: 16px;">
-        Use this space for diagrams, flowcharts, and visual planning. 
-        Data is auto-saved and Git-friendly.
-      </p>
-      <textarea id="canvasNotes" placeholder="Quick notes and sketches (Markdown supported)..." 
-        style="width: 80%; max-width: 500px; height: 200px; padding: 16px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; color: #e4e4e7; font-family: 'JetBrains Mono', monospace; font-size: 13px; resize: vertical; outline: none;"
-        onchange="saveCanvasNotes()">${canvasData?.notes || ''}</textarea>
-      <p style="font-size: 10px; color: #52525b; margin-top: 8px;">Full Excalidraw integration coming soon</p>
-    </div>
-  `;
+  excalidrawFrame.contentWindow.postMessage({
+    type: 'load',
+    data: canvasData || { elements: [], appState: {} }
+  }, '*');
+  
+  // Hide loading overlay
+  const loadingOverlay = document.getElementById('canvasLoadingOverlay');
+  if (loadingOverlay) {
+    setTimeout(() => {
+      loadingOverlay.style.display = 'none';
+    }, 500);
+  }
+}
+
+// Listen for messages from Excalidraw iframe
+window.addEventListener('message', async (event) => {
+  const { type, data, format } = event.data || {};
+  
+  if (type === 'ready') {
+    // Excalidraw iframe is ready
+    excalidrawReady = true;
+    if (pendingCanvasData !== null) {
+      sendCanvasData(pendingCanvasData);
+      pendingCanvasData = null;
+    }
+  } else if (type === 'save') {
+    // Auto-save canvas data
+    if (selectedModule && blueprintProjectPath && data) {
+      try {
+        await window.electronAPI.saveModuleCanvas(blueprintProjectPath, selectedModule.id, data);
+        updateCanvasSaveStatus('Saved');
+      } catch (err) {
+        console.error('Error saving canvas:', err);
+        updateCanvasSaveStatus('Error');
+      }
+    }
+  } else if (type === 'exported') {
+    // Handle exported image
+    handleCanvasExport(format, data);
+  }
+});
+
+function updateCanvasSaveStatus(status) {
+  const statusEl = document.getElementById('canvasSaveStatus');
+  if (!statusEl) return;
+  
+  if (status === 'Saved') {
+    statusEl.innerHTML = `
+      <span style="display: inline-block; width: 6px; height: 6px; background: #10b981; border-radius: 50%; margin-right: 4px;"></span>
+      Saved
+    `;
+    setTimeout(() => {
+      statusEl.innerHTML = `
+        <span style="display: inline-block; width: 6px; height: 6px; background: #10b981; border-radius: 50%; margin-right: 4px;"></span>
+        Auto-saved
+      `;
+    }, 2000);
+  } else if (status === 'Error') {
+    statusEl.innerHTML = `
+      <span style="display: inline-block; width: 6px; height: 6px; background: #f43f5e; border-radius: 50%; margin-right: 4px;"></span>
+      Error saving
+    `;
+  }
+}
+
+function handleCanvasExport(format, data) {
+  if (!data) return;
+  
+  const projectName = blueprintProjectPath ? path.basename(blueprintProjectPath) : 'canvas';
+  const moduleName = selectedModule ? selectedModule.title.replace(/[^a-z0-9]/gi, '-').toLowerCase() : 'module';
+  const filename = `${projectName}-${moduleName}-canvas.${format}`;
+  
+  if (format === 'png') {
+    // Download PNG
+    const link = document.createElement('a');
+    link.href = data;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    showNotification(`Exported as ${filename}`, 'success');
+  } else if (format === 'svg') {
+    // Download SVG
+    const blob = new Blob([data], { type: 'image/svg+xml' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    showNotification(`Exported as ${filename}`, 'success');
+  }
+}
+
+function exportCanvasAsPng() {
+  if (excalidrawFrame && excalidrawFrame.contentWindow) {
+    excalidrawFrame.contentWindow.postMessage({ type: 'export-png' }, '*');
+  }
+}
+
+function exportCanvasAsSvg() {
+  if (excalidrawFrame && excalidrawFrame.contentWindow) {
+    excalidrawFrame.contentWindow.postMessage({ type: 'export-svg' }, '*');
+  }
+}
+
+function clearCanvas() {
+  if (!confirm('Clear the entire canvas? This cannot be undone.')) return;
+  
+  if (excalidrawFrame && excalidrawFrame.contentWindow) {
+    excalidrawFrame.contentWindow.postMessage({ type: 'clear' }, '*');
+    showNotification('Canvas cleared', 'info');
+  }
 }
 
 async function saveCanvasNotes() {
+  // Legacy function - kept for compatibility
   if (!selectedModule || !blueprintProjectPath) return;
-  
-  const notesEl = document.getElementById('canvasNotes');
-  if (!notesEl) return;
   
   try {
     await window.electronAPI.saveModuleCanvas(blueprintProjectPath, selectedModule.id, {
@@ -5059,6 +5170,21 @@ function initBlueprintListeners() {
   // Add file reference button
   if (addFileRefBtn) {
     addFileRefBtn.addEventListener('click', browseAndAddFile);
+  }
+  
+  // Canvas export/clear buttons
+  const exportPngBtn = document.getElementById('exportCanvasPngBtn');
+  const exportSvgBtn = document.getElementById('exportCanvasSvgBtn');
+  const clearCanvasBtn = document.getElementById('clearCanvasBtn');
+  
+  if (exportPngBtn) {
+    exportPngBtn.addEventListener('click', exportCanvasAsPng);
+  }
+  if (exportSvgBtn) {
+    exportSvgBtn.addEventListener('click', exportCanvasAsSvg);
+  }
+  if (clearCanvasBtn) {
+    clearCanvasBtn.addEventListener('click', clearCanvas);
   }
   
   // Add Module Modal
