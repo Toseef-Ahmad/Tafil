@@ -129,6 +129,19 @@ const closeInsightsBtn = document.getElementById("closeInsightsBtn");
 const insightsProjectName = document.getElementById("insightsProjectName");
 const projectInsightsContent = document.getElementById("projectInsightsContent");
 
+// Fix It Modal
+const fixItModal = document.getElementById("fixItModal");
+const closeFixItBtn = document.getElementById("closeFixItBtn");
+const fixItTitle = document.getElementById("fixItTitle");
+const fixItMessage = document.getElementById("fixItMessage");
+const fixItDetails = document.getElementById("fixItDetails");
+const fixItExtra = document.getElementById("fixItExtra");
+const fixItActions = document.getElementById("fixItActions");
+const fixItNoteSection = document.getElementById("fixItNoteSection");
+const fixItNoteInput = document.getElementById("fixItNoteInput");
+const saveNoteBtn = document.getElementById("saveNoteBtn");
+const skipNoteBtn = document.getElementById("skipNoteBtn");
+
 // Empty state buttons
 const emptyStateScanHome = document.getElementById("emptyStateScanHome");
 const emptyStateScanFolder = document.getElementById("emptyStateScanFolder");
@@ -169,9 +182,115 @@ let activeModule = 'projects'; // 'projects' | 'playground' | 'ssh'
 
 // Playground state
 let monacoEditor = null;
-let isAutoRunEnabled = false; // Disabled by default to prevent infinite scrolling
+let isAutoRunEnabled = true; // RunJS-like: auto-run enabled by default
 let autoRunTimeout = null;
 let lastRunTime = 0;
+let inlineDecorations = []; // Track Monaco inline decorations
+let monacoInstance = null; // Store Monaco instance for decorations
+let inlineWidgets = []; // Quokka-style inline widgets (content widgets)
+
+// Snippets
+const PLAYGROUND_SNIPPETS_KEY = 'playgroundSnippets';
+
+function getSavedSnippets() {
+  try {
+    const raw = localStorage.getItem(PLAYGROUND_SNIPPETS_KEY);
+    const arr = raw ? JSON.parse(raw) : [];
+    return Array.isArray(arr) ? arr : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveSnippet(name, code) {
+  const snippets = getSavedSnippets();
+  snippets.unshift({
+    id: Date.now(),
+    name: name || 'Untitled',
+    code: code || '',
+    savedAt: new Date().toISOString(),
+  });
+  localStorage.setItem(PLAYGROUND_SNIPPETS_KEY, JSON.stringify(snippets.slice(0, 50)));
+}
+
+function renderSnippetHistory() {
+  if (!codeOutput) return;
+  const snippets = getSavedSnippets();
+  if (snippets.length === 0) {
+    codeOutput.innerHTML = '<p class="text-xs" style="color: #52525b;">No saved snippets yet.</p>';
+    return;
+  }
+
+  codeOutput.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+      <div style="font-size:12px;color:#a1a1aa;">Saved Snippets</div>
+      <div style="font-size:11px;color:#52525b;">Click Load</div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:6px;">
+      ${snippets.map(s => `
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px;border:1px solid rgba(255,255,255,0.06);border-radius:8px;background:rgba(255,255,255,0.03);">
+          <div style="min-width:0;">
+            <div style="font-size:12px;color:#e4e4e7;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(s.name)}</div>
+            <div style="font-size:10px;color:#71717a;">${new Date(s.savedAt).toLocaleString()}</div>
+          </div>
+          <div style="display:flex;gap:6px;flex-shrink:0;">
+            <button data-snippet-action="load" data-snippet-id="${s.id}" class="action-btn" title="Load Snippet">Load</button>
+            <button data-snippet-action="delete" data-snippet-id="${s.id}" class="action-btn" title="Delete Snippet">Delete</button>
+          </div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+function clearInlineWidgets() {
+  if (!monacoEditor) return;
+  try {
+    inlineWidgets.forEach(w => {
+      try { monacoEditor.removeContentWidget(w); } catch {}
+    });
+  } finally {
+    inlineWidgets = [];
+  }
+}
+
+function applyInlineResults(inlineResults) {
+  if (!monacoEditor || !monacoInstance) return 0;
+  const model = monacoEditor.getModel();
+  if (!model) return 0;
+
+  clearInlineWidgets();
+
+  const sorted = [...inlineResults].sort((a, b) => (Number(a.line) || 0) - (Number(b.line) || 0));
+
+  for (let idx = 0; idx < sorted.length; idx++) {
+    const item = sorted[idx];
+    const line = Number(item.line);
+    if (!Number.isFinite(line) || line < 1 || line > model.getLineCount()) continue;
+
+    const col = model.getLineMaxColumn(line);
+    const raw = String(item.value ?? '');
+    const value = raw.length > 120 ? raw.slice(0, 117) + '…' : raw;
+
+    const node = document.createElement('span');
+    node.className = 'inline-result-widget';
+    node.textContent = `⇒ ${value}`;
+
+    const widget = {
+      getId: () => `inline-result-${line}-${idx}`,
+      getDomNode: () => node,
+      getPosition: () => ({
+        position: { lineNumber: line, column: col },
+        preference: [monacoInstance.editor.ContentWidgetPositionPreference.EXACT],
+      }),
+    };
+
+    monacoEditor.addContentWidget(widget);
+    inlineWidgets.push(widget);
+  }
+
+  return inlineWidgets.length;
+}
 
 // SSH state
 let sshHosts = [];
@@ -353,6 +472,55 @@ document.addEventListener("DOMContentLoaded", async () => {
   // Project Insights Modal
   if (closeInsightsBtn) closeInsightsBtn.addEventListener("click", () => projectInsightsModal?.classList.add("hidden"));
   
+  // Fix It Modal
+  if (closeFixItBtn) closeFixItBtn.addEventListener("click", () => {
+    fixItModal?.classList.add("hidden");
+    fixItNoteSection?.classList.add("hidden");
+    if (fixItNoteInput) fixItNoteInput.value = '';
+  });
+  
+  // Error Note handlers
+  let currentErrorContext = null; // Store { projectPath, runId, errorKind }
+  
+  if (saveNoteBtn) {
+    saveNoteBtn.addEventListener("click", async () => {
+      if (!currentErrorContext || !fixItNoteInput) return;
+      
+      const note = fixItNoteInput.value.trim();
+      if (!note) {
+        showNotification('Note is empty', 'warning');
+        return;
+      }
+      
+      try {
+        await window.electronAPI.saveErrorNote(
+          currentErrorContext.projectPath,
+          note,
+          currentErrorContext.runId,
+          currentErrorContext.errorKind
+        );
+        
+        showNotification('✅ Error note saved', 'success');
+        fixItModal?.classList.add("hidden");
+        fixItNoteSection?.classList.add("hidden");
+        fixItNoteInput.value = '';
+        currentErrorContext = null;
+      } catch (err) {
+        console.error('Error saving note:', err);
+        showNotification('Failed to save note', 'error');
+      }
+    });
+  }
+  
+  if (skipNoteBtn) {
+    skipNoteBtn.addEventListener("click", () => {
+      fixItModal?.classList.add("hidden");
+      fixItNoteSection?.classList.add("hidden");
+      if (fixItNoteInput) fixItNoteInput.value = '';
+      currentErrorContext = null;
+    });
+  }
+  
   // Empty state buttons
   if (emptyStateScanHome) emptyStateScanHome.addEventListener("click", renderProjects);
   if (emptyStateScanFolder) emptyStateScanFolder.addEventListener("click", renderCustomProjects);
@@ -367,7 +535,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
   
   // Click outside modals to close
-  [dependencyModal, confirmDialog, logsModal, settingsModal, newCollectionModal, projectInsightsModal].forEach(modal => {
+  [dependencyModal, confirmDialog, logsModal, settingsModal, newCollectionModal, projectInsightsModal, fixItModal].forEach(modal => {
     if (modal) {
       modal.addEventListener("click", (e) => {
         if (e.target === modal) {
@@ -384,7 +552,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // Listen for project status updates
   window.electronAPI.onProjectStatus((_event, statusData) => {
-    const { projectPath, status, port, error, pid, framework } = statusData;
+    const { projectPath, status, port, error, pid, framework, diagnostic } = statusData;
     console.log("Project Status:", statusData);
 
     if (status === "running") {
@@ -408,8 +576,16 @@ document.addEventListener("DOMContentLoaded", async () => {
     } else if (status === "error") {
       runningProjects.delete(projectPath);
       projectProcesses.delete(projectPath);
-      setCardStatus(projectPath, error || "Error occurred", 'error');
-      showNotification(`Error: ${error || 'Unknown error'}`, 'error');
+      const errText = diagnostic?.title || error || "Error occurred";
+      setCardStatus(projectPath, errText, 'error');
+      const detail = diagnostic?.details ? `\n${diagnostic.details}` : '';
+      showNotification(`Error: ${errText}${detail}`, 'error');
+      
+      // Show Fix It modal with note section if diagnostic exists
+      if (diagnostic) {
+        showFixItModalWithNote(projectPath, diagnostic, statusData.runId);
+      }
+      
       updateRunningCount();
     }
 
@@ -1152,6 +1328,12 @@ async function showProjectInsights(projectPath) {
   
   insightsProjectName.textContent = project.name || path.basename(projectPath);
   
+  // Get Project Brain data
+  const brainData = await window.electronAPI.getProjectBrain(projectPath);
+  
+  // Get environment snapshot if exists
+  const snapshot = await window.electronAPI.getEnvironmentSnapshot(projectPath);
+  
   // Build insights content
   let content = `
     <div class="space-y-4">
@@ -1189,6 +1371,104 @@ async function showProjectInsights(projectPath) {
     </div>
   `;
   
+  // Environment Snapshot (Pro Feature)
+  content += `
+    <div class="insight-item" style="border-top: 1px solid rgba(255,255,255,0.06); padding-top: 12px; margin-top: 12px;">
+      <div class="insight-icon info">💾</div>
+      <div style="flex: 1;">
+        <div class="text-sm font-medium" style="color: #fafafa; margin-bottom: 8px;">Environment Snapshot</div>
+        ${snapshot 
+          ? `<div class="text-xs mb-2" style="color: #71717a;">
+              <div>Saved: ${new Date(snapshot.savedAt).toLocaleDateString()}</div>
+              ${snapshot.node?.detected ? `<div>Node: ${snapshot.node.detected.version} (${snapshot.node.detected.source})</div>` : ''}
+              ${snapshot.startup ? `<div>Startup: ${snapshot.startup.full || snapshot.startup.command}</div>` : ''}
+              ${snapshot.environment?.detectedKeys?.length > 0 ? `<div>Env vars: ${snapshot.environment.detectedKeys.length} detected</div>` : ''}
+            </div>
+            <div class="flex gap-2">
+              <button id="restoreProjectBtn" class="px-3 py-1.5 text-xs rounded-lg font-medium" style="background: linear-gradient(135deg, #10b981, #059669); color: white;">
+                🔄 Restore Project
+              </button>
+              <button id="createSnapshotBtn" class="px-3 py-1.5 text-xs rounded-lg font-medium" style="background: rgba(255,255,255,0.1); color: #fafafa; border: 1px solid rgba(255,255,255,0.1);">
+                📸 Update Snapshot
+              </button>
+            </div>`
+          : `<div class="text-xs mb-2" style="color: #71717a;">No snapshot saved yet</div>
+            <button id="createSnapshotBtn" class="px-3 py-1.5 text-xs rounded-lg font-medium" style="background: linear-gradient(135deg, #8b5cf6, #7c3aed); color: white;">
+              📸 Create Snapshot
+            </button>`
+        }
+      </div>
+    </div>
+  `;
+  
+  // Project Brain (Memory)
+  if (brainData) {
+    content += `
+      <div class="insight-item" style="border-top: 1px solid rgba(255,255,255,0.06); padding-top: 12px; margin-top: 12px;">
+        <div class="insight-icon info">🧠</div>
+        <div>
+          <div class="text-sm font-medium" style="color: #fafafa;">Project Memory</div>
+          <div class="text-xs" style="color: #71717a;">
+            <div>Runs: ${brainData.runCount || 0} (${brainData.successCount || 0} success, ${brainData.errorCount || 0} errors)</div>
+            ${brainData.last?.actualPort ? `<div>Last port: ${brainData.last.actualPort}</div>` : ''}
+            ${brainData.last?.framework ? `<div>Framework: ${brainData.last.framework}</div>` : ''}
+            ${brainData.last?.status ? `<div>Last status: ${brainData.last.status}</div>` : ''}
+          </div>
+        </div>
+      </div>
+    `;
+  }
+  
+  // Error Notes (Error Context Memory)
+  const errorNotes = await window.electronAPI.getErrorNotes(projectPath);
+  if (errorNotes && errorNotes.length > 0) {
+    content += `
+      <div class="insight-item" style="border-top: 1px solid rgba(255,255,255,0.06); padding-top: 12px; margin-top: 12px;">
+        <div class="insight-icon info">💡</div>
+        <div style="flex: 1;">
+          <div class="text-sm font-medium" style="color: #fafafa; margin-bottom: 8px;">Error Context Notes (${errorNotes.length})</div>
+          <div class="space-y-2" style="max-height: 200px; overflow-y: auto;">
+            ${errorNotes.slice(0, 5).map(note => `
+              <div class="text-xs p-2 rounded" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); color: #a1a1aa;">
+                <div class="text-xs mb-1" style="color: #71717a;">${new Date(note.createdAt).toLocaleDateString()}</div>
+                <div>${escapeHtml(note.note)}</div>
+                ${note.errorKind ? `<div class="text-xs mt-1" style="color: #71717a;">Type: ${note.errorKind}</div>` : ''}
+              </div>
+            `).join('')}
+            ${errorNotes.length > 5 ? `<div class="text-xs" style="color: #71717a;">...and ${errorNotes.length - 5} more</div>` : ''}
+          </div>
+        </div>
+      </div>
+    `;
+  }
+  
+  // Project Notes (Human Memory)
+  const currentNotes = brainData?.notes || '';
+  content += `
+    <div class="insight-item" style="border-top: 1px solid rgba(255,255,255,0.06); padding-top: 12px; margin-top: 12px;">
+      <div style="width: 100%;">
+        <button id="notesToggleBtn" class="flex items-center justify-between w-full text-left" style="background: none; border: none; color: #fafafa; cursor: pointer; padding: 0;">
+          <div class="flex items-center gap-2">
+            <span style="font-size: 16px;">📝</span>
+            <div class="text-sm font-medium" style="color: #fafafa;">Notes</div>
+          </div>
+          <svg id="notesToggleIcon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="transition: transform 0.2s;">
+            <path d="m6 9 6 6 6-6"/>
+          </svg>
+        </button>
+        <div id="notesContent" class="hidden" style="margin-top: 12px;">
+          <textarea 
+            id="projectNotesTextarea" 
+            placeholder="Add notes for future reference..."
+            rows="4"
+            style="width: 100%; padding: 8px; border-radius: 6px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #fafafa; font-size: 13px; font-family: inherit; resize: vertical; min-height: 80px;"
+          >${escapeHtml(currentNotes)}</textarea>
+          <div class="text-xs mt-1" style="color: #71717a;">Autosaves as you type</div>
+        </div>
+      </div>
+    </div>
+  `;
+  
   // Git info
   if (project.message && !['No commits yet', 'No Git history', 'Git Error'].includes(project.message)) {
     content += `
@@ -1206,6 +1486,398 @@ async function showProjectInsights(projectPath) {
   
   projectInsightsContent.innerHTML = content;
   projectInsightsModal.classList.remove('hidden');
+  
+  // Add event listeners for snapshot/restore buttons
+  const createSnapshotBtn = document.getElementById('createSnapshotBtn');
+  const restoreProjectBtn = document.getElementById('restoreProjectBtn');
+  const openArchitectureBtn = document.getElementById('openArchitectureBtn');
+  
+  createSnapshotBtn?.addEventListener('click', async () => {
+    await createEnvironmentSnapshot(projectPath);
+  });
+  
+  restoreProjectBtn?.addEventListener('click', async () => {
+    await restoreProjectFromSnapshot(projectPath);
+  });
+  
+  openArchitectureBtn?.addEventListener('click', () => {
+    showArchitectureCanvas(projectPath);
+  });
+  
+  // Notes toggle and autosave
+  const notesToggleBtn = document.getElementById('notesToggleBtn');
+  const notesContent = document.getElementById('notesContent');
+  const notesToggleIcon = document.getElementById('notesToggleIcon');
+  const projectNotesTextarea = document.getElementById('projectNotesTextarea');
+  
+  let notesAutosaveTimeout = null;
+  
+  notesToggleBtn?.addEventListener('click', () => {
+    const isHidden = notesContent.classList.contains('hidden');
+    notesContent.classList.toggle('hidden');
+    if (isHidden) {
+      notesToggleIcon.style.transform = 'rotate(180deg)';
+    } else {
+      notesToggleIcon.style.transform = 'rotate(0deg)';
+    }
+  });
+  
+  // Autosave notes with debounce
+  projectNotesTextarea?.addEventListener('input', () => {
+    clearTimeout(notesAutosaveTimeout);
+    notesAutosaveTimeout = setTimeout(async () => {
+      const notes = projectNotesTextarea.value || '';
+      try {
+        await window.electronAPI.updateProjectNotes(projectPath, notes);
+      } catch (err) {
+        console.error('Failed to save notes:', err);
+      }
+    }, 500); // 500ms debounce
+  });
+}
+
+// Architecture Canvas - Simple drawing canvas for project memory
+let currentArchitectureProjectPath = null;
+let architectureSaveTimeout = null;
+let canvasCtx = null;
+let isDrawing = false;
+let lastX = 0;
+let lastY = 0;
+
+async function showArchitectureCanvas(projectPath) {
+  const project = currentProjects.find(p => p.path === projectPath);
+  if (!project) return;
+  
+  const architectureModal = document.getElementById('architectureCanvasModal');
+  const architectureProjectName = document.getElementById('architectureProjectName');
+  const closeArchitectureBtn = document.getElementById('closeArchitectureBtn');
+  const canvasContainer = document.getElementById('architectureCanvasContainer');
+  
+  if (!architectureModal || !canvasContainer) {
+    console.error('Architecture canvas modal elements not found');
+    return;
+  }
+  
+  currentArchitectureProjectPath = projectPath;
+  architectureProjectName.textContent = `${project.name || path.basename(projectPath)} - Architecture`;
+  
+  // Show modal
+  architectureModal.classList.remove('hidden');
+  
+  // Load saved architecture data
+  let savedImageData = null;
+  try {
+    const saved = await window.electronAPI.getProjectArchitecture(projectPath);
+    if (saved && saved.imageData) {
+      savedImageData = saved.imageData;
+    }
+  } catch (err) {
+    console.warn('Failed to load architecture data:', err);
+  }
+  
+  // Clear container and create canvas
+  canvasContainer.innerHTML = '';
+  
+  const canvas = document.createElement('canvas');
+  canvas.style.width = '100%';
+  canvas.style.height = '100%';
+  canvas.style.cursor = 'crosshair';
+  canvas.style.background = '#0a0a0b';
+  
+  // Set canvas size
+  const resizeCanvas = () => {
+    const rect = canvasContainer.getBoundingClientRect();
+    canvas.width = rect.width;
+    canvas.height = rect.height;
+    canvasCtx = canvas.getContext('2d');
+    
+    // Set drawing style
+    canvasCtx.strokeStyle = '#fafafa';
+    canvasCtx.lineWidth = 2;
+    canvasCtx.lineCap = 'round';
+    canvasCtx.lineJoin = 'round';
+    
+    // Load saved image if exists
+    if (savedImageData) {
+      const img = new Image();
+      img.onload = () => {
+        canvasCtx.drawImage(img, 0, 0);
+      };
+      img.src = savedImageData;
+    }
+  };
+  
+  resizeCanvas();
+  window.addEventListener('resize', resizeCanvas);
+  
+  // Drawing handlers
+  const startDrawing = (e) => {
+    isDrawing = true;
+    const rect = canvas.getBoundingClientRect();
+    lastX = e.clientX - rect.left;
+    lastY = e.clientY - rect.top;
+  };
+  
+  const draw = (e) => {
+    if (!isDrawing || !canvasCtx) return;
+    
+    const rect = canvas.getBoundingClientRect();
+    const currentX = e.clientX - rect.left;
+    const currentY = e.clientY - rect.top;
+    
+    canvasCtx.beginPath();
+    canvasCtx.moveTo(lastX, lastY);
+    canvasCtx.lineTo(currentX, currentY);
+    canvasCtx.stroke();
+    
+    lastX = currentX;
+    lastY = currentY;
+    
+    // Auto-save
+    saveCanvasDebounced(projectPath);
+  };
+  
+  const stopDrawing = () => {
+    if (isDrawing) {
+      isDrawing = false;
+      saveCanvasDebounced(projectPath);
+    }
+  };
+  
+  // Mouse events
+  canvas.addEventListener('mousedown', startDrawing);
+  canvas.addEventListener('mousemove', draw);
+  canvas.addEventListener('mouseup', stopDrawing);
+  canvas.addEventListener('mouseout', stopDrawing);
+  
+  // Touch events for mobile
+  canvas.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    const touch = e.touches[0];
+    const mouseEvent = new MouseEvent('mousedown', {
+      clientX: touch.clientX,
+      clientY: touch.clientY,
+    });
+    canvas.dispatchEvent(mouseEvent);
+  });
+  
+  canvas.addEventListener('touchmove', (e) => {
+    e.preventDefault();
+    const touch = e.touches[0];
+    const mouseEvent = new MouseEvent('mousemove', {
+      clientX: touch.clientX,
+      clientY: touch.clientY,
+    });
+    canvas.dispatchEvent(mouseEvent);
+  });
+  
+  canvas.addEventListener('touchend', (e) => {
+    e.preventDefault();
+    const mouseEvent = new MouseEvent('mouseup', {});
+    canvas.dispatchEvent(mouseEvent);
+  });
+  
+  canvasContainer.appendChild(canvas);
+  
+  // Clear button (minimal UI)
+  const clearBtn = document.createElement('button');
+  clearBtn.textContent = 'Clear';
+  clearBtn.style.cssText = 'position: absolute; top: 12px; right: 50px; padding: 6px 12px; background: rgba(255,255,255,0.1); color: #fafafa; border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; font-size: 12px; cursor: pointer; z-index: 10;';
+  clearBtn.addEventListener('click', () => {
+    if (confirm('Clear canvas?')) {
+      canvasCtx.fillStyle = '#0a0a0b';
+      canvasCtx.fillRect(0, 0, canvas.width, canvas.height);
+      saveCanvasDebounced(projectPath);
+    }
+  });
+  canvasContainer.appendChild(clearBtn);
+  
+  // Close button handler
+  const closeHandler = () => {
+    architectureModal.classList.add('hidden');
+    window.removeEventListener('resize', resizeCanvas);
+    currentArchitectureProjectPath = null;
+    canvasCtx = null;
+    canvasContainer.innerHTML = '';
+  };
+  
+  // Remove old listeners by cloning and replacing
+  const newCloseBtn = closeArchitectureBtn.cloneNode(true);
+  closeArchitectureBtn.parentNode.replaceChild(newCloseBtn, closeArchitectureBtn);
+  newCloseBtn.addEventListener('click', closeHandler);
+  
+  // Close on backdrop click (only if clicking backdrop, not canvas)
+  const backdropClickHandler = (e) => {
+    if (e.target === architectureModal) {
+      closeHandler();
+      architectureModal.removeEventListener('click', backdropClickHandler);
+    }
+  };
+  architectureModal.addEventListener('click', backdropClickHandler);
+}
+
+// Debounced save function
+function saveCanvasDebounced(projectPath) {
+  if (!canvasCtx) return;
+  
+  if (architectureSaveTimeout) {
+    clearTimeout(architectureSaveTimeout);
+  }
+  architectureSaveTimeout = setTimeout(async () => {
+    try {
+      const canvas = canvasCtx.canvas;
+      const imageData = canvas.toDataURL('image/png');
+      await window.electronAPI.saveProjectArchitecture(projectPath, {
+        imageData,
+        updatedAt: new Date().toISOString(),
+      });
+    } catch (err) {
+      console.error('Failed to save architecture data:', err);
+    }
+  }, 1000); // Save after 1 second of inactivity
+}
+
+// Create environment snapshot (Pro Feature)
+async function createEnvironmentSnapshot(projectPath) {
+  try {
+    showNotification('Creating environment snapshot...', 'info');
+    
+    const result = await window.electronAPI.createEnvironmentSnapshot(projectPath, {
+      includeGlobals: false,
+      includeEnvContent: false,
+    });
+    
+    if (result.success) {
+      showNotification('✅ Environment snapshot created successfully!', 'success');
+      // Refresh insights to show updated snapshot
+      await showProjectInsights(projectPath);
+    } else {
+      showNotification(`❌ Failed to create snapshot: ${result.error}`, 'error');
+    }
+  } catch (err) {
+    console.error('Error creating snapshot:', err);
+    showNotification(`❌ Error: ${err.message}`, 'error');
+  }
+}
+
+// Show Fix It modal with error note section
+function showFixItModalWithNote(projectPath, diagnostic, runId = null) {
+  if (!fixItModal || !diagnostic) return;
+  
+  // Store error context for note saving
+  currentErrorContext = {
+    projectPath,
+    runId,
+    errorKind: diagnostic.kind || null,
+  };
+  
+  // Set modal content
+  if (fixItTitle) fixItTitle.textContent = diagnostic.title || 'Fix It';
+  if (fixItMessage) fixItMessage.textContent = diagnostic.details || '';
+  
+  // Show details if available
+  if (fixItDetails && diagnostic.details) {
+    fixItDetails.textContent = diagnostic.details;
+    fixItDetails.style.display = 'block';
+  } else if (fixItDetails) {
+    fixItDetails.style.display = 'none';
+  }
+  
+  // Add action buttons
+  if (fixItActions && diagnostic.suggestions && diagnostic.suggestions.length > 0) {
+    fixItActions.innerHTML = diagnostic.suggestions.map((suggestion, idx) => {
+      // Create action buttons based on suggestion text
+      let action = '';
+      if (suggestion.includes('Stop') || suggestion.includes('stop')) {
+        action = `stop-conflicting`;
+      } else if (suggestion.includes('Switch') || suggestion.includes('port')) {
+        action = `switch-port`;
+      } else if (suggestion.includes('Check') || suggestion.includes('inspect')) {
+        action = `inspect-port`;
+      }
+      
+      return `<button class="px-3 py-1.5 text-xs rounded-lg font-medium" style="background: rgba(139, 92, 246, 0.2); color: #a78bfa; border: 1px solid rgba(139, 92, 246, 0.3);" data-action="${action}">${escapeHtml(suggestion)}</button>`;
+    }).join('');
+    
+    // Add click handlers for actions (existing Fix It logic - don't change)
+    fixItActions.querySelectorAll('button').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const action = btn.dataset.action;
+        // Handle actions (existing logic - placeholder)
+        console.log('Fix It action:', action, projectPath);
+      });
+    });
+  } else if (fixItActions) {
+    fixItActions.innerHTML = '';
+  }
+  
+  // Show note section
+  if (fixItNoteSection) {
+    fixItNoteSection.classList.remove('hidden');
+    if (fixItNoteInput) {
+      fixItNoteInput.value = '';
+      fixItNoteInput.placeholder = `e.g., ${diagnostic.kind === 'PORT_IN_USE' ? 'Port conflict resolved by stopping other project' : diagnostic.kind === 'MISSING_ENV' ? 'Added missing env vars to .env file' : 'How I fixed this error'}...`;
+    }
+  }
+  
+  // Show modal
+  fixItModal.classList.remove('hidden');
+}
+
+// Restore project from snapshot (Pro Feature)
+async function restoreProjectFromSnapshot(projectPath) {
+  try {
+    // Validate prerequisites first
+    const validation = await window.electronAPI.validateSnapshotPrerequisites(projectPath);
+    
+    if (!validation.valid) {
+      const issues = validation.issues.map(i => i.message).join('\n• ');
+      const confirmRestore = confirm(
+        `⚠️ Prerequisites validation failed:\n\n• ${issues}\n\n` +
+        `Do you want to continue anyway?`
+      );
+      if (!confirmRestore) return;
+    }
+    
+    if (validation.warnings.length > 0) {
+      const warnings = validation.warnings.map(w => w.message).join('\n• ');
+      const confirmRestore = confirm(
+        `⚠️ Warnings detected:\n\n• ${warnings}\n\n` +
+        `Do you want to continue with restore?`
+      );
+      if (!confirmRestore) return;
+    }
+    
+    showNotification('Restoring project environment...', 'info');
+    
+    const result = await window.electronAPI.restoreProject(projectPath, {
+      installDeps: true,
+      createEnvFile: true,
+      startProject: false,
+    });
+    
+    if (result.success) {
+      const steps = result.steps.map(s => `• ${s.message}`).join('\n');
+      showNotification(`✅ Project restored successfully!\n\n${steps}`, 'success');
+      
+      // Optionally start the project
+      const startProject = confirm('Restore completed! Do you want to start the project now?');
+      if (startProject) {
+        await attemptRunProject(projectPath);
+      }
+    } else {
+      const errors = result.errors.map(e => e.error || e.message || 'Unknown error').join('\n• ');
+      showNotification(`❌ Restore failed:\n\n• ${errors}`, 'error');
+    }
+    
+    if (result.warnings && result.warnings.length > 0) {
+      const warnings = result.warnings.map(w => w.message || w).join('\n• ');
+      console.warn('Restore warnings:', warnings);
+    }
+  } catch (err) {
+    console.error('Error restoring project:', err);
+    showNotification(`❌ Error: ${err.message}`, 'error');
+  }
 }
 
 // =====================================================
@@ -1841,6 +2513,10 @@ async function populateCardContent(card, project) {
       <button class="action-btn insights-button" style="background: ${btnBg}; color: ${btnColor};" title="View insights">
         ${Icons.chart}
       </button>
+      <button class="blueprint-btn blueprints-button" title="Open Blueprints">
+        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="7.5 4.21 12 6.81 16.5 4.21"/><polyline points="7.5 19.79 7.5 14.6 3 12"/><polyline points="21 12 16.5 14.6 16.5 19.79"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+        Blueprints
+      </button>
       ${dependenciesInstalled 
         ? `<button class="action-btn remove-modules-button" style="background: ${btnBg}; color: ${btnColor};" title="Remove node_modules">
             ${Icons.trash}
@@ -1860,6 +2536,7 @@ async function populateCardContent(card, project) {
   const terminalButton = card.querySelector(".terminal-button");
   const collectionButton = card.querySelector(".collection-button");
   const insightsButton = card.querySelector(".insights-button");
+  const blueprintsButton = card.querySelector(".blueprints-button");
   const removeButton = card.querySelector(".remove-modules-button");
 
   removeButton?.addEventListener("click", (e) => { e.stopPropagation(); removeModulesFromProject(project.path); });
@@ -1872,6 +2549,7 @@ async function populateCardContent(card, project) {
   terminalButton?.addEventListener("click", (e) => { e.stopPropagation(); openInTerminal(project.path); });
   collectionButton?.addEventListener("click", (e) => { e.stopPropagation(); showCollectionPicker(project.path); });
   insightsButton?.addEventListener("click", (e) => { e.stopPropagation(); showProjectInsights(project.path); });
+  blueprintsButton?.addEventListener("click", (e) => { e.stopPropagation(); openBlueprints(project.path); });
 }
 
 function getStatusIcon(type) {
@@ -2383,6 +3061,7 @@ async function initPlayground() {
     );
     
     monaco = await Promise.race([monacoPromise, timeoutPromise]);
+    monacoInstance = monaco; // Store for later use
     console.log('✅ Monaco loaded successfully');
   } catch (err) {
     console.warn('⚠️ Monaco failed, using fallback:', err.message);
@@ -2424,17 +3103,26 @@ async function initPlayground() {
 
   try {
     // Load saved code
-    const savedCode = localStorage.getItem('playgroundCode') || `// Write JavaScript here - it runs automatically!
-// Like RunJS/Quokka - just type and see results instantly
+    const savedCode = localStorage.getItem('playgroundCode') || `// ✨ QUOKKA-STYLE INLINE EVALUATION! ✨
+// Values appear right next to your code!
 
-console.log('Hello, World!');
+const name = 'Tafil'
+const version = '1.0'
 
-const sum = (a, b) => a + b;
-console.log('Sum:', sum(5, 3));
+// Math operations
+const x = 5
+const y = 10
+const sum = x + y
 
-// Try async/await
-// const res = await fetch('https://api.github.com');
-// console.log(await res.json());
+// Arrays & Objects
+const numbers = [1, 2, 3, 4, 5]
+const user = { name: 'John', age: 30 }
+
+// Functions
+const multiply = (a, b) => a * b
+const result = multiply(7, 6)
+
+console.log('✅ See values inline!')
 `;
 
     // Define custom theme
@@ -2618,11 +3306,71 @@ console.log('Sum:', sum(5, 3));
     }
 
     // Clear output
-    if (clearOutputBtn) {
-      clearOutputBtn.addEventListener('click', () => {
-        if (codeOutput) codeOutput.innerHTML = '<p class="text-xs" style="color: #52525b;">Output cleared</p>';
-      });
-    }
+      if (clearOutputBtn) {
+        clearOutputBtn.addEventListener('click', () => {
+          if (codeOutput) codeOutput.innerHTML = '<p class="text-xs" style="color: #52525b;">Output cleared</p>';
+          // Clear inline decorations
+          if (monacoEditor && inlineDecorations.length > 0) {
+            inlineDecorations = monacoEditor.deltaDecorations(inlineDecorations, []);
+          }
+        clearInlineWidgets();
+        });
+      }
+
+      // Save snippet
+      if (saveSnippetBtn) {
+        saveSnippetBtn.addEventListener('click', () => {
+          const code = monacoEditor ? monacoEditor.getValue() : '';
+          const name = window.prompt('Snippet name?', `Snippet ${new Date().toLocaleString()}`) || '';
+          saveSnippet(name.trim(), code);
+          showNotification('Snippet saved', 'success');
+        });
+      }
+
+      // Playground sidebar actions
+      const navNewSnippet = document.getElementById('navNewSnippet');
+      const navSnippetHistory = document.getElementById('navSnippetHistory');
+
+      if (navNewSnippet) {
+        navNewSnippet.addEventListener('click', () => {
+          if (monacoEditor) monacoEditor.setValue('');
+          if (codeOutput) codeOutput.innerHTML = '<p class="text-xs" style="color: #52525b;">New snippet</p>';
+          clearInlineWidgets();
+          showNotification('New snippet', 'info');
+        });
+      }
+      if (navSnippetHistory) {
+        navSnippetHistory.addEventListener('click', () => {
+          renderSnippetHistory();
+        });
+      }
+
+      // Snippet history event delegation
+      if (codeOutput) {
+        codeOutput.addEventListener('click', (e) => {
+          const btn = e.target?.closest?.('button[data-snippet-action]');
+          if (!btn) return;
+          const action = btn.getAttribute('data-snippet-action');
+          const id = Number(btn.getAttribute('data-snippet-id'));
+          const snippets = getSavedSnippets();
+          const idx = snippets.findIndex(s => s.id === id);
+          if (idx === -1) return;
+
+          if (action === 'load') {
+            if (monacoEditor) monacoEditor.setValue(snippets[idx].code || '');
+            showNotification(`Loaded: ${snippets[idx].name}`, 'success');
+            clearInlineWidgets();
+            return;
+          }
+
+          if (action === 'delete') {
+            snippets.splice(idx, 1);
+            localStorage.setItem(PLAYGROUND_SNIPPETS_KEY, JSON.stringify(snippets));
+            renderSnippetHistory();
+            showNotification('Snippet deleted', 'info');
+          }
+        });
+      }
 
     // Keyboard shortcut: Cmd/Ctrl + Enter to run
     monacoEditor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => {
@@ -2759,6 +3507,15 @@ async function runCode() {
     if (executionTimeEl) executionTimeEl.textContent = `${duration}ms`;
 
     if (result.success) {
+      // Display inline results like Quokka (content widgets - reliable for Monaco 0.45)
+      let inlineCount = 0;
+      if (Array.isArray(result.inlineResults) && result.inlineResults.length > 0) {
+        inlineCount = applyInlineResults(result.inlineResults);
+      } else {
+        clearInlineWidgets();
+      }
+      
+      // Display console output
       let outputHtml = '';
 
       if (result.logs && result.logs.length > 0) {
@@ -2767,6 +3524,10 @@ async function runCode() {
           const icon = log.type === 'error' ? '❌' : log.type === 'warn' ? '⚠️' : log.type === 'info' ? 'ℹ️' : '✓';
           outputHtml += `<p class="${typeClass}">${icon} ${escapeHtml(log.message)}</p>`;
         });
+      }
+
+      if (inlineCount > 0) {
+        outputHtml += `<p class="info" style="opacity: 0.7; font-size: 11px; margin-top: 8px;">💡 Inline values shown in editor (${inlineCount})</p>`;
       }
 
       if (result.result !== undefined && result.result !== 'undefined') {
@@ -2779,6 +3540,11 @@ async function runCode() {
 
       codeOutput.innerHTML = outputHtml;
     } else {
+      // Clear inline decorations on error
+      if (monacoEditor && inlineDecorations.length > 0) {
+        inlineDecorations = monacoEditor.deltaDecorations(inlineDecorations, []);
+      }
+      clearInlineWidgets();
       codeOutput.innerHTML = `<p class="error">❌ ${escapeHtml(result.error || 'Execution failed')}</p>`;
     }
   } catch (err) {
@@ -3223,5 +3989,1190 @@ async function deleteSSHHost(hostId) {
   saveSSHHostsToStorage();
   renderSSHHosts();
   showNotification(`Host "${host.name}" deleted`, 'info');
+}
+
+// =====================================================
+// BLUEPRINTS / MODULES SYSTEM
+// =====================================================
+
+// Blueprint DOM Elements
+const blueprintModal = document.getElementById('blueprintModal');
+const closeBlueprintBtn = document.getElementById('closeBlueprintBtn');
+const addModuleBtn = document.getElementById('addModuleBtn');
+const blueprintProjectName = document.getElementById('blueprintProjectName');
+const moduleSearchInput = document.getElementById('moduleSearchInput');
+const moduleList = document.getElementById('moduleList');
+const moduleCountLabel = document.getElementById('moduleCountLabel');
+
+// Module Header
+const moduleHeader = document.getElementById('moduleHeader');
+const moduleIcon = document.getElementById('moduleIcon');
+const moduleTitle = document.getElementById('moduleTitle');
+const moduleUpdatedAt = document.getElementById('moduleUpdatedAt');
+const moduleHistoryBtn = document.getElementById('moduleHistoryBtn');
+const moduleSettingsBtn = document.getElementById('moduleSettingsBtn');
+const deleteModuleBtn = document.getElementById('deleteModuleBtn');
+
+// View Elements
+const viewTabs = document.getElementById('viewTabs');
+const moduleContent = document.getElementById('moduleContent');
+const moduleEmptyState = document.getElementById('moduleEmptyState');
+const createFirstModuleBtn = document.getElementById('createFirstModuleBtn');
+
+// Content Views
+const goalView = document.getElementById('goalView');
+const kanbanView = document.getElementById('kanbanView');
+const canvasView = document.getElementById('canvasView');
+const resourcesView = document.getElementById('resourcesView');
+
+// Goal View
+const goalEditor = document.getElementById('goalEditor');
+const goalSaveStatus = document.getElementById('goalSaveStatus');
+
+// Kanban View
+const kanbanBoard = document.getElementById('kanbanBoard');
+const addTaskBtn = document.getElementById('addTaskBtn');
+
+// Canvas View
+const excalidrawContainer = document.getElementById('excalidrawContainer');
+const canvasSaveStatus = document.getElementById('canvasSaveStatus');
+
+// Resources View
+const resourcesList = document.getElementById('resourcesList');
+const addLinkBtn = document.getElementById('addLinkBtn');
+const addFileRefBtn = document.getElementById('addFileRefBtn');
+
+// Add Module Modal
+const addModuleModal = document.getElementById('addModuleModal');
+const closeAddModuleBtn = document.getElementById('closeAddModuleBtn');
+const newModuleTitle = document.getElementById('newModuleTitle');
+const newModuleDesc = document.getElementById('newModuleDesc');
+const cancelAddModuleBtn = document.getElementById('cancelAddModuleBtn');
+const confirmAddModuleBtn = document.getElementById('confirmAddModuleBtn');
+
+// Add Task Modal
+const addTaskModal = document.getElementById('addTaskModal');
+const closeAddTaskBtn = document.getElementById('closeAddTaskBtn');
+const newTaskTitle = document.getElementById('newTaskTitle');
+const newTaskDesc = document.getElementById('newTaskDesc');
+const newTaskPriority = document.getElementById('newTaskPriority');
+const newTaskColumn = document.getElementById('newTaskColumn');
+const cancelAddTaskBtn = document.getElementById('cancelAddTaskBtn');
+const confirmAddTaskBtn = document.getElementById('confirmAddTaskBtn');
+
+// Add Link Modal
+const addLinkModal = document.getElementById('addLinkModal');
+const closeAddLinkBtn = document.getElementById('closeAddLinkBtn');
+const newLinkUrl = document.getElementById('newLinkUrl');
+const newLinkTitle = document.getElementById('newLinkTitle');
+const newLinkType = document.getElementById('newLinkType');
+const cancelAddLinkBtn = document.getElementById('cancelAddLinkBtn');
+const confirmAddLinkBtn = document.getElementById('confirmAddLinkBtn');
+
+// Search Modal
+const moduleSearchModal = document.getElementById('moduleSearchModal');
+const globalModuleSearch = document.getElementById('globalModuleSearch');
+const moduleSearchResults = document.getElementById('moduleSearchResults');
+const closeModuleSearchBtn = document.getElementById('closeModuleSearchBtn');
+
+// Blueprint State
+let blueprintProjectPath = null;
+let blueprintData = null;
+let selectedModule = null;
+let currentBlueprintView = 'goal';
+let goalSaveTimeout = null;
+let canvasSaveTimeout = null;
+let selectedModuleIcon = '📦';
+let selectedModuleColor = '#8b5cf6';
+let draggedTask = null;
+let draggedModule = null;
+
+// =====================================================
+// Blueprint Core Functions
+// =====================================================
+
+async function openBlueprints(projectPath) {
+  if (!projectPath) return;
+  
+  blueprintProjectPath = projectPath;
+  
+  try {
+    // Initialize/load blueprints
+    const result = await window.electronAPI.loadBlueprints(projectPath);
+    if (!result.success) {
+      // Try to initialize
+      const initResult = await window.electronAPI.initBlueprints(projectPath);
+      if (!initResult.success) {
+        showNotification('Failed to load blueprints', 'error');
+        return;
+      }
+      blueprintData = initResult.blueprints;
+    } else {
+      blueprintData = result.blueprints;
+    }
+    
+    // Update UI
+    const projectName = path.basename(projectPath);
+    if (blueprintProjectName) {
+      blueprintProjectName.textContent = projectName;
+      blueprintProjectName.title = projectPath;
+    }
+    
+    // Render modules
+    renderModuleList();
+    
+    // Show modal
+    if (blueprintModal) {
+      blueprintModal.classList.remove('hidden');
+    }
+    
+    // Reset selection
+    selectedModule = null;
+    showModuleEmptyState();
+    
+    console.log('📦 Blueprints opened for:', projectName);
+    
+  } catch (err) {
+    console.error('Error opening blueprints:', err);
+    showNotification('Failed to load blueprints', 'error');
+  }
+}
+
+function closeBlueprints() {
+  if (blueprintModal) {
+    blueprintModal.classList.add('hidden');
+  }
+  blueprintProjectPath = null;
+  blueprintData = null;
+  selectedModule = null;
+}
+
+function renderModuleList() {
+  if (!moduleList || !blueprintData) return;
+  
+  const modules = blueprintData.modules || [];
+  
+  if (modules.length === 0) {
+    moduleList.innerHTML = `
+      <div style="padding: 20px; text-align: center; color: #52525b;">
+        <p style="font-size: 12px; margin-bottom: 8px;">No modules yet</p>
+        <button onclick="showAddModuleModal()" style="font-size: 11px; color: #a78bfa; background: none; border: none; cursor: pointer;">
+          + Create your first module
+        </button>
+      </div>
+    `;
+  } else {
+    moduleList.innerHTML = modules.map(m => `
+      <div class="module-list-item ${selectedModule?.id === m.id ? 'active' : ''}" 
+           data-module-id="${m.id}"
+           draggable="true"
+           onclick="selectModule('${m.id}')"
+           ondragstart="onModuleDragStart(event, '${m.id}')"
+           ondragover="onModuleDragOver(event)"
+           ondrop="onModuleDrop(event, '${m.id}')"
+           ondragleave="onModuleDragLeave(event)">
+        <div class="module-icon" style="background: ${m.color}20; color: ${m.color};">${m.icon}</div>
+        <div class="module-info">
+          <div class="module-info-title">${escapeHtml(m.title)}</div>
+          <div class="module-info-meta">${formatRelativeTime(m.updatedAt)}</div>
+        </div>
+      </div>
+    `).join('');
+  }
+  
+  // Update count
+  if (moduleCountLabel) {
+    moduleCountLabel.textContent = `${modules.length} module${modules.length !== 1 ? 's' : ''}`;
+  }
+}
+
+async function selectModule(moduleId) {
+  if (!blueprintData) return;
+  
+  const module = blueprintData.modules.find(m => m.id === moduleId);
+  if (!module) return;
+  
+  selectedModule = module;
+  
+  // Update sidebar selection
+  renderModuleList();
+  
+  // Update header
+  if (moduleIcon) moduleIcon.textContent = module.icon;
+  if (moduleTitle) moduleTitle.textContent = module.title;
+  if (moduleUpdatedAt) moduleUpdatedAt.textContent = `Updated ${formatRelativeTime(module.updatedAt)}`;
+  
+  // Show action buttons
+  if (moduleHistoryBtn) moduleHistoryBtn.style.display = '';
+  if (moduleSettingsBtn) moduleSettingsBtn.style.display = '';
+  if (deleteModuleBtn) deleteModuleBtn.style.display = '';
+  
+  // Show view tabs
+  if (viewTabs) viewTabs.style.display = '';
+  
+  // Hide empty state, show content
+  if (moduleEmptyState) moduleEmptyState.style.display = 'none';
+  
+  // Load current view
+  switchBlueprintView(currentBlueprintView);
+}
+
+function showModuleEmptyState() {
+  if (moduleEmptyState) moduleEmptyState.style.display = '';
+  if (viewTabs) viewTabs.style.display = 'none';
+  if (goalView) goalView.style.display = 'none';
+  if (kanbanView) kanbanView.style.display = 'none';
+  if (canvasView) canvasView.style.display = 'none';
+  if (resourcesView) resourcesView.style.display = 'none';
+  
+  // Reset header
+  if (moduleIcon) moduleIcon.textContent = '📦';
+  if (moduleTitle) moduleTitle.textContent = 'Select a Module';
+  if (moduleUpdatedAt) moduleUpdatedAt.textContent = 'Create or select a module to get started';
+  
+  // Hide action buttons
+  if (moduleHistoryBtn) moduleHistoryBtn.style.display = 'none';
+  if (moduleSettingsBtn) moduleSettingsBtn.style.display = 'none';
+  if (deleteModuleBtn) deleteModuleBtn.style.display = 'none';
+}
+
+async function switchBlueprintView(view) {
+  if (!selectedModule) return;
+  
+  currentBlueprintView = view;
+  
+  // Update tab states
+  document.querySelectorAll('.view-tab').forEach(tab => {
+    tab.classList.toggle('active', tab.dataset.view === view);
+  });
+  
+  // Hide all views
+  if (goalView) goalView.style.display = 'none';
+  if (kanbanView) kanbanView.style.display = 'none';
+  if (canvasView) canvasView.style.display = 'none';
+  if (resourcesView) resourcesView.style.display = 'none';
+  
+  // Show and load selected view
+  switch (view) {
+    case 'goal':
+      if (goalView) goalView.style.display = '';
+      await loadGoalContent();
+      break;
+    case 'kanban':
+      if (kanbanView) kanbanView.style.display = '';
+      await loadKanbanContent();
+      break;
+    case 'canvas':
+      if (canvasView) canvasView.style.display = '';
+      await loadCanvasContent();
+      break;
+    case 'resources':
+      if (resourcesView) resourcesView.style.display = '';
+      await loadResourcesContent();
+      break;
+  }
+}
+
+// =====================================================
+// Goal/Description View
+// =====================================================
+
+async function loadGoalContent() {
+  if (!selectedModule || !blueprintProjectPath) return;
+  
+  try {
+    const result = await window.electronAPI.getModuleGoal(blueprintProjectPath, selectedModule.id);
+    if (result.success && goalEditor) {
+      goalEditor.value = result.goal || '';
+    }
+  } catch (err) {
+    console.error('Error loading goal:', err);
+  }
+}
+
+async function saveGoalContent() {
+  if (!selectedModule || !blueprintProjectPath || !goalEditor) return;
+  
+  if (goalSaveStatus) goalSaveStatus.textContent = 'Saving...';
+  
+  try {
+    const result = await window.electronAPI.saveModuleGoal(
+      blueprintProjectPath, 
+      selectedModule.id, 
+      goalEditor.value
+    );
+    
+    if (result.success) {
+      if (goalSaveStatus) goalSaveStatus.textContent = 'Saved';
+      setTimeout(() => {
+        if (goalSaveStatus) goalSaveStatus.textContent = 'Auto-saved';
+      }, 2000);
+    }
+  } catch (err) {
+    console.error('Error saving goal:', err);
+    if (goalSaveStatus) goalSaveStatus.textContent = 'Error saving';
+  }
+}
+
+// =====================================================
+// Kanban View
+// =====================================================
+
+async function loadKanbanContent() {
+  if (!selectedModule || !blueprintProjectPath || !kanbanBoard) return;
+  
+  try {
+    const result = await window.electronAPI.getModuleTasks(blueprintProjectPath, selectedModule.id);
+    if (result.success) {
+      renderKanbanBoard(result.tasks);
+    }
+  } catch (err) {
+    console.error('Error loading tasks:', err);
+  }
+}
+
+function renderKanbanBoard(tasksData) {
+  if (!kanbanBoard) return;
+  
+  const columns = tasksData?.columns || [
+    { id: 'todo', title: 'To Do', tasks: [] },
+    { id: 'inprogress', title: 'In Progress', tasks: [] },
+    { id: 'done', title: 'Done', tasks: [] }
+  ];
+  
+  kanbanBoard.innerHTML = columns.map(column => `
+    <div class="kanban-column" data-column-id="${column.id}">
+      <div class="kanban-column-header">
+        <span class="kanban-column-title">${escapeHtml(column.title)}</span>
+        <span class="kanban-column-count">${column.tasks.length}</span>
+      </div>
+      <div class="kanban-column-body" 
+           ondragover="onTaskDragOver(event)" 
+           ondrop="onTaskDrop(event, '${column.id}')"
+           ondragleave="onTaskDragLeave(event)">
+        ${column.tasks.map(task => renderKanbanTask(task)).join('')}
+      </div>
+    </div>
+  `).join('');
+}
+
+function renderKanbanTask(task) {
+  return `
+    <div class="kanban-task" 
+         data-task-id="${task.id}"
+         draggable="true"
+         ondragstart="onTaskDragStart(event, '${task.id}')"
+         ondragend="onTaskDragEnd(event)">
+      <div class="kanban-task-title">${escapeHtml(task.title)}</div>
+      ${task.description ? `<div class="kanban-task-desc">${escapeHtml(task.description)}</div>` : ''}
+      <div class="kanban-task-meta">
+        <span class="kanban-task-priority ${task.priority}">${task.priority}</span>
+        <div class="kanban-task-actions">
+          <button class="action-btn" onclick="editTask('${task.id}')" title="Edit" style="width: 22px; height: 22px;">
+            <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
+          </button>
+          <button class="action-btn" onclick="deleteTaskItem('${task.id}')" title="Delete" style="width: 22px; height: 22px; color: #f43f5e;">
+            <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// Task Drag & Drop
+function onTaskDragStart(event, taskId) {
+  draggedTask = taskId;
+  event.target.classList.add('dragging');
+  event.dataTransfer.effectAllowed = 'move';
+}
+
+function onTaskDragEnd(event) {
+  event.target.classList.remove('dragging');
+  draggedTask = null;
+}
+
+function onTaskDragOver(event) {
+  event.preventDefault();
+  event.currentTarget.classList.add('drag-over');
+}
+
+function onTaskDragLeave(event) {
+  event.currentTarget.classList.remove('drag-over');
+}
+
+async function onTaskDrop(event, columnId) {
+  event.preventDefault();
+  event.currentTarget.classList.remove('drag-over');
+  
+  if (!draggedTask || !selectedModule || !blueprintProjectPath) return;
+  
+  try {
+    // Find the drop position
+    const columnBody = event.currentTarget;
+    const tasks = columnBody.querySelectorAll('.kanban-task');
+    let dropIndex = tasks.length;
+    
+    for (let i = 0; i < tasks.length; i++) {
+      const rect = tasks[i].getBoundingClientRect();
+      if (event.clientY < rect.top + rect.height / 2) {
+        dropIndex = i;
+        break;
+      }
+    }
+    
+    const result = await window.electronAPI.moveTask(
+      blueprintProjectPath,
+      selectedModule.id,
+      draggedTask,
+      columnId,
+      dropIndex
+    );
+    
+    if (result.success) {
+      await loadKanbanContent();
+    }
+  } catch (err) {
+    console.error('Error moving task:', err);
+  }
+  
+  draggedTask = null;
+}
+
+async function deleteTaskItem(taskId) {
+  if (!selectedModule || !blueprintProjectPath) return;
+  
+  try {
+    const result = await window.electronAPI.deleteTask(blueprintProjectPath, selectedModule.id, taskId);
+    if (result.success) {
+      await loadKanbanContent();
+      showNotification('Task deleted', 'info');
+    }
+  } catch (err) {
+    console.error('Error deleting task:', err);
+  }
+}
+
+// =====================================================
+// Canvas View (Excalidraw)
+// =====================================================
+
+let excalidrawInstance = null;
+
+async function loadCanvasContent() {
+  if (!selectedModule || !blueprintProjectPath || !excalidrawContainer) return;
+  
+  try {
+    const result = await window.electronAPI.getModuleCanvas(blueprintProjectPath, selectedModule.id);
+    
+    // Initialize or update Excalidraw
+    initExcalidraw(result.success ? result.canvas : null);
+    
+  } catch (err) {
+    console.error('Error loading canvas:', err);
+  }
+}
+
+function initExcalidraw(canvasData) {
+  if (!excalidrawContainer) return;
+  
+  // Create a simple canvas fallback (full Excalidraw would require React integration)
+  excalidrawContainer.innerHTML = `
+    <div style="width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #71717a;">
+      <div style="width: 64px; height: 64px; border-radius: 16px; background: rgba(139, 92, 246, 0.1); display: flex; align-items: center; justify-content: center; margin-bottom: 16px;">
+        <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="1.5"><path d="M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.375 2.625a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4Z"/></svg>
+      </div>
+      <h4 style="font-size: 14px; font-weight: 600; color: #fafafa; margin-bottom: 8px;">Brainstorm Canvas</h4>
+      <p style="font-size: 12px; text-align: center; max-width: 300px; margin-bottom: 16px;">
+        Use this space for diagrams, flowcharts, and visual planning. 
+        Data is auto-saved and Git-friendly.
+      </p>
+      <textarea id="canvasNotes" placeholder="Quick notes and sketches (Markdown supported)..." 
+        style="width: 80%; max-width: 500px; height: 200px; padding: 16px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; color: #e4e4e7; font-family: 'JetBrains Mono', monospace; font-size: 13px; resize: vertical; outline: none;"
+        onchange="saveCanvasNotes()">${canvasData?.notes || ''}</textarea>
+      <p style="font-size: 10px; color: #52525b; margin-top: 8px;">Full Excalidraw integration coming soon</p>
+    </div>
+  `;
+}
+
+async function saveCanvasNotes() {
+  if (!selectedModule || !blueprintProjectPath) return;
+  
+  const notesEl = document.getElementById('canvasNotes');
+  if (!notesEl) return;
+  
+  try {
+    await window.electronAPI.saveModuleCanvas(blueprintProjectPath, selectedModule.id, {
+      notes: notesEl.value,
+      elements: [],
+      appState: {}
+    });
+    if (canvasSaveStatus) canvasSaveStatus.textContent = 'Saved';
+  } catch (err) {
+    console.error('Error saving canvas:', err);
+  }
+}
+
+// =====================================================
+// Resources View
+// =====================================================
+
+async function loadResourcesContent() {
+  if (!selectedModule || !blueprintProjectPath || !resourcesList) return;
+  
+  try {
+    const result = await window.electronAPI.getModuleResources(blueprintProjectPath, selectedModule.id);
+    if (result.success) {
+      renderResources(result.resources);
+    }
+  } catch (err) {
+    console.error('Error loading resources:', err);
+  }
+}
+
+function renderResources(resourcesData) {
+  if (!resourcesList) return;
+  
+  const links = resourcesData?.links || [];
+  const files = resourcesData?.files || [];
+  
+  if (links.length === 0 && files.length === 0) {
+    resourcesList.innerHTML = `
+      <div class="resources-empty">
+        <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+          <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+        </svg>
+        <h4 style="font-size: 14px; font-weight: 600; color: #a1a1aa; margin-bottom: 4px;">No resources yet</h4>
+        <p style="font-size: 12px;">Add links to docs, Figma designs, or deep link to local files</p>
+      </div>
+    `;
+    return;
+  }
+  
+  let html = '';
+  
+  // Links section
+  if (links.length > 0) {
+    html += `<div style="margin-bottom: 16px;">
+      <h4 style="font-size: 11px; font-weight: 600; color: #52525b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">External Links</h4>
+    `;
+    links.forEach(link => {
+      const iconClass = link.type === 'figma' ? 'figma' : link.type === 'api' ? 'api' : 'link';
+      html += `
+        <div class="resource-item" data-resource-id="${link.id}">
+          <div class="resource-icon ${iconClass}">
+            ${getResourceIcon(link.type)}
+          </div>
+          <div class="resource-info">
+            <div class="resource-title">${escapeHtml(link.title || 'Untitled')}</div>
+            <div class="resource-url">${escapeHtml(link.url)}</div>
+          </div>
+          <div class="resource-actions">
+            <button class="action-btn" onclick="openExternalLink('${escapeHtml(link.url)}')" title="Open" style="width: 24px; height: 24px;">
+              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" x2="21" y1="14" y2="3"/></svg>
+            </button>
+            <button class="action-btn" onclick="removeResourceItem('${link.id}', 'link')" title="Remove" style="width: 24px; height: 24px; color: #f43f5e;">
+              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/></svg>
+            </button>
+          </div>
+        </div>
+      `;
+    });
+    html += '</div>';
+  }
+  
+  // Files section
+  if (files.length > 0) {
+    html += `<div>
+      <h4 style="font-size: 11px; font-weight: 600; color: #52525b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">Project Files</h4>
+    `;
+    files.forEach(file => {
+      html += `
+        <div class="resource-item file-link-item" data-resource-id="${file.id}" onclick="openFileInIDE('${escapeHtml(file.path)}')">
+          <div class="resource-icon file">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
+          </div>
+          <div class="resource-info">
+            <div class="resource-title">${escapeHtml(file.name)}</div>
+            <div class="resource-url">${escapeHtml(file.path)}</div>
+          </div>
+          <div class="resource-actions">
+            <button class="action-btn" onclick="event.stopPropagation(); removeResourceItem('${file.id}', 'file')" title="Remove" style="width: 24px; height: 24px; color: #f43f5e;">
+              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/></svg>
+            </button>
+          </div>
+        </div>
+      `;
+    });
+    html += '</div>';
+  }
+  
+  resourcesList.innerHTML = html;
+}
+
+function getResourceIcon(type) {
+  switch (type) {
+    case 'figma':
+      return '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M5 5.5A3.5 3.5 0 0 1 8.5 2H12v7H8.5A3.5 3.5 0 0 1 5 5.5z"/><path d="M12 2h3.5a3.5 3.5 0 1 1 0 7H12V2z"/><path d="M12 12.5a3.5 3.5 0 1 1 7 0 3.5 3.5 0 1 1-7 0z"/><path d="M5 19.5A3.5 3.5 0 0 1 8.5 16H12v3.5a3.5 3.5 0 1 1-7 0z"/><path d="M5 12.5A3.5 3.5 0 0 1 8.5 9H12v7H8.5A3.5 3.5 0 0 1 5 12.5z"/></svg>';
+    case 'api':
+      return '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m7 11 2-2-2-2"/><path d="M11 13h4"/><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/></svg>';
+    default:
+      return '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>';
+  }
+}
+
+function openExternalLink(url) {
+  window.open(url, '_blank');
+}
+
+async function openFileInIDE(filePath) {
+  if (!blueprintProjectPath) return;
+  
+  try {
+    const ide = defaultIDE || 'code';
+    await window.electronAPI.openFileInIDE(blueprintProjectPath, filePath, ide);
+    showNotification('Opening in editor...', 'info');
+  } catch (err) {
+    console.error('Error opening file:', err);
+    showNotification('Failed to open file', 'error');
+  }
+}
+
+async function removeResourceItem(resourceId, type) {
+  if (!selectedModule || !blueprintProjectPath) return;
+  
+  try {
+    const result = await window.electronAPI.removeModuleResource(
+      blueprintProjectPath, 
+      selectedModule.id, 
+      resourceId, 
+      type
+    );
+    
+    if (result.success) {
+      await loadResourcesContent();
+      showNotification('Resource removed', 'info');
+    }
+  } catch (err) {
+    console.error('Error removing resource:', err);
+  }
+}
+
+// =====================================================
+// Module CRUD
+// =====================================================
+
+function showAddModuleModal() {
+  if (!addModuleModal) return;
+  
+  // Reset form
+  if (newModuleTitle) newModuleTitle.value = '';
+  if (newModuleDesc) newModuleDesc.value = '';
+  selectedModuleIcon = '📦';
+  selectedModuleColor = '#8b5cf6';
+  
+  // Reset icon/color selections
+  document.querySelectorAll('.module-icon-btn').forEach(btn => {
+    btn.style.borderColor = btn.dataset.icon === '📦' ? 'rgba(139, 92, 246, 0.5)' : 'transparent';
+  });
+  document.querySelectorAll('.module-color-btn').forEach(btn => {
+    btn.style.borderColor = btn.dataset.color === '#8b5cf6' ? 'white' : 'transparent';
+  });
+  
+  addModuleModal.classList.remove('hidden');
+  if (newModuleTitle) newModuleTitle.focus();
+}
+
+function hideAddModuleModal() {
+  if (addModuleModal) addModuleModal.classList.add('hidden');
+}
+
+async function createModule() {
+  if (!blueprintProjectPath || !newModuleTitle) return;
+  
+  const title = newModuleTitle.value.trim();
+  if (!title) {
+    showNotification('Please enter a module title', 'error');
+    return;
+  }
+  
+  try {
+    const result = await window.electronAPI.createModule(blueprintProjectPath, {
+      title,
+      description: newModuleDesc?.value.trim() || '',
+      icon: selectedModuleIcon,
+      color: selectedModuleColor
+    });
+    
+    if (result.success) {
+      // Reload blueprints
+      const loadResult = await window.electronAPI.loadBlueprints(blueprintProjectPath);
+      if (loadResult.success) {
+        blueprintData = loadResult.blueprints;
+        renderModuleList();
+        
+        // Select the new module
+        selectModule(result.module.id);
+      }
+      
+      hideAddModuleModal();
+      showNotification(`Module "${title}" created`, 'success');
+    } else {
+      showNotification(result.error || 'Failed to create module', 'error');
+    }
+  } catch (err) {
+    console.error('Error creating module:', err);
+    showNotification('Failed to create module', 'error');
+  }
+}
+
+async function deleteCurrentModule() {
+  if (!selectedModule || !blueprintProjectPath) return;
+  
+  if (!confirm(`Delete module "${selectedModule.title}"? This cannot be undone.`)) return;
+  
+  try {
+    const result = await window.electronAPI.deleteModule(blueprintProjectPath, selectedModule.id);
+    
+    if (result.success) {
+      // Reload blueprints
+      const loadResult = await window.electronAPI.loadBlueprints(blueprintProjectPath);
+      if (loadResult.success) {
+        blueprintData = loadResult.blueprints;
+        renderModuleList();
+      }
+      
+      selectedModule = null;
+      showModuleEmptyState();
+      showNotification('Module deleted', 'info');
+    }
+  } catch (err) {
+    console.error('Error deleting module:', err);
+    showNotification('Failed to delete module', 'error');
+  }
+}
+
+// Module Drag & Drop (reordering)
+function onModuleDragStart(event, moduleId) {
+  draggedModule = moduleId;
+  event.target.classList.add('dragging');
+  event.dataTransfer.effectAllowed = 'move';
+}
+
+function onModuleDragOver(event) {
+  event.preventDefault();
+  event.currentTarget.classList.add('drag-over');
+}
+
+function onModuleDragLeave(event) {
+  event.currentTarget.classList.remove('drag-over');
+}
+
+async function onModuleDrop(event, targetModuleId) {
+  event.preventDefault();
+  event.currentTarget.classList.remove('drag-over');
+  
+  if (!draggedModule || draggedModule === targetModuleId || !blueprintProjectPath) return;
+  
+  try {
+    // Get current order
+    const moduleIds = blueprintData.modules.map(m => m.id);
+    const fromIndex = moduleIds.indexOf(draggedModule);
+    const toIndex = moduleIds.indexOf(targetModuleId);
+    
+    // Reorder
+    moduleIds.splice(fromIndex, 1);
+    moduleIds.splice(toIndex, 0, draggedModule);
+    
+    const result = await window.electronAPI.reorderModules(blueprintProjectPath, moduleIds);
+    
+    if (result.success) {
+      // Reload blueprints
+      const loadResult = await window.electronAPI.loadBlueprints(blueprintProjectPath);
+      if (loadResult.success) {
+        blueprintData = loadResult.blueprints;
+        renderModuleList();
+      }
+    }
+  } catch (err) {
+    console.error('Error reordering modules:', err);
+  }
+  
+  draggedModule = null;
+}
+
+// =====================================================
+// Task Modal
+// =====================================================
+
+function showAddTaskModal() {
+  if (!addTaskModal) return;
+  
+  // Reset form
+  if (newTaskTitle) newTaskTitle.value = '';
+  if (newTaskDesc) newTaskDesc.value = '';
+  if (newTaskPriority) newTaskPriority.value = 'medium';
+  if (newTaskColumn) newTaskColumn.value = 'todo';
+  
+  addTaskModal.classList.remove('hidden');
+  if (newTaskTitle) newTaskTitle.focus();
+}
+
+function hideAddTaskModal() {
+  if (addTaskModal) addTaskModal.classList.add('hidden');
+}
+
+async function addNewTask() {
+  if (!selectedModule || !blueprintProjectPath || !newTaskTitle) return;
+  
+  const title = newTaskTitle.value.trim();
+  if (!title) {
+    showNotification('Please enter a task title', 'error');
+    return;
+  }
+  
+  try {
+    const result = await window.electronAPI.addTask(
+      blueprintProjectPath,
+      selectedModule.id,
+      newTaskColumn?.value || 'todo',
+      {
+        title,
+        description: newTaskDesc?.value.trim() || '',
+        priority: newTaskPriority?.value || 'medium'
+      }
+    );
+    
+    if (result.success) {
+      await loadKanbanContent();
+      hideAddTaskModal();
+      showNotification('Task added', 'success');
+    }
+  } catch (err) {
+    console.error('Error adding task:', err);
+    showNotification('Failed to add task', 'error');
+  }
+}
+
+// =====================================================
+// Link Modal
+// =====================================================
+
+function showAddLinkModal() {
+  if (!addLinkModal) return;
+  
+  // Reset form
+  if (newLinkUrl) newLinkUrl.value = '';
+  if (newLinkTitle) newLinkTitle.value = '';
+  if (newLinkType) newLinkType.value = 'external';
+  
+  addLinkModal.classList.remove('hidden');
+  if (newLinkUrl) newLinkUrl.focus();
+}
+
+function hideAddLinkModal() {
+  if (addLinkModal) addLinkModal.classList.add('hidden');
+}
+
+async function addNewLink() {
+  if (!selectedModule || !blueprintProjectPath || !newLinkUrl) return;
+  
+  const url = newLinkUrl.value.trim();
+  if (!url) {
+    showNotification('Please enter a URL', 'error');
+    return;
+  }
+  
+  try {
+    const result = await window.electronAPI.addModuleLink(
+      blueprintProjectPath,
+      selectedModule.id,
+      {
+        url,
+        title: newLinkTitle?.value.trim() || '',
+        type: newLinkType?.value || 'external'
+      }
+    );
+    
+    if (result.success) {
+      await loadResourcesContent();
+      hideAddLinkModal();
+      showNotification('Link added', 'success');
+    }
+  } catch (err) {
+    console.error('Error adding link:', err);
+    showNotification('Failed to add link', 'error');
+  }
+}
+
+async function browseAndAddFile() {
+  if (!selectedModule || !blueprintProjectPath) return;
+  
+  try {
+    const result = await window.electronAPI.browseForFile(blueprintProjectPath);
+    
+    if (result.success && !result.canceled) {
+      const addResult = await window.electronAPI.addModuleFile(
+        blueprintProjectPath,
+        selectedModule.id,
+        {
+          path: result.relativePath || result.path,
+          name: result.name
+        }
+      );
+      
+      if (addResult.success) {
+        await loadResourcesContent();
+        showNotification('File linked', 'success');
+      }
+    }
+  } catch (err) {
+    console.error('Error adding file:', err);
+    showNotification('Failed to link file', 'error');
+  }
+}
+
+// =====================================================
+// Search
+// =====================================================
+
+async function searchInModules(query) {
+  if (!blueprintProjectPath || !query.trim()) {
+    if (moduleSearchResults) {
+      moduleSearchResults.innerHTML = '<p style="padding: 16px; color: #52525b; font-size: 13px; text-align: center;">Start typing to search...</p>';
+    }
+    return;
+  }
+  
+  try {
+    const result = await window.electronAPI.searchModules(blueprintProjectPath, query);
+    
+    if (!result.success || result.results.length === 0) {
+      if (moduleSearchResults) {
+        moduleSearchResults.innerHTML = '<p style="padding: 16px; color: #52525b; font-size: 13px; text-align: center;">No results found</p>';
+      }
+      return;
+    }
+    
+    renderSearchResults(result.results);
+    
+  } catch (err) {
+    console.error('Error searching modules:', err);
+  }
+}
+
+function renderSearchResults(results) {
+  if (!moduleSearchResults) return;
+  
+  moduleSearchResults.innerHTML = results.map(result => `
+    <div class="search-result-item" onclick="jumpToSearchResult('${result.module.id}')">
+      <div class="search-result-module">
+        <span>${result.module.icon}</span>
+        <span>${escapeHtml(result.module.title)}</span>
+      </div>
+      <div class="search-result-matches">
+        ${result.matches.slice(0, 3).map(match => `
+          <div class="search-result-match">
+            <span class="search-result-match-type ${match.type}">${match.type}</span>
+            <span>${escapeHtml(match.text)}</span>
+          </div>
+        `).join('')}
+        ${result.matches.length > 3 ? `<div class="search-result-match" style="color: #52525b;">+${result.matches.length - 3} more</div>` : ''}
+      </div>
+    </div>
+  `).join('');
+}
+
+function jumpToSearchResult(moduleId) {
+  if (moduleSearchModal) moduleSearchModal.classList.add('hidden');
+  selectModule(moduleId);
+}
+
+function showModuleSearchModal() {
+  if (!moduleSearchModal) return;
+  moduleSearchModal.classList.remove('hidden');
+  if (globalModuleSearch) {
+    globalModuleSearch.value = '';
+    globalModuleSearch.focus();
+  }
+  if (moduleSearchResults) {
+    moduleSearchResults.innerHTML = '<p style="padding: 16px; color: #52525b; font-size: 13px; text-align: center;">Start typing to search...</p>';
+  }
+}
+
+function hideModuleSearchModal() {
+  if (moduleSearchModal) moduleSearchModal.classList.add('hidden');
+}
+
+// =====================================================
+// Blueprint Event Listeners
+// =====================================================
+
+function initBlueprintListeners() {
+  // Close button
+  if (closeBlueprintBtn) {
+    closeBlueprintBtn.addEventListener('click', closeBlueprints);
+  }
+  
+  // Add module button
+  if (addModuleBtn) {
+    addModuleBtn.addEventListener('click', showAddModuleModal);
+  }
+  
+  // Create first module button
+  if (createFirstModuleBtn) {
+    createFirstModuleBtn.addEventListener('click', showAddModuleModal);
+  }
+  
+  // Delete module button
+  if (deleteModuleBtn) {
+    deleteModuleBtn.addEventListener('click', deleteCurrentModule);
+  }
+  
+  // View tabs
+  document.querySelectorAll('.view-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      switchBlueprintView(tab.dataset.view);
+    });
+  });
+  
+  // Goal editor auto-save
+  if (goalEditor) {
+    goalEditor.addEventListener('input', () => {
+      clearTimeout(goalSaveTimeout);
+      if (goalSaveStatus) goalSaveStatus.textContent = 'Unsaved changes...';
+      goalSaveTimeout = setTimeout(saveGoalContent, 1000);
+    });
+  }
+  
+  // Add task button
+  if (addTaskBtn) {
+    addTaskBtn.addEventListener('click', showAddTaskModal);
+  }
+  
+  // Add link button
+  if (addLinkBtn) {
+    addLinkBtn.addEventListener('click', showAddLinkModal);
+  }
+  
+  // Add file reference button
+  if (addFileRefBtn) {
+    addFileRefBtn.addEventListener('click', browseAndAddFile);
+  }
+  
+  // Add Module Modal
+  if (closeAddModuleBtn) {
+    closeAddModuleBtn.addEventListener('click', hideAddModuleModal);
+  }
+  if (cancelAddModuleBtn) {
+    cancelAddModuleBtn.addEventListener('click', hideAddModuleModal);
+  }
+  if (confirmAddModuleBtn) {
+    confirmAddModuleBtn.addEventListener('click', createModule);
+  }
+  
+  // Icon selection
+  document.querySelectorAll('.module-icon-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      selectedModuleIcon = btn.dataset.icon;
+      document.querySelectorAll('.module-icon-btn').forEach(b => {
+        b.style.borderColor = b === btn ? 'rgba(139, 92, 246, 0.5)' : 'transparent';
+      });
+    });
+  });
+  
+  // Color selection
+  document.querySelectorAll('.module-color-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      selectedModuleColor = btn.dataset.color;
+      document.querySelectorAll('.module-color-btn').forEach(b => {
+        b.style.borderColor = b === btn ? 'white' : 'transparent';
+      });
+    });
+  });
+  
+  // Add Task Modal
+  if (closeAddTaskBtn) {
+    closeAddTaskBtn.addEventListener('click', hideAddTaskModal);
+  }
+  if (cancelAddTaskBtn) {
+    cancelAddTaskBtn.addEventListener('click', hideAddTaskModal);
+  }
+  if (confirmAddTaskBtn) {
+    confirmAddTaskBtn.addEventListener('click', addNewTask);
+  }
+  
+  // Add Link Modal
+  if (closeAddLinkBtn) {
+    closeAddLinkBtn.addEventListener('click', hideAddLinkModal);
+  }
+  if (cancelAddLinkBtn) {
+    cancelAddLinkBtn.addEventListener('click', hideAddLinkModal);
+  }
+  if (confirmAddLinkBtn) {
+    confirmAddLinkBtn.addEventListener('click', addNewLink);
+  }
+  
+  // Search modal
+  if (closeModuleSearchBtn) {
+    closeModuleSearchBtn.addEventListener('click', hideModuleSearchModal);
+  }
+  
+  // Global search in sidebar
+  if (moduleSearchInput) {
+    moduleSearchInput.addEventListener('focus', showModuleSearchModal);
+  }
+  
+  // Global search input
+  if (globalModuleSearch) {
+    let searchTimeout = null;
+    globalModuleSearch.addEventListener('input', () => {
+      clearTimeout(searchTimeout);
+      searchTimeout = setTimeout(() => {
+        searchInModules(globalModuleSearch.value);
+      }, 300);
+    });
+  }
+  
+  // Keyboard shortcuts
+  document.addEventListener('keydown', (e) => {
+    // Escape to close modals
+    if (e.key === 'Escape') {
+      if (!addModuleModal?.classList.contains('hidden')) {
+        hideAddModuleModal();
+      } else if (!addTaskModal?.classList.contains('hidden')) {
+        hideAddTaskModal();
+      } else if (!addLinkModal?.classList.contains('hidden')) {
+        hideAddLinkModal();
+      } else if (!moduleSearchModal?.classList.contains('hidden')) {
+        hideModuleSearchModal();
+      } else if (!blueprintModal?.classList.contains('hidden')) {
+        closeBlueprints();
+      }
+    }
+  });
+}
+
+// Initialize blueprint listeners when DOM is ready
+document.addEventListener('DOMContentLoaded', initBlueprintListeners);
+
+// Helper function for relative time
+function formatRelativeTime(dateStr) {
+  if (!dateStr) return 'Never';
+  
+  const date = new Date(dateStr);
+  const now = new Date();
+  const diffMs = now - date;
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+  
+  if (diffMins < 1) return 'just now';
+  if (diffMins < 60) return `${diffMins}m ago`;
+  if (diffHours < 24) return `${diffHours}h ago`;
+  if (diffDays < 7) return `${diffDays}d ago`;
+  
+  return date.toLocaleDateString();
 }
 

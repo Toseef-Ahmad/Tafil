@@ -364,3 +364,21 @@ npm run dev
 
 **Your Electron Node Manager is now even more powerful and flexible!** 🚀
 
+---
+
+## 🧠 New: Project Brain + “Fix It” Recovery Actions (Tafil 2.0 foundation)
+
+Tafil now builds **memory over time** and turns common crashes into **one-click recovery**.
+
+### ✅ Project Brain (local, offline-first)
+- Persists per-project run history to `userData/project-brain.json`
+- Tracks last run status, last error, detected port, and recent run outcomes
+- Shows a “Project Memory” block inside the existing **Project Insights** modal
+
+### 🛠 Fix It modal (actionable diagnostics)
+On structured failures, Tafil shows a **Fix It** modal with real actions:
+- **Port in use**: stop conflicting Tafil project, inspect the process on the port, kill external PID, or rerun on a custom port
+- **Missing env vars**: list detected keys, copy them, and open the project in your editor
+- **Node mismatch**: shows suggested `nvm` commands and lets you copy them
+
+

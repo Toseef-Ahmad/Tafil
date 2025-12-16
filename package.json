@@ -202,6 +202,7 @@
     "tailwindcss": "^3.4.17"
   },
   "dependencies": {
+    "fs-extra": "^11.3.2",
     "monaco-editor": "^0.55.1",
     "portfinder": "^1.0.32",
     "ps-tree": "^1.2.0",

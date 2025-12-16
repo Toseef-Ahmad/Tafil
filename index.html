@@ -287,6 +287,43 @@
       overflow: hidden !important;
     }
     
+    /* Inline Results (Quokka-style) */
+    .inline-result {
+      font-style: italic;
+      font-weight: 600;
+      opacity: 1;
+      margin-left: 12px;
+      font-size: 13px;
+      font-family: 'JetBrains Mono', monospace;
+      letter-spacing: 0.5px;
+    }
+    .monaco-editor .inline-result {
+      color: #10b981 !important;
+      background: rgba(16, 185, 129, 0.1) !important;
+      padding: 2px 6px !important;
+      border-radius: 3px !important;
+    }
+
+    /* Inline Results via Monaco Content Widgets (reliable) */
+    .monaco-editor .contentWidgets {
+      overflow: visible !important;
+    }
+    .inline-result-widget {
+      display: inline-block;
+      margin-left: 10px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      font-weight: 700;
+      color: #10b981;
+      background: rgba(16, 185, 129, 0.12);
+      border: 1px solid rgba(16, 185, 129, 0.22);
+      white-space: nowrap;
+      pointer-events: none;
+      opacity: 0.95;
+    }
+    
     /* SSH Host Cards */
     .ssh-host-card {
       background: #111113; border: 1px solid rgba(255,255,255,0.06);
@@ -331,6 +368,357 @@
     ::-webkit-scrollbar-track { background: transparent; }
     ::-webkit-scrollbar-thumb { background: #27272a; border-radius: 3px; }
     ::-webkit-scrollbar-thumb:hover { background: #3f3f46; }
+    
+    /* ==================== BLUEPRINTS STYLES ==================== */
+    
+    /* Blueprint Modal & Container */
+    .blueprint-container {
+      animation: blueprintFadeIn 0.2s ease;
+    }
+    @keyframes blueprintFadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    
+    /* Module List */
+    .module-list-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      border: 1px solid transparent;
+      margin-bottom: 4px;
+    }
+    .module-list-item:hover {
+      background: rgba(255,255,255,0.05);
+    }
+    .module-list-item.active {
+      background: rgba(139, 92, 246, 0.15);
+      border-color: rgba(139, 92, 246, 0.3);
+    }
+    .module-list-item.dragging {
+      opacity: 0.5;
+      transform: scale(0.98);
+    }
+    .module-list-item.drag-over {
+      border-color: rgba(139, 92, 246, 0.5);
+      background: rgba(139, 92, 246, 0.1);
+    }
+    
+    .module-icon {
+      font-size: 18px;
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 6px;
+      background: rgba(255,255,255,0.05);
+    }
+    
+    .module-info {
+      flex: 1;
+      min-width: 0;
+    }
+    .module-info-title {
+      font-size: 13px;
+      font-weight: 500;
+      color: #fafafa;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .module-info-meta {
+      font-size: 11px;
+      color: #52525b;
+    }
+    
+    /* View Tabs */
+    .view-tab {
+      background: transparent;
+      color: #71717a;
+      transition: all 0.15s ease;
+    }
+    .view-tab:hover {
+      background: rgba(255,255,255,0.05);
+      color: #a1a1aa;
+    }
+    .view-tab.active {
+      background: rgba(139, 92, 246, 0.15);
+      color: #a78bfa;
+    }
+    
+    /* Kanban Board */
+    .kanban-column {
+      flex: 1;
+      min-width: 260px;
+      max-width: 320px;
+      background: rgba(255,255,255,0.02);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 10px;
+      display: flex;
+      flex-direction: column;
+      max-height: 100%;
+    }
+    .kanban-column-header {
+      padding: 12px 14px;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .kanban-column-title {
+      font-size: 12px;
+      font-weight: 600;
+      color: #a1a1aa;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .kanban-column-count {
+      font-size: 11px;
+      color: #52525b;
+      background: rgba(255,255,255,0.05);
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+    .kanban-column-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px;
+      min-height: 100px;
+    }
+    .kanban-column-body.drag-over {
+      background: rgba(139, 92, 246, 0.05);
+    }
+    
+    /* Kanban Task Card */
+    .kanban-task {
+      background: #111113;
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 8px;
+      cursor: grab;
+      transition: all 0.15s ease;
+    }
+    .kanban-task:hover {
+      border-color: rgba(139, 92, 246, 0.3);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    }
+    .kanban-task.dragging {
+      opacity: 0.5;
+      transform: rotate(2deg) scale(1.02);
+      cursor: grabbing;
+    }
+    .kanban-task-title {
+      font-size: 13px;
+      font-weight: 500;
+      color: #fafafa;
+      margin-bottom: 4px;
+    }
+    .kanban-task-desc {
+      font-size: 11px;
+      color: #71717a;
+      margin-bottom: 8px;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .kanban-task-meta {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .kanban-task-priority {
+      font-size: 9px;
+      font-weight: 600;
+      padding: 2px 6px;
+      border-radius: 4px;
+      text-transform: uppercase;
+    }
+    .kanban-task-priority.high {
+      background: rgba(244, 63, 94, 0.15);
+      color: #f43f5e;
+    }
+    .kanban-task-priority.medium {
+      background: rgba(245, 158, 11, 0.15);
+      color: #f59e0b;
+    }
+    .kanban-task-priority.low {
+      background: rgba(14, 165, 233, 0.15);
+      color: #0ea5e9;
+    }
+    .kanban-task-actions {
+      display: none;
+      margin-left: auto;
+    }
+    .kanban-task:hover .kanban-task-actions {
+      display: flex;
+      gap: 4px;
+    }
+    
+    /* Resource Items */
+    .resource-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 14px;
+      background: rgba(255,255,255,0.02);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 8px;
+      margin-bottom: 8px;
+      transition: all 0.15s ease;
+    }
+    .resource-item:hover {
+      background: rgba(255,255,255,0.04);
+      border-color: rgba(255,255,255,0.1);
+    }
+    .resource-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+    }
+    .resource-icon.link { background: rgba(14, 165, 233, 0.15); color: #0ea5e9; }
+    .resource-icon.file { background: rgba(16, 185, 129, 0.15); color: #10b981; }
+    .resource-icon.figma { background: rgba(244, 63, 94, 0.15); color: #f43f5e; }
+    .resource-icon.api { background: rgba(245, 158, 11, 0.15); color: #f59e0b; }
+    .resource-info {
+      flex: 1;
+      min-width: 0;
+    }
+    .resource-title {
+      font-size: 13px;
+      font-weight: 500;
+      color: #fafafa;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .resource-url {
+      font-size: 11px;
+      color: #52525b;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .resource-actions {
+      display: none;
+    }
+    .resource-item:hover .resource-actions {
+      display: flex;
+      gap: 4px;
+    }
+    
+    /* Deep Link File Item */
+    .file-link-item {
+      cursor: pointer;
+    }
+    .file-link-item:hover {
+      border-color: rgba(16, 185, 129, 0.3);
+    }
+    .file-link-item .resource-title::before {
+      content: '@';
+      color: #10b981;
+      font-weight: 600;
+      margin-right: 2px;
+    }
+    
+    /* Module Search Results */
+    .search-result-item {
+      padding: 12px 16px;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      cursor: pointer;
+      transition: background 0.1s ease;
+    }
+    .search-result-item:hover {
+      background: rgba(139, 92, 246, 0.1);
+    }
+    .search-result-item:last-child {
+      border-bottom: none;
+    }
+    .search-result-module {
+      font-size: 13px;
+      font-weight: 500;
+      color: #fafafa;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .search-result-matches {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .search-result-match {
+      font-size: 12px;
+      color: #71717a;
+      padding-left: 24px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .search-result-match-type {
+      font-size: 9px;
+      padding: 1px 4px;
+      border-radius: 3px;
+      text-transform: uppercase;
+      font-weight: 600;
+    }
+    .search-result-match-type.goal { background: rgba(139, 92, 246, 0.15); color: #a78bfa; }
+    .search-result-match-type.task { background: rgba(16, 185, 129, 0.15); color: #10b981; }
+    .search-result-match-type.link { background: rgba(14, 165, 233, 0.15); color: #0ea5e9; }
+    .search-result-match-type.file { background: rgba(245, 158, 11, 0.15); color: #f59e0b; }
+    
+    /* Blueprint Button on Project Cards */
+    .blueprint-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 8px;
+      background: rgba(139, 92, 246, 0.1);
+      color: #a78bfa;
+      border: 1px solid rgba(139, 92, 246, 0.2);
+      border-radius: 5px;
+      font-size: 10px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .blueprint-btn:hover {
+      background: rgba(139, 92, 246, 0.2);
+      border-color: rgba(139, 92, 246, 0.4);
+    }
+    .blueprint-btn svg {
+      width: 12px;
+      height: 12px;
+    }
+    
+    /* Resources Empty State */
+    .resources-empty {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 40px;
+      text-align: center;
+      color: #52525b;
+    }
+    .resources-empty svg {
+      width: 48px;
+      height: 48px;
+      margin-bottom: 16px;
+      opacity: 0.5;
+    }
   </style>
 </head>
 <body class="min-h-screen flex" style="font-family: 'Inter', -apple-system, sans-serif; background-color: #0a0a0b; color: #fafafa;">
@@ -723,6 +1111,38 @@
     </div>
   </div>
 
+  <!-- Modal: Fix It (Diagnostics / Recovery Actions) -->
+  <div id="fixItModal" class="modal-backdrop hidden" style="position: fixed; inset: 0; background: rgba(0, 0, 0, 0.7); z-index: 110; display: flex; align-items: center; justify-content: center;">
+    <div class="modal animate-slide-up" style="background: #18181b; border: 1px solid rgba(255, 255, 255, 0.08); color: #fafafa; border-radius: 12px; width: 560px; max-width: 95vw;">
+      <div class="modal-header" style="display: flex; align-items: center; justify-content: space-between; padding: 16px; border-bottom: 1px solid rgba(255,255,255,0.06);">
+        <h3 class="modal-title" style="display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600;">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.8-3.8a2 2 0 0 0-2.8-2.8z"/><path d="m21 2-9.6 9.6"/><path d="M7.5 12.5 3 17v4h4l4.5-4.5"/><path d="m16 5 3 3"/></svg>
+          <span id="fixItTitle">Fix it</span>
+        </h3>
+        <button id="closeFixItBtn" class="action-btn">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+        </button>
+      </div>
+      <div class="modal-body" style="padding: 16px; max-height: 70vh; overflow-y: auto;">
+        <div id="fixItMessage" class="text-sm" style="color: #a1a1aa; margin-bottom: 12px;"></div>
+        <div id="fixItDetails" class="text-xs" style="color: #71717a; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 10px; padding: 12px; white-space: pre-wrap; word-break: break-word; display: none;"></div>
+        <div id="fixItExtra" style="margin-top: 12px;"></div>
+      </div>
+      <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 8px; padding: 16px; border-top: 1px solid rgba(255,255,255,0.06); flex-wrap: wrap;">
+        <div id="fixItActions" style="display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; width: 100%;"></div>
+      </div>
+      <!-- Error Context Note (Optional, skippable) -->
+      <div id="fixItNoteSection" class="hidden" style="padding: 0 16px 16px 16px; border-top: 1px solid rgba(255,255,255,0.06); margin-top: 8px;">
+        <div class="text-xs mb-2" style="color: #71717a;">💡 Remember: Add a note about this error and how you fixed it (optional)</div>
+        <textarea id="fixItNoteInput" placeholder="e.g., Port conflict resolved by stopping other project on port 3000..." rows="2" style="width: 100%; padding: 8px; border-radius: 6px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #fafafa; font-size: 12px; font-family: inherit; resize: vertical; min-height: 50px;"></textarea>
+        <div class="flex gap-2 mt-2 justify-end">
+          <button id="skipNoteBtn" class="text-xs px-3 py-1.5 rounded-lg" style="background: rgba(255,255,255,0.05); color: #71717a; border: 1px solid rgba(255,255,255,0.1);">Skip</button>
+          <button id="saveNoteBtn" class="text-xs px-3 py-1.5 rounded-lg font-medium" style="background: linear-gradient(135deg, #8b5cf6, #7c3aed); color: white;">Save Note</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Modal: Settings -->
   <div id="settingsModal" class="modal-backdrop hidden" style="position: fixed; inset: 0; background: rgba(0, 0, 0, 0.7); z-index: 100; display: flex; align-items: center; justify-content: center;">
     <div class="modal animate-slide-up" style="background: #18181b; border: 1px solid rgba(255, 255, 255, 0.08); color: #fafafa; border-radius: 12px; width: 480px; max-width: 95vw;">
@@ -803,6 +1223,24 @@
     </div>
   </div>
 
+  <!-- Modal: Architecture Canvas -->
+  <div id="architectureCanvasModal" class="modal-backdrop hidden" style="position: fixed; inset: 0; background: rgba(0, 0, 0, 0.9); z-index: 101; display: flex; align-items: center; justify-content: center;">
+    <div class="modal animate-slide-up" style="background: #0a0a0b; border: 1px solid rgba(255, 255, 255, 0.08); color: #fafafa; border-radius: 12px; width: 90vw; height: 85vh; max-width: 1400px; display: flex; flex-direction: column;">
+      <div class="modal-header" style="display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid rgba(255,255,255,0.06);">
+        <h3 class="modal-title" style="display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600;">
+          <span>🏗️</span>
+          <span id="architectureProjectName">Architecture Canvas</span>
+        </h3>
+        <button id="closeArchitectureBtn" class="action-btn">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+        </button>
+      </div>
+      <div id="architectureCanvasContainer" style="flex: 1; position: relative; overflow: hidden; background: #0a0a0b;">
+        <!-- Excalidraw canvas will be mounted here -->
+      </div>
+    </div>
+  </div>
+
   <!-- Modal: Add SSH Host -->
   <div id="sshHostModal" class="modal-backdrop hidden" style="position: fixed; inset: 0; background: rgba(0, 0, 0, 0.7); z-index: 100; display: flex; align-items: center; justify-content: center;">
     <div class="modal animate-slide-up" style="background: #18181b; border: 1px solid rgba(255, 255, 255, 0.08); color: #fafafa; border-radius: 12px; width: 520px; max-width: 95vw;">
@@ -879,6 +1317,338 @@
       <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 8px; padding: 16px; border-top: 1px solid rgba(255,255,255,0.06);">
         <button id="cancelSSHHostBtn" class="px-4 py-2 rounded-lg text-sm font-medium" style="background: rgba(255,255,255,0.05); color: #a1a1aa;">Cancel</button>
         <button id="saveSSHHostBtn" class="px-4 py-2 rounded-lg text-sm font-medium" style="background: linear-gradient(135deg, #8b5cf6, #7c3aed); color: white;">Save Host</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== BLUEPRINTS MODAL ==================== -->
+  <div id="blueprintModal" class="modal-backdrop hidden" style="position: fixed; inset: 0; background: rgba(0, 0, 0, 0.85); z-index: 200; display: flex;">
+    <div class="blueprint-container" style="display: flex; width: 100%; height: 100%; background: #0a0a0b;">
+      
+      <!-- Left Sidebar: Module List -->
+      <aside id="blueprintSidebar" class="blueprint-sidebar" style="width: 280px; min-width: 280px; background: #111113; border-right: 1px solid rgba(255,255,255,0.06); display: flex; flex-direction: column; height: 100%;">
+        <!-- Sidebar Header -->
+        <div class="blueprint-sidebar-header" style="padding: 16px; border-bottom: 1px solid rgba(255,255,255,0.06);">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <button id="closeBlueprintBtn" class="action-btn" title="Close Blueprints" style="width: 28px; height: 28px;">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+              </button>
+              <span style="font-size: 14px; font-weight: 600; color: #fafafa;">Blueprints</span>
+            </div>
+            <button id="addModuleBtn" class="action-btn" title="Add Module" style="background: linear-gradient(135deg, #8b5cf6, #7c3aed); color: white; width: 28px; height: 28px;">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+            </button>
+          </div>
+          <div id="blueprintProjectName" style="font-size: 11px; color: #71717a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"></div>
+          
+          <!-- Module Search -->
+          <div style="position: relative; margin-top: 12px;">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#52525b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%);"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+            <input type="text" id="moduleSearchInput" placeholder="Search modules..." style="width: 100%; padding: 8px 10px 8px 32px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; color: #fafafa; font-size: 12px; outline: none;" />
+          </div>
+        </div>
+        
+        <!-- Module List -->
+        <div id="moduleList" class="module-list" style="flex: 1; overflow-y: auto; padding: 8px;">
+          <!-- Modules will be rendered here -->
+        </div>
+        
+        <!-- Sidebar Footer -->
+        <div style="padding: 12px; border-top: 1px solid rgba(255,255,255,0.06);">
+          <div style="display: flex; align-items: center; gap: 8px; font-size: 11px; color: #52525b;">
+            <span id="moduleCountLabel">0 modules</span>
+            <span>•</span>
+            <span>Git-friendly storage</span>
+          </div>
+        </div>
+      </aside>
+      
+      <!-- Main Content Area -->
+      <main class="blueprint-main" style="flex: 1; display: flex; flex-direction: column; overflow: hidden;">
+        
+        <!-- Module Header -->
+        <header id="moduleHeader" class="module-header" style="display: flex; align-items: center; justify-content: space-between; padding: 12px 20px; border-bottom: 1px solid rgba(255,255,255,0.06); background: #111113;">
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <span id="moduleIcon" style="font-size: 20px;">📦</span>
+            <div>
+              <h2 id="moduleTitle" style="font-size: 16px; font-weight: 600; color: #fafafa; margin: 0;">Select a Module</h2>
+              <p id="moduleUpdatedAt" style="font-size: 11px; color: #52525b; margin: 0;">Create or select a module to get started</p>
+            </div>
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <button id="moduleHistoryBtn" class="action-btn" title="View History" style="display: none;">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            </button>
+            <button id="moduleSettingsBtn" class="action-btn" title="Module Settings" style="display: none;">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+            </button>
+            <button id="deleteModuleBtn" class="action-btn" title="Delete Module" style="display: none; color: #f43f5e;">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+            </button>
+          </div>
+        </header>
+        
+        <!-- View Tabs -->
+        <div id="viewTabs" class="view-tabs" style="display: none; padding: 8px 20px; border-bottom: 1px solid rgba(255,255,255,0.06); background: rgba(255,255,255,0.02);">
+          <div style="display: flex; gap: 4px; background: rgba(255,255,255,0.03); border-radius: 8px; padding: 4px;">
+            <button class="view-tab active" data-view="goal" style="flex: 1; padding: 8px 16px; border-radius: 6px; border: none; font-size: 12px; font-weight: 500; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
+              Goal
+            </button>
+            <button class="view-tab" data-view="kanban" style="flex: 1; padding: 8px 16px; border-radius: 6px; border: none; font-size: 12px; font-weight: 500; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>
+              Tasks
+            </button>
+            <button class="view-tab" data-view="canvas" style="flex: 1; padding: 8px 16px; border-radius: 6px; border: none; font-size: 12px; font-weight: 500; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.375 2.625a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4Z"/></svg>
+              Canvas
+            </button>
+            <button class="view-tab" data-view="resources" style="flex: 1; padding: 8px 16px; border-radius: 6px; border: none; font-size: 12px; font-weight: 500; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+              Resources
+            </button>
+          </div>
+        </div>
+        
+        <!-- Content Views -->
+        <div id="moduleContent" class="module-content" style="flex: 1; overflow: hidden; position: relative;">
+          
+          <!-- Empty State -->
+          <div id="moduleEmptyState" class="module-empty-state" style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; text-align: center; padding: 40px;">
+            <div style="width: 80px; height: 80px; border-radius: 20px; background: linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(124, 58, 237, 0.1)); display: flex; align-items: center; justify-content: center; margin-bottom: 20px;">
+              <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="7.5 4.21 12 6.81 16.5 4.21"/><polyline points="7.5 19.79 7.5 14.6 3 12"/><polyline points="21 12 16.5 14.6 16.5 19.79"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+            </div>
+            <h3 style="font-size: 18px; font-weight: 600; color: #fafafa; margin-bottom: 8px;">Start with a Module</h3>
+            <p style="font-size: 13px; color: #71717a; max-width: 360px; margin-bottom: 24px;">Create your first module to organize features, tasks, and ideas for this project. Each module has its own goals, kanban board, and brainstorm canvas.</p>
+            <button id="createFirstModuleBtn" style="display: flex; align-items: center; gap: 8px; padding: 12px 24px; background: linear-gradient(135deg, #8b5cf6, #7c3aed); color: white; border: none; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s ease;">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+              Create First Module
+            </button>
+          </div>
+          
+          <!-- Goal View -->
+          <div id="goalView" class="content-view" style="display: none; height: 100%; overflow: hidden;">
+            <div style="height: 100%; display: flex; flex-direction: column;">
+              <div style="padding: 16px 20px; border-bottom: 1px solid rgba(255,255,255,0.06); display: flex; align-items: center; justify-content: space-between;">
+                <span style="font-size: 12px; font-weight: 500; color: #71717a;">Goal / Description</span>
+                <span id="goalSaveStatus" style="font-size: 11px; color: #52525b;">Auto-saved</span>
+              </div>
+              <div id="goalEditorContainer" style="flex: 1; overflow: hidden; padding: 0;">
+                <textarea id="goalEditor" placeholder="# Module Goal&#10;&#10;Describe the purpose and objectives of this module...&#10;&#10;## Key Features&#10;- Feature 1&#10;- Feature 2&#10;&#10;## Notes&#10;Add any additional notes here..." style="width: 100%; height: 100%; padding: 20px; background: transparent; border: none; color: #e4e4e7; font-family: 'JetBrains Mono', monospace; font-size: 14px; line-height: 1.7; resize: none; outline: none;"></textarea>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Kanban View -->
+          <div id="kanbanView" class="content-view" style="display: none; height: 100%; overflow: hidden;">
+            <div style="height: 100%; display: flex; flex-direction: column;">
+              <div style="padding: 12px 20px; border-bottom: 1px solid rgba(255,255,255,0.06); display: flex; align-items: center; justify-content: space-between;">
+                <span style="font-size: 12px; font-weight: 500; color: #71717a;">Tasks / Mini-Kanban</span>
+                <button id="addTaskBtn" style="display: flex; align-items: center; gap: 6px; padding: 6px 12px; background: rgba(139, 92, 246, 0.15); color: #a78bfa; border: none; border-radius: 6px; font-size: 11px; font-weight: 500; cursor: pointer;">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+                  Add Task
+                </button>
+              </div>
+              <div id="kanbanBoard" class="kanban-board" style="flex: 1; display: flex; gap: 16px; padding: 16px 20px; overflow-x: auto;">
+                <!-- Kanban columns will be rendered here -->
+              </div>
+            </div>
+          </div>
+          
+          <!-- Canvas View (Excalidraw) -->
+          <div id="canvasView" class="content-view" style="display: none; height: 100%; overflow: hidden;">
+            <div style="height: 100%; display: flex; flex-direction: column;">
+              <div style="padding: 12px 20px; border-bottom: 1px solid rgba(255,255,255,0.06); display: flex; align-items: center; justify-content: space-between;">
+                <span style="font-size: 12px; font-weight: 500; color: #71717a;">Brainstorm / Canvas</span>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <span id="canvasSaveStatus" style="font-size: 11px; color: #52525b;">Auto-saved</span>
+                </div>
+              </div>
+              <div id="excalidrawContainer" style="flex: 1; overflow: hidden; background: #0a0a0b;">
+                <!-- Excalidraw will be mounted here -->
+              </div>
+            </div>
+          </div>
+          
+          <!-- Resources View -->
+          <div id="resourcesView" class="content-view" style="display: none; height: 100%; overflow: hidden;">
+            <div style="height: 100%; display: flex; flex-direction: column;">
+              <div style="padding: 12px 20px; border-bottom: 1px solid rgba(255,255,255,0.06); display: flex; align-items: center; justify-content: space-between;">
+                <span style="font-size: 12px; font-weight: 500; color: #71717a;">Resources / Links</span>
+                <div style="display: flex; gap: 8px;">
+                  <button id="addLinkBtn" style="display: flex; align-items: center; gap: 6px; padding: 6px 12px; background: rgba(14, 165, 233, 0.15); color: #0ea5e9; border: none; border-radius: 6px; font-size: 11px; font-weight: 500; cursor: pointer;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+                    Add Link
+                  </button>
+                  <button id="addFileRefBtn" style="display: flex; align-items: center; gap: 6px; padding: 6px 12px; background: rgba(16, 185, 129, 0.15); color: #10b981; border: none; border-radius: 6px; font-size: 11px; font-weight: 500; cursor: pointer;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
+                    Link File
+                  </button>
+                </div>
+              </div>
+              <div id="resourcesList" class="resources-list" style="flex: 1; overflow-y: auto; padding: 16px 20px;">
+                <!-- Resources will be rendered here -->
+              </div>
+            </div>
+          </div>
+          
+        </div>
+      </main>
+      
+    </div>
+  </div>
+
+  <!-- Add Module Modal -->
+  <div id="addModuleModal" class="modal-backdrop hidden" style="position: fixed; inset: 0; background: rgba(0, 0, 0, 0.7); z-index: 250; display: flex; align-items: center; justify-content: center;">
+    <div class="modal animate-slide-up" style="background: #18181b; border: 1px solid rgba(255, 255, 255, 0.08); color: #fafafa; border-radius: 12px; width: 420px; max-width: 95vw;">
+      <div class="modal-header" style="display: flex; align-items: center; justify-content: space-between; padding: 16px; border-bottom: 1px solid rgba(255,255,255,0.06);">
+        <h3 class="modal-title" style="display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600;">
+          <span>📦</span>
+          New Module
+        </h3>
+        <button id="closeAddModuleBtn" class="action-btn">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+        </button>
+      </div>
+      <div class="modal-body" style="padding: 16px;">
+        <div style="margin-bottom: 16px;">
+          <label style="display: block; font-size: 12px; font-weight: 500; color: #a1a1aa; margin-bottom: 6px;">Module Title</label>
+          <input type="text" id="newModuleTitle" placeholder="e.g., Payment Integration" style="width: 100%; padding: 10px 12px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: #fafafa; font-size: 14px; outline: none;" />
+        </div>
+        <div style="margin-bottom: 16px;">
+          <label style="display: block; font-size: 12px; font-weight: 500; color: #a1a1aa; margin-bottom: 6px;">Description (optional)</label>
+          <textarea id="newModuleDesc" placeholder="Brief description of this module..." rows="3" style="width: 100%; padding: 10px 12px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: #fafafa; font-size: 13px; outline: none; resize: vertical;"></textarea>
+        </div>
+        <div>
+          <label style="display: block; font-size: 12px; font-weight: 500; color: #a1a1aa; margin-bottom: 8px;">Icon & Color</label>
+          <div style="display: flex; gap: 12px;">
+            <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+              <button class="module-icon-btn" data-icon="📦" style="width: 32px; height: 32px; border-radius: 6px; border: 2px solid rgba(139, 92, 246, 0.5); background: rgba(139, 92, 246, 0.1); font-size: 16px; cursor: pointer;">📦</button>
+              <button class="module-icon-btn" data-icon="🚀" style="width: 32px; height: 32px; border-radius: 6px; border: 2px solid transparent; background: rgba(255,255,255,0.05); font-size: 16px; cursor: pointer;">🚀</button>
+              <button class="module-icon-btn" data-icon="💳" style="width: 32px; height: 32px; border-radius: 6px; border: 2px solid transparent; background: rgba(255,255,255,0.05); font-size: 16px; cursor: pointer;">💳</button>
+              <button class="module-icon-btn" data-icon="🔐" style="width: 32px; height: 32px; border-radius: 6px; border: 2px solid transparent; background: rgba(255,255,255,0.05); font-size: 16px; cursor: pointer;">🔐</button>
+              <button class="module-icon-btn" data-icon="📊" style="width: 32px; height: 32px; border-radius: 6px; border: 2px solid transparent; background: rgba(255,255,255,0.05); font-size: 16px; cursor: pointer;">📊</button>
+              <button class="module-icon-btn" data-icon="🎨" style="width: 32px; height: 32px; border-radius: 6px; border: 2px solid transparent; background: rgba(255,255,255,0.05); font-size: 16px; cursor: pointer;">🎨</button>
+              <button class="module-icon-btn" data-icon="⚡" style="width: 32px; height: 32px; border-radius: 6px; border: 2px solid transparent; background: rgba(255,255,255,0.05); font-size: 16px; cursor: pointer;">⚡</button>
+              <button class="module-icon-btn" data-icon="🔧" style="width: 32px; height: 32px; border-radius: 6px; border: 2px solid transparent; background: rgba(255,255,255,0.05); font-size: 16px; cursor: pointer;">🔧</button>
+            </div>
+            <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+              <button class="module-color-btn" data-color="#8b5cf6" style="width: 24px; height: 24px; border-radius: 50%; border: 2px solid white; background: #8b5cf6; cursor: pointer;"></button>
+              <button class="module-color-btn" data-color="#10b981" style="width: 24px; height: 24px; border-radius: 50%; border: 2px solid transparent; background: #10b981; cursor: pointer;"></button>
+              <button class="module-color-btn" data-color="#0ea5e9" style="width: 24px; height: 24px; border-radius: 50%; border: 2px solid transparent; background: #0ea5e9; cursor: pointer;"></button>
+              <button class="module-color-btn" data-color="#f59e0b" style="width: 24px; height: 24px; border-radius: 50%; border: 2px solid transparent; background: #f59e0b; cursor: pointer;"></button>
+              <button class="module-color-btn" data-color="#f43f5e" style="width: 24px; height: 24px; border-radius: 50%; border: 2px solid transparent; background: #f43f5e; cursor: pointer;"></button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 8px; padding: 16px; border-top: 1px solid rgba(255,255,255,0.06);">
+        <button id="cancelAddModuleBtn" class="px-4 py-2 rounded-lg text-sm font-medium" style="background: rgba(255,255,255,0.05); color: #a1a1aa;">Cancel</button>
+        <button id="confirmAddModuleBtn" class="px-4 py-2 rounded-lg text-sm font-medium" style="background: linear-gradient(135deg, #8b5cf6, #7c3aed); color: white;">Create Module</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add Task Modal -->
+  <div id="addTaskModal" class="modal-backdrop hidden" style="position: fixed; inset: 0; background: rgba(0, 0, 0, 0.7); z-index: 250; display: flex; align-items: center; justify-content: center;">
+    <div class="modal animate-slide-up" style="background: #18181b; border: 1px solid rgba(255, 255, 255, 0.08); color: #fafafa; border-radius: 12px; width: 420px; max-width: 95vw;">
+      <div class="modal-header" style="display: flex; align-items: center; justify-content: space-between; padding: 16px; border-bottom: 1px solid rgba(255,255,255,0.06);">
+        <h3 class="modal-title" style="display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600;">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><path d="m9 12 2 2 4-4"/></svg>
+          New Task
+        </h3>
+        <button id="closeAddTaskBtn" class="action-btn">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+        </button>
+      </div>
+      <div class="modal-body" style="padding: 16px;">
+        <div style="margin-bottom: 16px;">
+          <label style="display: block; font-size: 12px; font-weight: 500; color: #a1a1aa; margin-bottom: 6px;">Task Title</label>
+          <input type="text" id="newTaskTitle" placeholder="e.g., Implement user authentication" style="width: 100%; padding: 10px 12px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: #fafafa; font-size: 14px; outline: none;" />
+        </div>
+        <div style="margin-bottom: 16px;">
+          <label style="display: block; font-size: 12px; font-weight: 500; color: #a1a1aa; margin-bottom: 6px;">Description (optional)</label>
+          <textarea id="newTaskDesc" placeholder="Add more details..." rows="2" style="width: 100%; padding: 10px 12px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: #fafafa; font-size: 13px; outline: none; resize: vertical;"></textarea>
+        </div>
+        <div style="display: flex; gap: 16px;">
+          <div style="flex: 1;">
+            <label style="display: block; font-size: 12px; font-weight: 500; color: #a1a1aa; margin-bottom: 6px;">Priority</label>
+            <select id="newTaskPriority" style="width: 100%; padding: 8px 12px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: #fafafa; font-size: 13px; outline: none;">
+              <option value="low">Low</option>
+              <option value="medium" selected>Medium</option>
+              <option value="high">High</option>
+            </select>
+          </div>
+          <div style="flex: 1;">
+            <label style="display: block; font-size: 12px; font-weight: 500; color: #a1a1aa; margin-bottom: 6px;">Column</label>
+            <select id="newTaskColumn" style="width: 100%; padding: 8px 12px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: #fafafa; font-size: 13px; outline: none;">
+              <option value="todo">To Do</option>
+              <option value="inprogress">In Progress</option>
+              <option value="done">Done</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 8px; padding: 16px; border-top: 1px solid rgba(255,255,255,0.06);">
+        <button id="cancelAddTaskBtn" class="px-4 py-2 rounded-lg text-sm font-medium" style="background: rgba(255,255,255,0.05); color: #a1a1aa;">Cancel</button>
+        <button id="confirmAddTaskBtn" class="px-4 py-2 rounded-lg text-sm font-medium" style="background: linear-gradient(135deg, #10b981, #059669); color: white;">Add Task</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add Link Modal -->
+  <div id="addLinkModal" class="modal-backdrop hidden" style="position: fixed; inset: 0; background: rgba(0, 0, 0, 0.7); z-index: 250; display: flex; align-items: center; justify-content: center;">
+    <div class="modal animate-slide-up" style="background: #18181b; border: 1px solid rgba(255, 255, 255, 0.08); color: #fafafa; border-radius: 12px; width: 420px; max-width: 95vw;">
+      <div class="modal-header" style="display: flex; align-items: center; justify-content: space-between; padding: 16px; border-bottom: 1px solid rgba(255,255,255,0.06);">
+        <h3 class="modal-title" style="display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600;">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0ea5e9" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+          Add Link
+        </h3>
+        <button id="closeAddLinkBtn" class="action-btn">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+        </button>
+      </div>
+      <div class="modal-body" style="padding: 16px;">
+        <div style="margin-bottom: 16px;">
+          <label style="display: block; font-size: 12px; font-weight: 500; color: #a1a1aa; margin-bottom: 6px;">URL</label>
+          <input type="url" id="newLinkUrl" placeholder="https://..." style="width: 100%; padding: 10px 12px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: #fafafa; font-size: 14px; outline: none;" />
+        </div>
+        <div style="margin-bottom: 16px;">
+          <label style="display: block; font-size: 12px; font-weight: 500; color: #a1a1aa; margin-bottom: 6px;">Title</label>
+          <input type="text" id="newLinkTitle" placeholder="e.g., Figma Design" style="width: 100%; padding: 10px 12px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: #fafafa; font-size: 14px; outline: none;" />
+        </div>
+        <div>
+          <label style="display: block; font-size: 12px; font-weight: 500; color: #a1a1aa; margin-bottom: 6px;">Type</label>
+          <select id="newLinkType" style="width: 100%; padding: 8px 12px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: #fafafa; font-size: 13px; outline: none;">
+            <option value="external">External Link</option>
+            <option value="figma">Figma</option>
+            <option value="api">API Docs</option>
+            <option value="docs">Documentation</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 8px; padding: 16px; border-top: 1px solid rgba(255,255,255,0.06);">
+        <button id="cancelAddLinkBtn" class="px-4 py-2 rounded-lg text-sm font-medium" style="background: rgba(255,255,255,0.05); color: #a1a1aa;">Cancel</button>
+        <button id="confirmAddLinkBtn" class="px-4 py-2 rounded-lg text-sm font-medium" style="background: linear-gradient(135deg, #0ea5e9, #0284c7); color: white;">Add Link</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Module Search Results Modal -->
+  <div id="moduleSearchModal" class="modal-backdrop hidden" style="position: fixed; inset: 0; background: rgba(0, 0, 0, 0.7); z-index: 260; display: flex; align-items: flex-start; justify-content: center; padding-top: 10vh;">
+    <div class="modal animate-slide-up" style="background: #18181b; border: 1px solid rgba(255, 255, 255, 0.08); color: #fafafa; border-radius: 12px; width: 560px; max-width: 95vw; max-height: 70vh; display: flex; flex-direction: column;">
+      <div class="modal-header" style="display: flex; align-items: center; justify-content: space-between; padding: 16px; border-bottom: 1px solid rgba(255,255,255,0.06);">
+        <div style="display: flex; align-items: center; gap: 12px; flex: 1;">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+          <input type="text" id="globalModuleSearch" placeholder="Search across all modules..." style="flex: 1; padding: 8px; background: transparent; border: none; color: #fafafa; font-size: 14px; outline: none;" autofocus />
+        </div>
+        <button id="closeModuleSearchBtn" class="action-btn">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+        </button>
+      </div>
+      <div id="moduleSearchResults" style="flex: 1; overflow-y: auto; padding: 8px;">
+        <p style="padding: 16px; color: #52525b; font-size: 13px; text-align: center;">Start typing to search...</p>
       </div>
     </div>
   </div>

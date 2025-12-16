@@ -51,7 +51,16 @@
   - Running status and port
   - Git information
   - Last commit details
+- **Project Memory (Project Brain):**
+  - Remembers last run outcome, detected port, and last crash summary
+  - Stored locally (offline-first) and visible in Project Insights
 - **System-wide Metrics:** Track all running projects and dependencies
+
+### 🛠 **Fix It (Recovery Actions)**
+- When a project fails, Tafil can show a **Fix It** modal with actionable recovery steps:
+  - **Port conflict**: stop the conflicting Tafil project, inspect/kill the process on the port, or rerun on a custom port
+  - **Missing env vars**: surfaces detected keys and lets you copy/open project quickly
+  - **Node mismatch**: suggests and copies `nvm` commands
 
 ### 🖥 **Developer Experience**
 - **IDE Integration:** Auto-detects VS Code, Cursor, WebStorm, Sublime Text, IntelliJ, Atom, and more

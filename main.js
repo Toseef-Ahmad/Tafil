@@ -5,6 +5,118 @@ const path = require('path');
 const fs = require('fs');
 const fsPromises = require('fs').promises;
 const psTree = require('ps-tree');
+const projectBrain = require('./utils/projectBrain');
+
+// ========================================
+// Error Intelligence (deterministic, offline)
+// ========================================
+function extractFirstPort(text, fallbackPort = null) {
+  const t = typeof text === 'string' ? text : '';
+  const patterns = [
+    /localhost:(\d{4,5})/i,
+    /\bport\s+(\d{4,5})\b/i,
+    /\b:(\d{4,5})\b/,
+  ];
+  for (const re of patterns) {
+    const m = t.match(re);
+    if (m) {
+      const p = parseInt(m[1], 10);
+      if (!Number.isNaN(p) && p >= 1000 && p <= 65535) return p;
+    }
+  }
+  return fallbackPort;
+}
+
+function uniqueNonEmpty(arr) {
+  return Array.from(new Set((arr || []).map(String).map(s => s.trim()).filter(Boolean)));
+}
+
+function extractEnvKeys(text) {
+  const t = typeof text === 'string' ? text : '';
+  const keys = [];
+  const patterns = [
+    /Missing(?: required)? (?:environment variable|env var|env)\s*[:=]?\s*([A-Z0-9_]{2,})/gi,
+    /Please set(?: the)? (?:environment variable|env var|env)\s*[:=]?\s*([A-Z0-9_]{2,})/gi,
+    /\bprocess\.env\.([A-Z0-9_]{2,})\b/g,
+    /\b([A-Z0-9_]{2,})\s+is\s+not\s+defined\b/g,
+  ];
+  for (const re of patterns) {
+    let m;
+    while ((m = re.exec(t)) !== null) keys.push(m[1]);
+  }
+  return uniqueNonEmpty(keys).slice(0, 10);
+}
+
+function detectNodeMismatch(text) {
+  const t = typeof text === 'string' ? text : '';
+  const engineMatch = t.match(/The engine "node" is incompatible.*Expected version "?([^"\n]+)"?/i);
+  if (engineMatch) return { kind: 'NODE_ENGINE_MISMATCH', required: engineMatch[1] };
+  const reqMatch = t.match(/requires Node(?:\.js)?\s*(?:version)?\s*v?(\d+(?:\.\d+)?(?:\.\d+)?)/i);
+  if (reqMatch) return { kind: 'NODE_ENGINE_MISMATCH', required: reqMatch[1] };
+  const ossl = t.includes('ERR_OSSL_EVP_UNSUPPORTED');
+  if (ossl) return { kind: 'NODE_OPENSSL_INCOMPAT', required: 'Node 16/18 LTS (or set NODE_OPTIONS=--openssl-legacy-provider)' };
+  return null;
+}
+
+function buildFailureDiagnostic({ projectPath, framework, suggestedPort, stdout, stderr, code, errorMessage }) {
+  const combined = `${stdout || ''}\n${stderr || ''}\n${errorMessage || ''}`;
+
+  // Port in use
+  const hasPortConflict =
+    /EADDRINUSE/i.test(combined) ||
+    /address already in use/i.test(combined) ||
+    /Something is already running on port/i.test(combined) ||
+    /\bport\b.*\balready in use\b/i.test(combined);
+  if (hasPortConflict) {
+    const port = extractFirstPort(combined, suggestedPort);
+    const ownership = port ? checkPortOwnership(port) : { isTafil: false, projectPath: null };
+    return {
+      kind: 'PORT_IN_USE',
+      title: port ? `Port ${port} is already in use` : 'Port is already in use',
+      details: ownership.isTafil
+        ? `That port is already used by another Tafil project: ${path.basename(ownership.projectPath)}`
+        : 'Another process is already using this port.',
+      data: {
+        port,
+        ownedByTafil: ownership.isTafil,
+        ownerProjectPath: ownership.projectPath,
+        framework: framework || null,
+        exitCode: code ?? null,
+      },
+      suggestions: uniqueNonEmpty([
+        ownership.isTafil && ownership.projectPath ? 'Stop the conflicting Tafil project' : null,
+        'Switch to a different port',
+        'Check what is running on the port (External Processes panel)',
+      ]),
+    };
+  }
+
+  // Missing env vars
+  const envKeys = extractEnvKeys(combined);
+  if (envKeys.length > 0 && /env|environment/i.test(combined)) {
+    return {
+      kind: 'MISSING_ENV',
+      title: envKeys.length === 1 ? `Missing env var: ${envKeys[0]}` : `Missing env vars: ${envKeys.slice(0, 3).join(', ')}${envKeys.length > 3 ? '…' : ''}`,
+      details: 'This project appears to require environment variables that are not set.',
+      data: { keys: envKeys, framework: framework || null, exitCode: code ?? null },
+      suggestions: ['Add them to a .env file (or your shell env) and run again'],
+    };
+  }
+
+  // Node mismatch / OpenSSL mismatch
+  const nodeIssue = detectNodeMismatch(combined);
+  if (nodeIssue) {
+    return {
+      kind: nodeIssue.kind,
+      title: 'Node.js version mismatch',
+      details: nodeIssue.required ? `Required: ${nodeIssue.required}` : 'This project likely needs a different Node.js version.',
+      data: { required: nodeIssue.required || null, framework: framework || null, exitCode: code ?? null },
+      suggestions: ['Use an LTS Node version (via nvm/volta) and re-run'],
+    };
+  }
+
+  return null;
+}
 const { exec, spawn } = require('child_process');
 const portfinder = require('portfinder');
 const { detectExternalNodeProcesses, getProcessOnPort } = require('./utils/externalProcessDetector');
@@ -1055,10 +1167,11 @@ ipcMain.handle('get-installed-terminals', async () => {
   }
 });
 
-// 1d) Execute JavaScript in sandbox (Playground)
+// 1d) Execute JavaScript in sandbox (Playground) - WITH INLINE EVALUATION
 ipcMain.handle('execute-js', async (_event, code) => {
   try {
     const logs = [];
+    const inlineResults = []; // Store inline values per line
     
     // Create a custom console that captures logs
     const customConsole = {
@@ -1071,13 +1184,16 @@ ipcMain.handle('execute-js', async (_event, code) => {
       clear: () => logs.length = 0,
     };
     
-    // Helper to format values
+    // Helper to format values for inline display
     function formatValue(val) {
       if (val === null) return 'null';
       if (val === undefined) return 'undefined';
+      if (typeof val === 'function') return '[Function]';
+      if (typeof val === 'symbol') return val.toString();
       if (typeof val === 'object') {
         try {
-          return JSON.stringify(val, null, 2);
+          const str = JSON.stringify(val, null, 0);
+          return str.length > 50 ? str.slice(0, 47) + '...' : str;
         } catch {
           return String(val);
         }
@@ -1085,18 +1201,96 @@ ipcMain.handle('execute-js', async (_event, code) => {
       return String(val);
     }
     
+    // Instrument code to capture line-by-line values (simplified for reliability)
+    // RunJS-style "magic comment": add `//?` to force inline capture for that line.
+    const lines = code.split('\n');
+    const instrumentedLines = [];
+    
+    lines.forEach((line, index) => {
+      const trimmed = line.trim();
+      const lineNum = index + 1;
+      
+      // Always keep original line
+      instrumentedLines.push(line);
+
+      // Magic comment capture (RunJS-style)
+      // Example:
+      //   someExpression //?
+      // or:
+      //   name //?
+      if (line.includes('//?')) {
+        const expr = line.split('//?')[0].trim();
+        if (expr) {
+          instrumentedLines.push(`try { __captureValue(${lineNum}, (${expr})); } catch(e) { }`);
+        }
+        return;
+      }
+
+      // Skip punctuation-only lines like: }); )); ]); }
+      // These were causing syntax errors when we tried to evaluate them as expressions.
+      if (/^[\)\}\]\s;,.]+$/.test(trimmed)) {
+        return;
+      }
+      
+      // Skip empty lines, comments, keywords, brackets
+      if (!trimmed || 
+          trimmed.startsWith('//') || 
+          trimmed.startsWith('/*') ||
+          trimmed.startsWith('*') ||
+          trimmed.startsWith('function') ||
+          trimmed.startsWith('class') ||
+          trimmed.startsWith('if') ||
+          trimmed.startsWith('else') ||
+          trimmed.startsWith('for') ||
+          trimmed.startsWith('while') ||
+          trimmed.startsWith('do') ||
+          trimmed.startsWith('switch') ||
+          trimmed.startsWith('case') ||
+          trimmed.startsWith('break') ||
+          trimmed.startsWith('continue') ||
+          trimmed.startsWith('return') ||
+          trimmed.startsWith('throw') ||
+          trimmed === '}' ||
+          trimmed === '{' ||
+          trimmed.endsWith('{') ||
+          trimmed.endsWith('}') ||
+          trimmed.includes('console.')) {
+        // Skip instrumentation for these lines
+      } else if (trimmed.match(/^(const|let|var)\s+\w+\s*=/)) {
+        // Skip variable declarations with assignment
+      } else if (trimmed && !trimmed.includes('=')) {
+        // Capture standalone expressions (variables, function calls, etc.)
+        instrumentedLines.push(`try { __captureValue(${lineNum}, ${trimmed}); } catch(e) { }`);
+      }
+    });
+    
+    const instrumentedCode = instrumentedLines.join('\n');
+    
     // Wrap code to capture result and provide console
     const wrappedCode = `
       (async () => {
         const console = customConsole;
-        ${code}
+        ${instrumentedCode}
       })()
     `;
     
     // Execute with limited context
     const vm = require('vm');
+    const lineValues = new Map(); // Track multiple values per line
+    
     const context = vm.createContext({
       customConsole,
+      __captureValue: (lineNum, value) => {
+        const formatted = formatValue(value);
+        if (!lineValues.has(lineNum)) {
+          lineValues.set(lineNum, []);
+        }
+        const values = lineValues.get(lineNum);
+        // Limit to 10 values per line to avoid clutter
+        if (values.length < 10) {
+          values.push(formatted);
+        }
+      },
       setTimeout,
       setInterval,
       clearTimeout,
@@ -1132,12 +1326,20 @@ ipcMain.handle('execute-js', async (_event, code) => {
     try {
       result = await script.runInContext(context, { timeout: 10000 });
     } catch (execError) {
-      return { success: false, error: execError.message, logs };
+      return { success: false, error: execError.message, logs, inlineResults };
     }
     
-    return { success: true, result: formatValue(result), logs };
+    // Convert Map to array of inline results
+    lineValues.forEach((values, lineNum) => {
+      const displayValue = values.length === 1 
+        ? values[0] 
+        : `[${values.join(', ')}]`;
+      inlineResults.push({ line: lineNum, value: displayValue });
+    });
+    
+    return { success: true, result: formatValue(result), logs, inlineResults };
   } catch (err) {
-    return { success: false, error: err.message, logs: [] };
+    return { success: false, error: err.message, logs: [], inlineResults: [] };
   }
 });
 
@@ -1795,6 +1997,7 @@ ipcMain.handle('play-project', async (_event, projectPath, customPort = null) =>
     const packageJsonPath = path.join(projectPath, 'package.json');
     const packageJson = JSON.parse(await fsPromises.readFile(packageJsonPath, 'utf8'));
     const scripts = packageJson.scripts || {};
+    const projectNameForBrain = packageJson.name || path.basename(projectPath);
 
     // Determine the appropriate start script
     let startScript;
@@ -1908,6 +2111,18 @@ ipcMain.handle('play-project', async (_event, projectPath, customPort = null) =>
     }
 
     console.log(`🚀 Starting ${projectInfo.type} project with "${startScript}" (suggested port: ${suggestedPort})`);
+    // Project Brain: record run attempt start (best-effort)
+    try {
+      await projectBrain.recordRunStart({
+        projectPath,
+        projectName: projectNameForBrain,
+        framework: projectInfo.framework || projectInfo.type,
+        command: startScript,
+        suggestedPort,
+      });
+    } catch (e) {
+      console.warn('Project Brain: recordRunStart failed:', e?.message || e);
+    }
 
     // Prepare environment variables based on framework
     const env = {
@@ -2119,6 +2334,8 @@ ipcMain.handle('play-project', async (_event, projectPath, customPort = null) =>
             pid: child.pid,
                     framework: projectInfo.framework,
           });
+                  // Project Brain: record running + actual port (best-effort)
+                  projectBrain.recordRunRunning({ projectPath, pid: child.pid, actualPort }).catch(() => {});
           break;
                 }
               }
@@ -2175,6 +2392,20 @@ ipcMain.handle('play-project', async (_event, projectPath, customPort = null) =>
               }
             }
           }
+          const diagnostic = (code !== 0)
+            ? buildFailureDiagnostic({
+                projectPath,
+                framework: projectInfo.framework,
+                suggestedPort,
+                stdout: stdoutBuffer,
+                stderr: stderrBuffer,
+                code,
+                errorMessage: errorMsg,
+              })
+            : null;
+          if (diagnostic) {
+            projectBrain.recordDiagnostic({ projectPath, diagnostic }).catch(() => {});
+          }
           
           mainWindow?.webContents.send('project-status', {
             projectPath,
@@ -2182,7 +2413,17 @@ ipcMain.handle('play-project', async (_event, projectPath, customPort = null) =>
             code,
             signal,
             error: errorMsg,
+            diagnostic,
           });
+          // Project Brain: record exit summary (best-effort)
+          projectBrain.recordRunExit({
+            projectPath,
+            code,
+            signal,
+            stdout: stdoutBuffer,
+            stderr: stderrBuffer,
+            errorMessage: errorMsg,
+          }).catch(() => {});
         });
         
         // Handle error
@@ -2352,6 +2593,8 @@ ipcMain.handle('play-project', async (_event, projectPath, customPort = null) =>
             pid: child.pid,
                   framework: projectInfo.type,
           });
+                // Project Brain: record running + actual port (best-effort)
+                projectBrain.recordRunRunning({ projectPath, pid: child.pid, actualPort }).catch(() => {});
           break;
               }
             }
@@ -2419,6 +2662,15 @@ ipcMain.handle('play-project', async (_event, projectPath, customPort = null) =>
         error: errorMessage,
       });
       runningProcesses.delete(projectPath);
+      // Project Brain: record exit as error (best-effort)
+      projectBrain.recordRunExit({
+        projectPath,
+        code: err?.code || null,
+        signal: null,
+        stdout: stdoutBuffer,
+        stderr: stderrBuffer,
+        errorMessage,
+      }).catch(() => {});
     });
 
     // Handle exit
@@ -2510,6 +2762,20 @@ ipcMain.handle('play-project', async (_event, projectPath, customPort = null) =>
         : (code !== 0 && code !== null 
           ? `Process exited with code ${code}. Check logs for details.` 
           : undefined);
+      const diagnostic = (status === 'error' || wasCRAPortConflict)
+        ? buildFailureDiagnostic({
+            projectPath,
+            framework: projectInfo.framework || projectInfo.type,
+            suggestedPort,
+            stdout: stdoutBuffer,
+            stderr: stderrBuffer,
+            code,
+            errorMessage,
+          })
+        : null;
+      if (diagnostic) {
+        projectBrain.recordDiagnostic({ projectPath, diagnostic }).catch(() => {});
+      }
       
       mainWindow?.webContents.send('project-status', {
         projectPath,
@@ -2517,7 +2783,17 @@ ipcMain.handle('play-project', async (_event, projectPath, customPort = null) =>
         code,
         signal,
         error: errorMessage,
+        diagnostic,
       });
+      // Project Brain: record exit summary (best-effort)
+      projectBrain.recordRunExit({
+        projectPath,
+        code,
+        signal,
+        stdout: stdoutBuffer,
+        stderr: stderrBuffer,
+        errorMessage,
+      }).catch(() => {});
     });
 
     // Fallback: Send initial status after timeout if port not detected
@@ -2547,6 +2823,8 @@ ipcMain.handle('play-project', async (_event, projectPath, customPort = null) =>
           framework: projectInfo.type,
           warning: 'Port detected from configuration, may not be accurate'
         });
+        // Project Brain: record running with fallback port (best-effort)
+        projectBrain.recordRunRunning({ projectPath, pid: child.pid, actualPort }).catch(() => {});
       }
     }, timeoutDuration);
 
@@ -2583,6 +2861,9 @@ ipcMain.handle('stop-project', async (_event, projectPath) => {
       console.log(`No running process found for ${projectPath}`);
       return { success: false, message: 'Project not running' };
     }
+    
+    // Project Brain: mark that a stop was requested (best-effort)
+    projectBrain.recordStopRequested({ projectPath }).catch(() => {});
     
     const childProcess = processInfo.process || processInfo; // Support old format too
 
@@ -2640,6 +2921,212 @@ ipcMain.handle('stop-project', async (_event, projectPath) => {
       message: 'Failed to stop project',
       error: err.message,
     };
+  }
+});
+
+// Project Brain: read-only access for renderer
+ipcMain.handle('get-project-brain', async (_event, projectPath) => {
+  try {
+    if (!isValidProjectPath(projectPath)) {
+      return null;
+    }
+    return await projectBrain.getProjectBrain(projectPath);
+  } catch (err) {
+    console.warn('get-project-brain failed:', err?.message || err);
+    return null;
+  }
+});
+
+// Project Brain: update project notes
+ipcMain.handle('update-project-notes', async (_event, projectPath, notes) => {
+  try {
+    if (!isValidProjectPath(projectPath)) {
+      return { success: false, error: 'Invalid project path' };
+    }
+    await projectBrain.updateProjectNotes(projectPath, notes);
+    return { success: true };
+  } catch (err) {
+    console.warn('update-project-notes failed:', err?.message || err);
+    return { success: false, error: err?.message || 'Failed to update notes' };
+  }
+});
+
+// Project Architecture: save/load canvas data
+ipcMain.handle('save-project-architecture', async (_event, projectPath, architectureData) => {
+  try {
+    if (!isValidProjectPath(projectPath)) {
+      return { success: false, error: 'Invalid project path' };
+    }
+    await projectBrain.saveProjectArchitecture(projectPath, architectureData);
+    return { success: true };
+  } catch (err) {
+    console.warn('save-project-architecture failed:', err?.message || err);
+    return { success: false, error: err?.message || 'Failed to save architecture' };
+  }
+});
+
+ipcMain.handle('get-project-architecture', async (_event, projectPath) => {
+  try {
+    if (!isValidProjectPath(projectPath)) {
+      return null;
+    }
+    return await projectBrain.getProjectArchitecture(projectPath);
+  } catch (err) {
+    console.warn('get-project-architecture failed:', err?.message || err);
+    return null;
+  }
+});
+
+// ========================================
+// Pro Feature: Environment Snapshot + Restore
+// ========================================
+
+const environmentSnapshot = require('./utils/environmentSnapshot');
+const restoreEverything = require('./utils/restoreEverything');
+
+// Create environment snapshot for a project
+ipcMain.handle('create-environment-snapshot', async (_event, projectPath, options = {}) => {
+  try {
+    if (!isValidProjectPath(projectPath)) {
+      return { success: false, error: 'Invalid project path' };
+    }
+
+    const snapshot = await environmentSnapshot.createSnapshot(projectPath, options);
+    
+    // Save to Project Brain
+    await projectBrain.saveEnvironmentSnapshot(projectPath, snapshot);
+    
+    return { success: true, snapshot };
+  } catch (err) {
+    console.error('create-environment-snapshot failed:', err);
+    return { success: false, error: err.message || 'Failed to create snapshot' };
+  }
+});
+
+// Get environment snapshot for a project
+ipcMain.handle('get-environment-snapshot', async (_event, projectPath) => {
+  try {
+    if (!isValidProjectPath(projectPath)) {
+      return null;
+    }
+    return await projectBrain.getEnvironmentSnapshot(projectPath);
+  } catch (err) {
+    console.warn('get-environment-snapshot failed:', err?.message || err);
+    return null;
+  }
+});
+
+// Restore project from snapshot
+ipcMain.handle('restore-project', async (_event, projectPath, options = {}) => {
+  try {
+    if (!isValidProjectPath(projectPath)) {
+      return { success: false, error: 'Invalid project path' };
+    }
+
+    // Get snapshot from Project Brain
+    const snapshot = await projectBrain.getEnvironmentSnapshot(projectPath);
+    
+    if (!snapshot) {
+      return { 
+        success: false, 
+        error: 'No snapshot found for this project. Create a snapshot first.' 
+      };
+    }
+
+    // Restore project
+    const result = await restoreEverything.restoreProject(snapshot, options);
+    
+    return result;
+  } catch (err) {
+    console.error('restore-project failed:', err);
+    return { 
+      success: false, 
+      error: err.message || 'Failed to restore project',
+      steps: [],
+      errors: [{ error: err.message }],
+    };
+  }
+});
+
+// Get restore instructions (manual steps)
+ipcMain.handle('get-restore-instructions', async (_event, projectPath) => {
+  try {
+    if (!isValidProjectPath(projectPath)) {
+      return { success: false, error: 'Invalid project path' };
+    }
+
+    const snapshot = await projectBrain.getEnvironmentSnapshot(projectPath);
+    
+    if (!snapshot) {
+      return { success: false, error: 'No snapshot found' };
+    }
+
+    const instructions = restoreEverything.getRestoreInstructions(snapshot);
+    
+    return { success: true, instructions };
+  } catch (err) {
+    console.error('get-restore-instructions failed:', err);
+    return { success: false, error: err.message || 'Failed to get instructions' };
+  }
+});
+
+// Validate prerequisites for a snapshot
+ipcMain.handle('validate-snapshot-prerequisites', async (_event, projectPath) => {
+  try {
+    if (!isValidProjectPath(projectPath)) {
+      return { success: false, error: 'Invalid project path' };
+    }
+
+    const snapshot = await projectBrain.getEnvironmentSnapshot(projectPath);
+    
+    if (!snapshot) {
+      return { success: false, error: 'No snapshot found' };
+    }
+
+    const validation = await environmentSnapshot.validatePrerequisites(snapshot);
+    
+    return validation;
+  } catch (err) {
+    console.error('validate-snapshot-prerequisites failed:', err);
+    return { 
+      valid: false, 
+      issues: [{ type: 'error', message: err.message || 'Validation failed' }],
+      warnings: [],
+    };
+  }
+});
+
+// ========================================
+// Error Context Notes (Memory Feature)
+// ========================================
+
+// Save error context note
+ipcMain.handle('save-error-note', async (_event, projectPath, note, runId = null, errorKind = null) => {
+  try {
+    if (!isValidProjectPath(projectPath)) {
+      return { success: false, error: 'Invalid project path' };
+    }
+
+    await projectBrain.saveErrorNote(projectPath, note, runId, errorKind);
+    
+    return { success: true };
+  } catch (err) {
+    console.error('save-error-note failed:', err);
+    return { success: false, error: err.message || 'Failed to save note' };
+  }
+});
+
+// Get error notes for a project
+ipcMain.handle('get-error-notes', async (_event, projectPath, runId = null, errorKind = null) => {
+  try {
+    if (!isValidProjectPath(projectPath)) {
+      return [];
+    }
+
+    return await projectBrain.getErrorNotes(projectPath, runId, errorKind);
+  } catch (err) {
+    console.warn('get-error-notes failed:', err?.message || err);
+    return [];
   }
 });
 
@@ -3333,6 +3820,363 @@ ipcMain.handle('kill-external-process', async (_event, pid) => {
     return { success: true };
   } catch (err) {
     console.error(`Error killing external process ${pid}:`, err);
+    return { success: false, error: err.message };
+  }
+});
+
+// ========================================
+// Blueprints / Modules System
+// ========================================
+
+const blueprintManager = require('./utils/blueprintManager');
+
+// Initialize blueprints for a project
+ipcMain.handle('init-blueprints', async (_event, projectPath) => {
+  try {
+    if (!isValidProjectPath(projectPath)) {
+      return { success: false, error: 'Invalid project path' };
+    }
+    const blueprints = await blueprintManager.initTafilFolder(projectPath);
+    return { success: true, blueprints };
+  } catch (err) {
+    console.error('Error initializing blueprints:', err);
+    return { success: false, error: err.message };
+  }
+});
+
+// Check if .tafil folder exists
+ipcMain.handle('check-tafil-exists', async (_event, projectPath) => {
+  try {
+    const exists = await blueprintManager.checkTafilExists(projectPath);
+    return { success: true, exists };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+});
+
+// Load blueprints for a project
+ipcMain.handle('load-blueprints', async (_event, projectPath) => {
+  try {
+    if (!isValidProjectPath(projectPath)) {
+      return { success: false, error: 'Invalid project path' };
+    }
+    const blueprints = await blueprintManager.loadBlueprints(projectPath);
+    return { success: true, blueprints };
+  } catch (err) {
+    console.error('Error loading blueprints:', err);
+    return { success: false, error: err.message };
+  }
+});
+
+// Create a new module
+ipcMain.handle('create-module', async (_event, projectPath, moduleData) => {
+  try {
+    if (!isValidProjectPath(projectPath)) {
+      return { success: false, error: 'Invalid project path' };
+    }
+    const module = await blueprintManager.createModule(projectPath, moduleData);
+    return { success: true, module };
+  } catch (err) {
+    console.error('Error creating module:', err);
+    return { success: false, error: err.message };
+  }
+});
+
+// Update a module
+ipcMain.handle('update-module', async (_event, projectPath, moduleId, updates) => {
+  try {
+    if (!isValidProjectPath(projectPath)) {
+      return { success: false, error: 'Invalid project path' };
+    }
+    const module = await blueprintManager.updateModule(projectPath, moduleId, updates);
+    return { success: true, module };
+  } catch (err) {
+    console.error('Error updating module:', err);
+    return { success: false, error: err.message };
+  }
+});
+
+// Delete a module
+ipcMain.handle('delete-module', async (_event, projectPath, moduleId) => {
+  try {
+    if (!isValidProjectPath(projectPath)) {
+      return { success: false, error: 'Invalid project path' };
+    }
+    await blueprintManager.deleteModule(projectPath, moduleId);
+    return { success: true };
+  } catch (err) {
+    console.error('Error deleting module:', err);
+    return { success: false, error: err.message };
+  }
+});
+
+// Reorder modules
+ipcMain.handle('reorder-modules', async (_event, projectPath, moduleIds) => {
+  try {
+    if (!isValidProjectPath(projectPath)) {
+      return { success: false, error: 'Invalid project path' };
+    }
+    const modules = await blueprintManager.reorderModules(projectPath, moduleIds);
+    return { success: true, modules };
+  } catch (err) {
+    console.error('Error reordering modules:', err);
+    return { success: false, error: err.message };
+  }
+});
+
+// Get module goal/description
+ipcMain.handle('get-module-goal', async (_event, projectPath, moduleId) => {
+  try {
+    const goal = await blueprintManager.getModuleGoal(projectPath, moduleId);
+    return { success: true, goal };
+  } catch (err) {
+    console.error('Error getting module goal:', err);
+    return { success: false, error: err.message };
+  }
+});
+
+// Save module goal/description
+ipcMain.handle('save-module-goal', async (_event, projectPath, moduleId, content) => {
+  try {
+    await blueprintManager.saveModuleGoal(projectPath, moduleId, content);
+    return { success: true };
+  } catch (err) {
+    console.error('Error saving module goal:', err);
+    return { success: false, error: err.message };
+  }
+});
+
+// Get module tasks (Kanban)
+ipcMain.handle('get-module-tasks', async (_event, projectPath, moduleId) => {
+  try {
+    const tasks = await blueprintManager.getModuleTasks(projectPath, moduleId);
+    return { success: true, tasks };
+  } catch (err) {
+    console.error('Error getting module tasks:', err);
+    return { success: false, error: err.message };
+  }
+});
+
+// Save module tasks
+ipcMain.handle('save-module-tasks', async (_event, projectPath, moduleId, tasksData) => {
+  try {
+    await blueprintManager.saveModuleTasks(projectPath, moduleId, tasksData);
+    return { success: true };
+  } catch (err) {
+    console.error('Error saving module tasks:', err);
+    return { success: false, error: err.message };
+  }
+});
+
+// Add a task
+ipcMain.handle('add-task', async (_event, projectPath, moduleId, columnId, taskData) => {
+  try {
+    const task = await blueprintManager.addTask(projectPath, moduleId, columnId, taskData);
+    return { success: true, task };
+  } catch (err) {
+    console.error('Error adding task:', err);
+    return { success: false, error: err.message };
+  }
+});
+
+// Update a task
+ipcMain.handle('update-task', async (_event, projectPath, moduleId, taskId, updates) => {
+  try {
+    const task = await blueprintManager.updateTask(projectPath, moduleId, taskId, updates);
+    return { success: true, task };
+  } catch (err) {
+    console.error('Error updating task:', err);
+    return { success: false, error: err.message };
+  }
+});
+
+// Move a task
+ipcMain.handle('move-task', async (_event, projectPath, moduleId, taskId, toColumnId, toIndex) => {
+  try {
+    const task = await blueprintManager.moveTask(projectPath, moduleId, taskId, toColumnId, toIndex);
+    return { success: true, task };
+  } catch (err) {
+    console.error('Error moving task:', err);
+    return { success: false, error: err.message };
+  }
+});
+
+// Delete a task
+ipcMain.handle('delete-task', async (_event, projectPath, moduleId, taskId) => {
+  try {
+    await blueprintManager.deleteTask(projectPath, moduleId, taskId);
+    return { success: true };
+  } catch (err) {
+    console.error('Error deleting task:', err);
+    return { success: false, error: err.message };
+  }
+});
+
+// Get module canvas (Excalidraw)
+ipcMain.handle('get-module-canvas', async (_event, projectPath, moduleId) => {
+  try {
+    const canvas = await blueprintManager.getModuleCanvas(projectPath, moduleId);
+    return { success: true, canvas };
+  } catch (err) {
+    console.error('Error getting module canvas:', err);
+    return { success: false, error: err.message };
+  }
+});
+
+// Save module canvas
+ipcMain.handle('save-module-canvas', async (_event, projectPath, moduleId, canvasData) => {
+  try {
+    await blueprintManager.saveModuleCanvas(projectPath, moduleId, canvasData, false);
+    return { success: true };
+  } catch (err) {
+    console.error('Error saving module canvas:', err);
+    return { success: false, error: err.message };
+  }
+});
+
+// Get module resources
+ipcMain.handle('get-module-resources', async (_event, projectPath, moduleId) => {
+  try {
+    const resources = await blueprintManager.getModuleResources(projectPath, moduleId);
+    return { success: true, resources };
+  } catch (err) {
+    console.error('Error getting module resources:', err);
+    return { success: false, error: err.message };
+  }
+});
+
+// Add a link resource
+ipcMain.handle('add-module-link', async (_event, projectPath, moduleId, linkData) => {
+  try {
+    const link = await blueprintManager.addLink(projectPath, moduleId, linkData);
+    return { success: true, link };
+  } catch (err) {
+    console.error('Error adding link:', err);
+    return { success: false, error: err.message };
+  }
+});
+
+// Add a file reference
+ipcMain.handle('add-module-file', async (_event, projectPath, moduleId, fileData) => {
+  try {
+    const file = await blueprintManager.addFileReference(projectPath, moduleId, fileData);
+    return { success: true, file };
+  } catch (err) {
+    console.error('Error adding file reference:', err);
+    return { success: false, error: err.message };
+  }
+});
+
+// Remove a resource
+ipcMain.handle('remove-module-resource', async (_event, projectPath, moduleId, resourceId, type) => {
+  try {
+    await blueprintManager.removeResource(projectPath, moduleId, resourceId, type);
+    return { success: true };
+  } catch (err) {
+    console.error('Error removing resource:', err);
+    return { success: false, error: err.message };
+  }
+});
+
+// Search modules
+ipcMain.handle('search-modules', async (_event, projectPath, query) => {
+  try {
+    const results = await blueprintManager.searchModules(projectPath, query);
+    return { success: true, results };
+  } catch (err) {
+    console.error('Error searching modules:', err);
+    return { success: false, error: err.message };
+  }
+});
+
+// Get module history
+ipcMain.handle('get-module-history', async (_event, projectPath, moduleId, type) => {
+  try {
+    const history = await blueprintManager.getModuleHistory(projectPath, moduleId, type);
+    return { success: true, history };
+  } catch (err) {
+    console.error('Error getting module history:', err);
+    return { success: false, error: err.message };
+  }
+});
+
+// Restore from history
+ipcMain.handle('restore-from-history', async (_event, projectPath, moduleId, filename) => {
+  try {
+    const result = await blueprintManager.restoreFromHistory(projectPath, moduleId, filename);
+    return { success: true, result };
+  } catch (err) {
+    console.error('Error restoring from history:', err);
+    return { success: false, error: err.message };
+  }
+});
+
+// Export module data
+ipcMain.handle('export-module', async (_event, projectPath, moduleId) => {
+  try {
+    const data = await blueprintManager.exportModule(projectPath, moduleId);
+    return { success: true, data };
+  } catch (err) {
+    console.error('Error exporting module:', err);
+    return { success: false, error: err.message };
+  }
+});
+
+// Open file in IDE (deep link support)
+ipcMain.handle('open-file-in-ide', async (_event, projectPath, filePath, ideCommand) => {
+  try {
+    const fullPath = path.isAbsolute(filePath) ? filePath : path.join(projectPath, filePath);
+    
+    if (!fs.existsSync(fullPath)) {
+      return { success: false, error: 'File not found' };
+    }
+    
+    const ide = ideCommand || 'code'; // Default to VS Code
+    
+    return new Promise((resolve) => {
+      exec(`${ide} "${fullPath}"`, (error) => {
+        if (error) {
+          console.error('Error opening file in IDE:', error);
+          resolve({ success: false, error: error.message });
+        } else {
+          resolve({ success: true });
+        }
+      });
+    });
+  } catch (err) {
+    console.error('Error opening file in IDE:', err);
+    return { success: false, error: err.message };
+  }
+});
+
+// Browse for file (for deep linking)
+ipcMain.handle('browse-for-file', async (_event, projectPath) => {
+  try {
+    const result = await dialog.showOpenDialog(mainWindow, {
+      defaultPath: projectPath,
+      properties: ['openFile'],
+      title: 'Select File to Link'
+    });
+    
+    if (result.canceled || result.filePaths.length === 0) {
+      return { success: false, canceled: true };
+    }
+    
+    const selectedPath = result.filePaths[0];
+    // Make path relative if it's inside the project
+    let relativePath = selectedPath;
+    if (selectedPath.startsWith(projectPath)) {
+      relativePath = selectedPath.substring(projectPath.length + 1);
+    }
+    
+    return { 
+      success: true, 
+      path: selectedPath,
+      relativePath,
+      name: path.basename(selectedPath)
+    };
+  } catch (err) {
+    console.error('Error browsing for file:', err);
     return { success: false, error: err.message };
   }
 });
