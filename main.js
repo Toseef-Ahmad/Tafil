@@ -129,6 +129,13 @@ const {
   removeNodeModules,
 } = require('./utils/projectActions');
 
+const {
+  createProject,
+  getTemplates,
+  getTemplateLibrary,
+  validateProjectName,
+} = require('./utils/projectCreator');
+
 // Platform detection
 const isWindows = process.platform === 'win32';
 const isMac = process.platform === 'darwin';
@@ -841,6 +848,21 @@ async function detectInstalledTerminals() {
 
 const { execSync } = require('child_process');
 
+// Single-instance lock (prevents two Tafils fighting over ports/process state)
+// Must be set before `app.whenReady()`.
+const gotTheLock = app.requestSingleInstanceLock();
+if (!gotTheLock) {
+  app.quit();
+} else {
+  app.on('second-instance', () => {
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.show();
+      mainWindow.focus();
+    }
+  });
+}
+
 /**
  * Check permissions - macOS specific
  */
@@ -1054,39 +1076,34 @@ function createWindow() {
     isDev ? path.join(__dirname, 'index.html') : path.join(app.getAppPath(), 'index.html')
   );
 
-  mainWindow.webContents.session.webRequest.onHeadersReceived((details, callback) => {
-    callback({
-      responseHeaders: {
-        ...details.responseHeaders,
-        'Content-Security-Policy':
-          "default-src 'self'; " +
-          "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
-          "script-src 'self' https://kit.fontawesome.com; " +
-          "img-src 'self' data:; " +
-          "font-src 'self' data: https://fonts.gstatic.com; " +
-          "connect-src 'self' https://ka-f.fontawesome.com;",
-      },
-    });
-  });
+  // NOTE: CSP is defined in `index.html` via a meta tag.
+  // Avoid injecting CSP headers here; doing both can cause mismatched policies and break Monaco/Workers in production.
 
   mainWindow.on('closed', () => {
     // Kill all child processes on window close
-    for (const [projectPath, childProcess] of runningProcesses.entries()) {
-      if (childProcess && !childProcess.killed) {
-        try {
-          // Try graceful shutdown first
-          childProcess.kill('SIGTERM');
-          
-          // Force kill after 5 seconds if still running
-          setTimeout(() => {
-            if (!childProcess.killed) {
-              console.log(`Force killing process for ${projectPath}`);
-              childProcess.kill('SIGKILL');
+    for (const [projectPath, info] of runningProcesses.entries()) {
+      // IMPORTANT: map stores objects: { process: ChildProcess, port, ... }
+      const child = info?.process || info;
+      const pid = child?.pid;
+      if (!pid) continue;
+
+      try {
+        if (isWindows) {
+          exec(`taskkill /F /T /PID ${pid}`, (error) => {
+            if (error) console.warn(`Windows taskkill error (close cleanup): ${error.message}`);
+          });
+        } else {
+          psTree(pid, (err, children) => {
+            if (!err && Array.isArray(children)) {
+              children.forEach((c) => {
+                try { process.kill(parseInt(c.PID, 10), 'SIGTERM'); } catch {}
+              });
             }
-          }, 5000);
-        } catch (err) {
-          console.error(`Error killing process for ${projectPath}:`, err);
+            try { process.kill(parseInt(pid, 10), 'SIGTERM'); } catch {}
+          });
         }
+      } catch (err) {
+        console.error(`Error killing process for ${projectPath}:`, err);
       }
     }
     runningProcesses.clear();
@@ -1108,10 +1125,37 @@ app.on('window-all-closed', () => {
 // -------------------------------------------------
 
 // 1) Scan all Node.js projects in the home dir
-ipcMain.handle('scan-all-projects', async () => {
+ipcMain.handle('scan-all-projects', async (_event, paths = null) => {
   try {
     const homeDir = process.env.HOME || process.env.USERPROFILE;
-    const projects = await scanNodeProjects(homeDir);
+
+    const targets = Array.isArray(paths) && paths.length
+      ? paths.filter(p => typeof p === 'string' && p.trim().length > 0)
+      : [homeDir];
+
+    const allProjects = [];
+    for (const p of targets) {
+      try {
+        const normalized = path.normalize(p);
+        if (!fs.existsSync(normalized)) continue;
+        const stat = fs.statSync(normalized);
+        if (!stat.isDirectory()) continue;
+        const projects = await scanNodeProjects(normalized);
+        if (Array.isArray(projects)) allProjects.push(...projects);
+      } catch (e) {
+        console.warn(`scan-all-projects: failed scanning ${p}:`, e?.message || e);
+      }
+    }
+
+    // De-dupe by path (renderer expects unique project paths)
+    const byPath = new Map();
+    for (const proj of allProjects) {
+      const projPath = proj?.path;
+      if (typeof projPath !== 'string') continue;
+      byPath.set(projPath, proj);
+    }
+
+    const projects = Array.from(byPath.values());
     projects.sort((a, b) => b.timestamp - a.timestamp);
     return projects;
   } catch (err) {
@@ -1141,6 +1185,103 @@ ipcMain.handle('scan-custom-folder', async () => {
   } catch (err) {
     console.error('Error scanning custom folder:', err);
     throw err;
+  }
+});
+
+// -------------------------------------------------
+// Project Creation IPC Handlers
+// -------------------------------------------------
+
+// Get available project templates
+ipcMain.handle('get-project-templates', async () => {
+  try {
+    return getTemplates();
+  } catch (err) {
+    console.error('Error getting templates:', err);
+    return {};
+  }
+});
+
+// Get template library (pre-configured templates)
+ipcMain.handle('get-template-library', async () => {
+  try {
+    return getTemplateLibrary();
+  } catch (err) {
+    console.error('Error getting template library:', err);
+    return {};
+  }
+});
+
+// Validate project name
+ipcMain.handle('validate-project-name', async (_event, name) => {
+  try {
+    return validateProjectName(name);
+  } catch (err) {
+    console.error('Error validating project name:', err);
+    return { valid: false, errors: [err.message], sanitized: null };
+  }
+});
+
+// Select directory for new project
+ipcMain.handle('select-project-directory', async () => {
+  try {
+    const result = await dialog.showOpenDialog(mainWindow, {
+      properties: ['openDirectory', 'createDirectory'],
+      title: 'Select Location for New Project',
+      buttonLabel: 'Select Folder',
+    });
+
+    if (result.canceled || !result.filePaths || result.filePaths.length === 0) {
+      return null;
+    }
+
+    return result.filePaths[0];
+  } catch (err) {
+    console.error('Error selecting directory:', err);
+    throw err;
+  }
+});
+
+// Create new project
+ipcMain.handle('create-project', async (_event, options) => {
+  try {
+    console.log('Creating project with options:', options);
+    
+    const result = await createProject({
+      ...options,
+      onProgress: (progress) => {
+        // Send progress updates to renderer
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('project-creation-progress', progress);
+        }
+      },
+    });
+    
+    if (result.success) {
+      console.log(`✅ Project created: ${result.projectPath}`);
+      
+      // Immediately scan the new project to add it to the dashboard
+      try {
+        const projects = await scanNodeProjects(result.projectPath);
+        if (projects && projects.length > 0) {
+          return {
+            ...result,
+            project: projects[0], // Return the scanned project data
+          };
+        }
+      } catch (scanErr) {
+        console.warn('Could not scan new project:', scanErr);
+      }
+    }
+    
+    return result;
+  } catch (err) {
+    console.error('Error creating project:', err);
+    return {
+      success: false,
+      error: err.message || 'Unknown error occurred',
+      phase: 'unknown',
+    };
   }
 });
 
@@ -1658,9 +1799,14 @@ ipcMain.handle('send-ssh-input', async (_event, sessionId, data) => {
 // 2) Check process status by pid
 ipcMain.handle('check-process-status', async (_event, pid) => {
   try {
-    process.kill(pid, 0);
+    const pidNum = typeof pid === 'number' ? pid : parseInt(String(pid), 10);
+    if (!Number.isFinite(pidNum)) return false;
+    process.kill(pidNum, 0);
     return true;
-  } catch {
+  } catch (err) {
+    // EPERM means “process exists but we don't have permission”.
+    // For Tafils' own child processes this should be rare, but treating EPERM as dead causes false "stopped" states.
+    if (err && err.code === 'EPERM') return true;
     return false;
   }
 });
@@ -4317,31 +4463,40 @@ ipcMain.handle('browse-for-file', async (_event, projectPath) => {
 
 // Cleanup on quit
 app.on('before-quit', () => {
-  runningProcesses.forEach((childProcess, projectPath) => {
+  runningProcesses.forEach((info, projectPath) => {
     try {
-      if (childProcess && !childProcess.killed) {
-        console.log(`Cleaning up process for ${projectPath}`);
-        
-        // Try to kill the entire process tree
-        psTree(childProcess.pid, (err, children) => {
-          if (!err) {
-            children.forEach((child) => {
-              try {
-                process.kill(parseInt(child.PID), 'SIGTERM');
-              } catch (e) {
-                console.warn(`Failed to kill child process ${child.PID}:`, e);
-              }
-            });
-          }
-          
-          // Kill the main process
-          try {
-            process.kill(childProcess.pid, 'SIGTERM');
-          } catch (e) {
-            console.warn(`Failed to kill main process ${childProcess.pid}:`, e);
-          }
+      const child = info?.process || info;
+      const pid = child?.pid;
+      if (!pid) return;
+
+      console.log(`Cleaning up process for ${projectPath} (PID ${pid})`);
+
+      if (isWindows) {
+        exec(`taskkill /F /T /PID ${pid}`, (error) => {
+          if (error) console.warn(`Windows taskkill error (quit cleanup): ${error.message}`);
         });
+        return;
       }
+
+      // Try to kill the entire process tree
+      psTree(pid, (err, children) => {
+        if (!err && Array.isArray(children)) {
+          children.forEach((c) => {
+            try {
+              process.kill(parseInt(c.PID, 10), 'SIGTERM');
+            } catch (e) {
+              console.warn(`Failed to kill child process ${c.PID}:`, e);
+            }
+          });
+        }
+
+        // Kill the main process
+        try {
+          process.kill(parseInt(pid, 10), 'SIGTERM');
+        } catch (e) {
+          console.warn(`Failed to kill main process ${pid}:`, e);
+        }
+      });
     } catch (err) {
       console.error('Failed to kill process on quit:', err);
     }

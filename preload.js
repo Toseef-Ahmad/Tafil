@@ -3,7 +3,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('electronAPI', {
   // ~~~~~~~~~~~~~~ Project scanning ~~~~~~~~~~~~~~
-  scanAllProjects: () => ipcRenderer.invoke('scan-all-projects'),
+  scanAllProjects: (paths = null) => ipcRenderer.invoke('scan-all-projects', paths),
   scanCustomFolder: () => ipcRenderer.invoke('scan-custom-folder'),
   getInstalledIDEs: () => ipcRenderer.invoke('get-installed-ides'),
   getInstalledTerminals: () => ipcRenderer.invoke('get-installed-terminals'),
@@ -108,6 +108,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
   exportModule: (projectPath, moduleId) => ipcRenderer.invoke('export-module', projectPath, moduleId),
   openFileInIDE: (projectPath, filePath, ideCommand) => ipcRenderer.invoke('open-file-in-ide', projectPath, filePath, ideCommand),
   browseForFile: (projectPath) => ipcRenderer.invoke('browse-for-file', projectPath),
+
+  // ~~~~~~~~~~~~~~ Project Creation ~~~~~~~~~~~~~~
+  createProject: (options) => ipcRenderer.invoke('create-project', options),
+  getProjectTemplates: () => ipcRenderer.invoke('get-project-templates'),
+  getTemplateLibrary: () => ipcRenderer.invoke('get-template-library'),
+  validateProjectName: (name) => ipcRenderer.invoke('validate-project-name', name),
+  selectProjectDirectory: () => ipcRenderer.invoke('select-project-directory'),
+  onProjectCreationProgress: (callback) => ipcRenderer.on('project-creation-progress', callback),
+  removeProjectCreationListener: () => ipcRenderer.removeAllListeners('project-creation-progress'),
 
   // ~~~~~~~~~~~~~~ From main to renderer ~~~~~~~~~~~~~~
   onProjectStatus: (callback) => ipcRenderer.on('project-status', callback),

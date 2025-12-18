@@ -46,6 +46,10 @@
       "dist/output.css",
       "dist/canvas-bundle.js",
       "dist/goal-markdown-editor-bundle.js",
+      "node_modules/xterm/**/*",
+      "node_modules/xterm-addon-fit/**/*",
+      "node_modules/xterm-addon-web-links/**/*",
+      "node_modules/monaco-editor/**/*",
       "utils/**/*",
       "assets/**/*",
       "!**/*.map",
@@ -209,6 +213,7 @@
   },
   "dependencies": {
     "@excalidraw/excalidraw": "^0.18.0",
+    "d3-sankey": "^0.12.3",
     "fs-extra": "^11.3.2",
     "monaco-editor": "^0.55.1",
     "portfinder": "^1.0.32",

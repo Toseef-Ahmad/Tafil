@@ -148,6 +148,35 @@ const skipNoteBtn = document.getElementById("skipNoteBtn");
 const emptyStateScanHome = document.getElementById("emptyStateScanHome");
 const emptyStateScanFolder = document.getElementById("emptyStateScanFolder");
 
+// Create Project Modal
+const createProjectModal = document.getElementById("createProjectModal");
+const closeCreateProjectBtn = document.getElementById("closeCreateProjectBtn");
+const wizardBackBtn = document.getElementById("wizardBackBtn");
+const wizardNextBtn = document.getElementById("wizardNextBtn");
+const wizardCancelBtn = document.getElementById("wizardCancelBtn");
+const projectNameInput = document.getElementById("projectNameInput");
+const projectLocationInput = document.getElementById("projectLocationInput");
+const browseLocationBtn = document.getElementById("browseLocationBtn");
+const useGitClone = document.getElementById("useGitClone");
+const gitRepoUrl = document.getElementById("gitRepoUrl");
+const gitCloneSection = document.getElementById("gitCloneSection");
+const addEnvVars = document.getElementById("addEnvVars");
+const envVarsInput = document.getElementById("envVarsInput");
+const envVarsSection = document.getElementById("envVarsSection");
+const stackGrid = document.getElementById("stackGrid");
+const templateGrid = document.getElementById("templateGrid");
+const creationLog = document.getElementById("creationLog");
+const creationTitle = document.getElementById("creationTitle");
+const creationMessage = document.getElementById("creationMessage");
+const creationSuccess = document.getElementById("creationSuccess");
+const creationError = document.getElementById("creationError");
+const creationSpinner = document.getElementById("creationSpinner");
+const successProjectPath = document.getElementById("successProjectPath");
+const errorMessage = document.getElementById("errorMessage");
+const openInEditorBtn = document.getElementById("openInEditorBtn");
+const startDevServerBtn = document.getElementById("startDevServerBtn");
+const retryCreationBtn = document.getElementById("retryCreationBtn");
+
 // =====================================================
 // State
 // =====================================================
@@ -182,6 +211,24 @@ let activeCollection = 'all';
 
 // Module state
 let activeModule = 'projects'; // 'projects' | 'playground' | 'ssh'
+
+// Project Creation Wizard State
+let wizardStep = 1;
+let selectedStack = null;
+let selectedTemplate = null;
+let projectTemplates = {};
+let templateLibrary = {};
+let projectWizardData = {
+  projectName: '',
+  parentDirectory: '',
+  stack: null,
+  template: null,
+  packageManager: 'npm',
+  useTypeScript: false,
+  gitRepoUrl: null,
+  envVariables: {},
+};
+let createdProjectData = null;
 
 // Playground state
 let monacoEditor = null;
@@ -443,6 +490,15 @@ document.addEventListener("DOMContentLoaded", async () => {
       renderCustomProjects();
     });
   }
+  
+  // Create Project Button
+  const createProjectBtn = document.getElementById("createProjectBtn");
+  if (createProjectBtn) {
+    createProjectBtn.addEventListener("click", () => {
+      console.log('Create Project clicked');
+      showCreateProjectModal();
+    });
+  }
   if (addCollectionBtn) {
     addCollectionBtn.addEventListener("click", () => {
       console.log('Add Collection clicked');
@@ -531,6 +587,14 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (emptyStateScanHome) emptyStateScanHome.addEventListener("click", renderProjects);
   if (emptyStateScanFolder) emptyStateScanFolder.addEventListener("click", renderCustomProjects);
   
+  const emptyStateCreateProject = document.getElementById("emptyStateCreateProject");
+  if (emptyStateCreateProject) {
+    emptyStateCreateProject.addEventListener("click", showCreateProjectModal);
+  }
+  
+  // Project Creation Wizard - Initialize
+  initProjectCreationWizard();
+  
   // Command Palette
   if (commandInput) {
     commandInput.addEventListener("input", handleCommandInput);
@@ -541,10 +605,12 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
   
   // Click outside modals to close
-  [dependencyModal, confirmDialog, logsModal, settingsModal, newCollectionModal, projectInsightsModal, fixItModal].forEach(modal => {
+  [dependencyModal, confirmDialog, logsModal, settingsModal, newCollectionModal, projectInsightsModal, fixItModal, createProjectModal].forEach(modal => {
     if (modal) {
       modal.addEventListener("click", (e) => {
         if (e.target === modal) {
+          // Don't close create project modal during creation
+          if (modal === createProjectModal && wizardStep === 3) return;
           modal.classList.add("hidden");
         }
       });
@@ -562,6 +628,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     console.log("Project Status:", statusData);
 
     if (status === "running") {
+      // If this was previously detected as "external", promote it back to Tafil-managed.
+      externalProjects.delete(projectPath);
       runningProjects.set(projectPath, { port, status: "running", pid, framework: framework || 'Unknown' });
       projectProcesses.set(projectPath, pid);
       activeConnections.set(port, projectPath);
@@ -723,6 +791,19 @@ async function stopExternalProcess(projectPath) {
 // Keyboard Shortcuts
 // =====================================================
 function handleKeyboardShortcuts(e) {
+  // Don't hijack shortcuts while the user is typing (prevents data loss)
+  const target = e.target;
+  const tag = (target?.tagName || '').toLowerCase();
+  const isTypingContext =
+    tag === 'input' ||
+    tag === 'textarea' ||
+    tag === 'select' ||
+    target?.isContentEditable;
+
+  if (isTypingContext) {
+    return;
+  }
+
   // Command Palette: Cmd/Ctrl + K
   if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
     e.preventDefault();
@@ -732,7 +813,7 @@ function handleKeyboardShortcuts(e) {
   // Refresh: Cmd/Ctrl + R
   if ((e.ctrlKey || e.metaKey) && e.key === 'r') {
     e.preventDefault();
-    renderProjects();
+    refreshCurrentView();
   }
   
   // Escape: Close modals
@@ -786,6 +867,7 @@ function handleCommandKeydown(e) {
 function renderCommandResults(query) {
   // Build command list
   const commands = [
+    { type: 'action', id: 'create-project', title: 'Create New Project', desc: 'Bootstrap a new React, Next.js, Express, or NestJS project', icon: '🚀', action: showCreateProjectModal },
     { type: 'action', id: 'scan-home', title: 'Scan Home Directory', desc: 'Find Node.js projects in home folder', icon: Icons.home, action: renderProjects },
     { type: 'action', id: 'scan-folder', title: 'Scan Custom Folder', desc: 'Choose a folder to scan', icon: Icons.folder, action: renderCustomProjects },
     { type: 'action', id: 'refresh', title: 'Refresh Projects', desc: 'Reload project list', icon: Icons.check, action: () => refreshCurrentView() },
@@ -1052,6 +1134,7 @@ function renderCollections() {
     return `
       <div class="collection-item ${activeCollection === col.id ? 'active' : ''}" 
            data-collection="${col.id}"
+           data-tooltip="${escapeHtml(col.name)}"
            draggable="false"
            ondragover="handleCollectionDragOver(event)"
            ondragleave="handleCollectionDragLeave(event)"
@@ -1271,10 +1354,32 @@ function switchView(view) {
     renderProjectCards(currentProjects);
   } else if (view === 'running') {
     viewTitleEl.textContent = 'Running Projects';
-    // Include both Tafil-managed AND external running projects
-    const runningList = currentProjects.filter(p => 
-      runningProjects.has(p.path) || externalProjects.has(p.path)
-    );
+    // Include both Tafil-managed AND external running projects.
+    // IMPORTANT: a project can be running even if it isn't in `currentProjects` (scan scope changed, project moved, etc.)
+    const runningPaths = Array.from(new Set([
+      ...runningProjects.keys(),
+      ...externalProjects.keys(),
+    ]));
+
+    const runningList = [];
+
+    // First include scanned projects that are running (preserves metadata)
+    currentProjects.forEach(p => {
+      if (runningProjects.has(p.path) || externalProjects.has(p.path)) runningList.push(p);
+    });
+
+    // Then include placeholders for any running paths not in scan results
+    runningPaths.forEach(p => {
+      if (!runningList.some(x => x.path === p)) {
+        runningList.push({
+          name: path.basename(p),
+          path: p,
+          timestamp: 0,
+          message: 'Running (not in current scan results)'
+        });
+      }
+    });
+
     viewSubtitleEl.textContent = `${runningList.length} running`;
     renderProjectCards(runningList);
   } else if (view === 'insights') {
@@ -1304,9 +1409,26 @@ function refreshCurrentView() {
   
   // Otherwise, respect the current view/collection state
   if (currentView === 'running') {
-    const runningList = currentProjects.filter(p => 
-      runningProjects.has(p.path) || externalProjects.has(p.path)
-    );
+    const runningPaths = Array.from(new Set([
+      ...runningProjects.keys(),
+      ...externalProjects.keys(),
+    ]));
+
+    const runningList = [];
+    currentProjects.forEach(p => {
+      if (runningProjects.has(p.path) || externalProjects.has(p.path)) runningList.push(p);
+    });
+    runningPaths.forEach(p => {
+      if (!runningList.some(x => x.path === p)) {
+        runningList.push({
+          name: path.basename(p),
+          path: p,
+          timestamp: 0,
+          message: 'Running (not in current scan results)'
+        });
+      }
+    });
+
     viewSubtitleEl.textContent = `${runningList.length} running`;
     renderProjectCards(runningList);
   } else if (currentView === 'collection' && activeCollection) {
@@ -2343,7 +2465,7 @@ function setupThemeSelectorListeners() {
 async function silentRefreshProjects() {
   try {
     console.log('🔄 Silent background refresh...');
-    const projects = await window.electronAPI.scanAllProjects();
+    const projects = await window.electronAPI.scanAllProjects(scanPaths);
     if (!projects || projects.length === 0) return;
     
     const oldCount = currentProjects.length;
@@ -2373,7 +2495,7 @@ async function autoScanProjects() {
     console.log('🔍 Auto-scanning for projects...');
     viewSubtitleEl.textContent = 'Scanning for projects...';
     
-    const projects = await window.electronAPI.scanAllProjects();
+    const projects = await window.electronAPI.scanAllProjects(scanPaths);
     
     if (!projects || projects.length === 0) {
       updateEmptyState();
@@ -2403,7 +2525,7 @@ async function fullRefreshProjects() {
     console.log('🔄 Full refresh...');
     viewSubtitleEl.textContent = 'Refreshing...';
     
-    const projects = await window.electronAPI.scanAllProjects();
+    const projects = await window.electronAPI.scanAllProjects(scanPaths);
     
     if (!projects || projects.length === 0) {
       updateEmptyState();
@@ -2429,7 +2551,7 @@ async function fullRefreshProjects() {
 
 async function softRefreshProjects() {
   try {
-    const projects = await window.electronAPI.scanAllProjects();
+    const projects = await window.electronAPI.scanAllProjects(scanPaths);
     if (!projects) return;
     currentProjects = mergeProjectLists(currentProjects, projects);
     saveProjects();
@@ -2467,7 +2589,7 @@ async function renderProjects() {
   
   try {
     console.log('Calling scanAllProjects...');
-    const projects = await window.electronAPI.scanAllProjects();
+    const projects = await window.electronAPI.scanAllProjects(scanPaths);
     console.log('scanAllProjects returned:', projects?.length, 'projects');
     
     if (!projects || projects.length === 0) {
@@ -3104,6 +3226,34 @@ async function verifyProcessStatus(projectPath) {
   try {
     const isRunning = await window.electronAPI.checkProcessStatus(runningInfo.pid);
     if (!isRunning) {
+      // Fallback: PID might exit while the actual server keeps running (detached scripts, pm2, etc.).
+      // If we still have a port and something is listening, treat it as an external process so the UI stays honest.
+      const port = runningInfo.port;
+      if (port) {
+        try {
+          const portCheck = await window.electronAPI.checkPortProcess(port);
+          const proc = portCheck?.success ? portCheck.process : null;
+          if (proc && proc.pid) {
+            runningProjects.delete(projectPath);
+            projectProcesses.delete(projectPath);
+            externalProjects.set(projectPath, {
+              port,
+              pid: proc.pid,
+              command: proc.command,
+              status: 'external',
+              external: true
+            });
+            setCardStatus(projectPath, `Running externally on :${port}`, 'warning');
+            updateSingleCard(projectPath);
+            updateRunningCount();
+            setTimeout(() => clearCardStatus(projectPath), 4000);
+            return;
+          }
+        } catch (e) {
+          // ignore port fallback errors and proceed to mark stopped
+        }
+      }
+
       runningProjects.delete(projectPath);
       projectProcesses.delete(projectPath);
       updateSingleCard(projectPath);
@@ -7313,6 +7463,651 @@ function formatRelativeTime(dateStr) {
   
   return date.toLocaleDateString();
 }
+
+// =====================================================
+// Project Creation Wizard
+// =====================================================
+
+function initProjectCreationWizard() {
+  // Load templates
+  loadProjectTemplates();
+  
+  // Close button
+  if (closeCreateProjectBtn) {
+    closeCreateProjectBtn.addEventListener('click', hideCreateProjectModal);
+  }
+  
+  // Cancel button
+  if (wizardCancelBtn) {
+    wizardCancelBtn.addEventListener('click', hideCreateProjectModal);
+  }
+  
+  // Back button
+  if (wizardBackBtn) {
+    wizardBackBtn.addEventListener('click', () => {
+      if (wizardStep > 1 && wizardStep < 3) {
+        setWizardStep(wizardStep - 1);
+      }
+    });
+  }
+  
+  // Next button
+  if (wizardNextBtn) {
+    wizardNextBtn.addEventListener('click', handleWizardNext);
+  }
+  
+  // Browse location button
+  if (browseLocationBtn) {
+    browseLocationBtn.addEventListener('click', async () => {
+      try {
+        const dir = await window.electronAPI.selectProjectDirectory();
+        if (dir && projectLocationInput) {
+          projectLocationInput.value = dir;
+          projectWizardData.parentDirectory = dir;
+        }
+      } catch (err) {
+        console.error('Error selecting directory:', err);
+        showNotification('Failed to select directory', 'error');
+      }
+    });
+  }
+  
+  // Project location input click
+  if (projectLocationInput) {
+    projectLocationInput.addEventListener('click', async () => {
+      try {
+        const dir = await window.electronAPI.selectProjectDirectory();
+        if (dir) {
+          projectLocationInput.value = dir;
+          projectWizardData.parentDirectory = dir;
+        }
+      } catch (err) {
+        console.error('Error selecting directory:', err);
+      }
+    });
+  }
+  
+  // Project name input validation
+  if (projectNameInput) {
+    let validateTimeout = null;
+    projectNameInput.addEventListener('input', (e) => {
+      clearTimeout(validateTimeout);
+      validateTimeout = setTimeout(async () => {
+        const name = e.target.value.trim();
+        if (name) {
+          try {
+            const result = await window.electronAPI.validateProjectName(name);
+            const errorEl = document.getElementById('projectNameError');
+            const sanitizedEl = document.getElementById('projectNameSanitized');
+            
+            if (result.valid) {
+              if (errorEl) errorEl.style.display = 'none';
+              if (sanitizedEl && result.sanitized !== name) {
+                sanitizedEl.textContent = `Will be created as: ${result.sanitized}`;
+                sanitizedEl.style.display = 'block';
+              } else if (sanitizedEl) {
+                sanitizedEl.style.display = 'none';
+              }
+              projectWizardData.projectName = result.sanitized;
+            } else {
+              if (errorEl) {
+                errorEl.textContent = result.errors.join(', ');
+                errorEl.style.display = 'block';
+              }
+              if (sanitizedEl) sanitizedEl.style.display = 'none';
+            }
+          } catch (err) {
+            console.error('Validation error:', err);
+          }
+        }
+      }, 300);
+    });
+  }
+  
+  // Git clone checkbox
+  if (useGitClone) {
+    useGitClone.addEventListener('change', (e) => {
+      if (gitCloneSection) {
+        gitCloneSection.style.display = e.target.checked ? 'block' : 'none';
+      }
+      if (e.target.checked) {
+        // Clear stack selection when using git
+        selectedStack = null;
+        selectedTemplate = null;
+        document.querySelectorAll('.stack-card').forEach(card => card.classList.remove('selected'));
+        document.querySelectorAll('.template-card').forEach(card => card.classList.remove('selected'));
+      }
+    });
+  }
+  
+  // Env vars checkbox
+  if (addEnvVars) {
+    addEnvVars.addEventListener('change', (e) => {
+      if (envVarsSection) {
+        envVarsSection.style.display = e.target.checked ? 'block' : 'none';
+      }
+    });
+  }
+  
+  // Package manager buttons
+  document.querySelectorAll('.pkg-manager-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.pkg-manager-btn').forEach(b => {
+        b.classList.remove('active');
+        b.style.background = 'rgba(255,255,255,0.05)';
+        b.style.borderColor = 'rgba(255,255,255,0.1)';
+        b.style.color = '#71717a';
+      });
+      btn.classList.add('active');
+      btn.style.background = 'rgba(139, 92, 246, 0.15)';
+      btn.style.borderColor = 'rgba(139, 92, 246, 0.3)';
+      btn.style.color = '#a78bfa';
+      projectWizardData.packageManager = btn.dataset.pkg;
+    });
+  });
+  
+  // TypeScript buttons
+  document.querySelectorAll('.typescript-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.typescript-btn').forEach(b => {
+        b.classList.remove('active');
+        b.style.background = 'rgba(255,255,255,0.05)';
+        b.style.borderColor = 'rgba(255,255,255,0.1)';
+        b.style.color = '#71717a';
+      });
+      btn.classList.add('active');
+      btn.style.background = 'rgba(139, 92, 246, 0.15)';
+      btn.style.borderColor = 'rgba(139, 92, 246, 0.3)';
+      btn.style.color = '#a78bfa';
+      projectWizardData.useTypeScript = btn.dataset.ts === 'true';
+    });
+  });
+  
+  // Success actions
+  if (openInEditorBtn) {
+    openInEditorBtn.addEventListener('click', () => {
+      if (createdProjectData?.projectPath) {
+        window.electronAPI.openInEditor(createdProjectData.projectPath);
+        hideCreateProjectModal();
+      }
+    });
+  }
+  
+  if (startDevServerBtn) {
+    startDevServerBtn.addEventListener('click', async () => {
+      if (createdProjectData?.projectPath) {
+        hideCreateProjectModal();
+        // Start the project
+        await window.electronAPI.playProject(createdProjectData.projectPath);
+      }
+    });
+  }
+  
+  if (retryCreationBtn) {
+    retryCreationBtn.addEventListener('click', () => {
+      setWizardStep(2);
+    });
+  }
+  
+  // Listen for creation progress
+  window.electronAPI.onProjectCreationProgress((_event, progress) => {
+    if (creationLog && progress.message) {
+      const logLine = document.createElement('div');
+      logLine.style.marginBottom = '4px';
+      
+      if (progress.phase === 'complete') {
+        logLine.style.color = '#10b981';
+        logLine.textContent = `✓ ${progress.message}`;
+      } else if (progress.type === 'stderr') {
+        logLine.style.color = '#f59e0b';
+        logLine.textContent = progress.data;
+      } else {
+        logLine.textContent = `→ ${progress.message || progress.data || ''}`;
+      }
+      
+      creationLog.appendChild(logLine);
+      creationLog.scrollTop = creationLog.scrollHeight;
+    }
+    
+    if (creationMessage && progress.message) {
+      creationMessage.textContent = progress.message;
+    }
+  });
+}
+
+async function loadProjectTemplates() {
+  try {
+    projectTemplates = await window.electronAPI.getProjectTemplates();
+    templateLibrary = await window.electronAPI.getTemplateLibrary();
+    renderStackGrid();
+    renderTemplateGrid();
+  } catch (err) {
+    console.error('Error loading templates:', err);
+  }
+}
+
+function renderStackGrid() {
+  if (!stackGrid) return;
+  
+  const stacks = [
+    { id: 'react', icon: '⚛️', name: 'React.js', desc: 'UI library' },
+    { id: 'nextjs', icon: '▲', name: 'Next.js', desc: 'React framework' },
+    { id: 'vite', icon: '⚡', name: 'Vite + React', desc: 'Fast bundler' },
+    { id: 'vue', icon: '💚', name: 'Vue.js', desc: 'Progressive framework' },
+    { id: 'express', icon: '🚂', name: 'Express.js', desc: 'Node.js server' },
+    { id: 'nestjs', icon: '🐱', name: 'NestJS', desc: 'Enterprise Node.js' },
+  ];
+  
+  stackGrid.innerHTML = stacks.map(stack => `
+    <div class="stack-card" data-stack="${stack.id}">
+      <div class="stack-icon">${stack.icon}</div>
+      <div class="stack-name">${stack.name}</div>
+      <div class="stack-desc">${stack.desc}</div>
+    </div>
+  `).join('');
+  
+  // Add click handlers
+  stackGrid.querySelectorAll('.stack-card').forEach(card => {
+    card.addEventListener('click', () => {
+      // Clear template selection
+      selectedTemplate = null;
+      document.querySelectorAll('.template-card').forEach(t => t.classList.remove('selected'));
+      
+      // Clear git clone
+      if (useGitClone) useGitClone.checked = false;
+      if (gitCloneSection) gitCloneSection.style.display = 'none';
+      
+      // Toggle selection
+      if (card.classList.contains('selected')) {
+        card.classList.remove('selected');
+        selectedStack = null;
+      } else {
+        document.querySelectorAll('.stack-card').forEach(c => c.classList.remove('selected'));
+        card.classList.add('selected');
+        selectedStack = card.dataset.stack;
+      }
+      projectWizardData.stack = selectedStack;
+      projectWizardData.template = null;
+    });
+  });
+}
+
+function renderTemplateGrid() {
+  if (!templateGrid) return;
+  
+  const templates = [
+    { id: 'react-tailwind', icon: '🎨', name: 'React + Tailwind', desc: 'React with Tailwind CSS' },
+    { id: 'nextjs-typescript', icon: '📘', name: 'Next.js + TypeScript', desc: 'Type-safe Next.js' },
+    { id: 'express-jwt', icon: '🔐', name: 'Express + JWT', desc: 'API with authentication' },
+    { id: 'nestjs-rest-api', icon: '📡', name: 'NestJS REST API', desc: 'REST with Swagger docs' },
+  ];
+  
+  templateGrid.innerHTML = templates.map(template => `
+    <div class="template-card" data-template="${template.id}">
+      <div class="template-icon">${template.icon}</div>
+      <div class="template-info">
+        <div class="template-name">${template.name}</div>
+        <div class="template-desc">${template.desc}</div>
+      </div>
+    </div>
+  `).join('');
+  
+  // Add click handlers
+  templateGrid.querySelectorAll('.template-card').forEach(card => {
+    card.addEventListener('click', () => {
+      // Clear stack selection
+      selectedStack = null;
+      document.querySelectorAll('.stack-card').forEach(s => s.classList.remove('selected'));
+      
+      // Clear git clone
+      if (useGitClone) useGitClone.checked = false;
+      if (gitCloneSection) gitCloneSection.style.display = 'none';
+      
+      // Toggle selection
+      if (card.classList.contains('selected')) {
+        card.classList.remove('selected');
+        selectedTemplate = null;
+      } else {
+        document.querySelectorAll('.template-card').forEach(c => c.classList.remove('selected'));
+        card.classList.add('selected');
+        selectedTemplate = card.dataset.template;
+        
+        // Set the base stack from template
+        const templateDef = templateLibrary[selectedTemplate];
+        if (templateDef?.base) {
+          selectedStack = templateDef.base;
+        }
+      }
+      projectWizardData.template = selectedTemplate;
+      projectWizardData.stack = selectedStack;
+    });
+  });
+}
+
+function showCreateProjectModal() {
+  // Reset wizard state
+  wizardStep = 1;
+  selectedStack = null;
+  selectedTemplate = null;
+  projectWizardData = {
+    projectName: '',
+    parentDirectory: '',
+    stack: null,
+    template: null,
+    packageManager: 'npm',
+    useTypeScript: false,
+    gitRepoUrl: null,
+    envVariables: {},
+  };
+  createdProjectData = null;
+  
+  // Reset UI
+  if (projectNameInput) projectNameInput.value = '';
+  if (projectLocationInput) projectLocationInput.value = '';
+  if (gitRepoUrl) gitRepoUrl.value = '';
+  if (useGitClone) useGitClone.checked = false;
+  if (gitCloneSection) gitCloneSection.style.display = 'none';
+  if (addEnvVars) addEnvVars.checked = false;
+  if (envVarsSection) envVarsSection.style.display = 'none';
+  if (envVarsInput) envVarsInput.value = '';
+  if (creationLog) creationLog.innerHTML = '';
+  
+  // Reset selections
+  document.querySelectorAll('.stack-card').forEach(c => c.classList.remove('selected'));
+  document.querySelectorAll('.template-card').forEach(c => c.classList.remove('selected'));
+  
+  // Reset package manager to npm
+  document.querySelectorAll('.pkg-manager-btn').forEach(btn => {
+    if (btn.dataset.pkg === 'npm') {
+      btn.classList.add('active');
+      btn.style.background = 'rgba(139, 92, 246, 0.15)';
+      btn.style.borderColor = 'rgba(139, 92, 246, 0.3)';
+      btn.style.color = '#a78bfa';
+    } else {
+      btn.classList.remove('active');
+      btn.style.background = 'rgba(255,255,255,0.05)';
+      btn.style.borderColor = 'rgba(255,255,255,0.1)';
+      btn.style.color = '#71717a';
+    }
+  });
+  
+  // Reset TypeScript buttons (default to JavaScript)
+  document.querySelectorAll('.typescript-btn').forEach(btn => {
+    if (btn.dataset.ts === 'false') {
+      btn.classList.add('active');
+      btn.style.background = 'rgba(139, 92, 246, 0.15)';
+      btn.style.borderColor = 'rgba(139, 92, 246, 0.3)';
+      btn.style.color = '#a78bfa';
+    } else {
+      btn.classList.remove('active');
+      btn.style.background = 'rgba(255,255,255,0.05)';
+      btn.style.borderColor = 'rgba(255,255,255,0.1)';
+      btn.style.color = '#71717a';
+    }
+  });
+  
+  setWizardStep(1);
+  
+  if (createProjectModal) {
+    createProjectModal.classList.remove('hidden');
+  }
+}
+
+function hideCreateProjectModal() {
+  if (wizardStep === 3 && !createdProjectData) {
+    // Don't close during creation
+    return;
+  }
+  
+  if (createProjectModal) {
+    createProjectModal.classList.add('hidden');
+  }
+  
+  // Clean up listener
+  window.electronAPI.removeProjectCreationListener();
+}
+
+function setWizardStep(step) {
+  wizardStep = step;
+  
+  // Update step indicators
+  document.querySelectorAll('#projectWizardSteps .wizard-step').forEach((stepEl, index) => {
+    const stepNum = index + 1;
+    const numEl = stepEl.querySelector('.step-number');
+    const textEl = stepEl.querySelector('span');
+    
+    if (stepNum < step) {
+      // Completed step
+      stepEl.style.opacity = '1';
+      if (numEl) {
+        numEl.style.background = 'linear-gradient(135deg, #10b981, #059669)';
+        numEl.style.color = 'white';
+        numEl.innerHTML = '✓';
+      }
+      if (textEl) textEl.style.color = '#10b981';
+    } else if (stepNum === step) {
+      // Current step
+      stepEl.style.opacity = '1';
+      if (numEl) {
+        numEl.style.background = 'linear-gradient(135deg, #8b5cf6, #7c3aed)';
+        numEl.style.color = 'white';
+        numEl.textContent = stepNum;
+      }
+      if (textEl) textEl.style.color = '#fafafa';
+    } else {
+      // Future step
+      stepEl.style.opacity = '0.5';
+      if (numEl) {
+        numEl.style.background = 'rgba(255,255,255,0.1)';
+        numEl.style.color = '#71717a';
+        numEl.textContent = stepNum;
+      }
+      if (textEl) textEl.style.color = '#71717a';
+    }
+  });
+  
+  // Show/hide step content
+  document.getElementById('wizardStep1').style.display = step === 1 ? 'block' : 'none';
+  document.getElementById('wizardStep2').style.display = step === 2 ? 'block' : 'none';
+  document.getElementById('wizardStep3').style.display = step === 3 ? 'block' : 'none';
+  
+  // Show/hide buttons
+  if (wizardBackBtn) {
+    wizardBackBtn.style.display = step > 1 && step < 3 ? 'block' : 'none';
+  }
+  if (wizardNextBtn) {
+    if (step === 1) {
+      wizardNextBtn.textContent = 'Next →';
+      wizardNextBtn.style.display = 'block';
+    } else if (step === 2) {
+      wizardNextBtn.textContent = 'Create Project';
+      wizardNextBtn.style.display = 'block';
+    } else {
+      wizardNextBtn.style.display = 'none';
+    }
+  }
+  if (wizardCancelBtn) {
+    wizardCancelBtn.style.display = step < 3 ? 'block' : 'none';
+  }
+  
+  // Reset step 3 states
+  if (step === 3) {
+    if (creationSpinner) creationSpinner.style.display = 'block';
+    if (creationTitle) creationTitle.style.display = 'block';
+    if (creationMessage) creationMessage.style.display = 'block';
+    if (creationLog) creationLog.style.display = 'block';
+    if (creationSuccess) creationSuccess.style.display = 'none';
+    if (creationError) creationError.style.display = 'none';
+  }
+}
+
+async function handleWizardNext() {
+  if (wizardStep === 1) {
+    // Validate step 1
+    const isGitClone = useGitClone?.checked;
+    
+    if (isGitClone) {
+      const repoUrl = gitRepoUrl?.value?.trim();
+      if (!repoUrl) {
+        showNotification('Please enter a Git repository URL', 'warning');
+        return;
+      }
+      projectWizardData.gitRepoUrl = repoUrl;
+      projectWizardData.stack = 'node'; // Will detect after clone
+    } else if (!selectedStack && !selectedTemplate) {
+      showNotification('Please select a technology stack or template', 'warning');
+      return;
+    }
+    
+    setWizardStep(2);
+    
+  } else if (wizardStep === 2) {
+    // Validate step 2
+    const projectName = projectNameInput?.value?.trim();
+    const projectLocation = projectLocationInput?.value?.trim();
+    
+    if (!projectName) {
+      showNotification('Please enter a project name', 'warning');
+      projectNameInput?.focus();
+      return;
+    }
+    
+    if (!projectLocation) {
+      showNotification('Please select a project location', 'warning');
+      return;
+    }
+    
+    // Parse env variables if provided
+    if (addEnvVars?.checked && envVarsInput?.value) {
+      const envVars = {};
+      envVarsInput.value.split('\n').forEach(line => {
+        const [key, ...valueParts] = line.split('=');
+        if (key && valueParts.length > 0) {
+          envVars[key.trim()] = valueParts.join('=').trim();
+        }
+      });
+      projectWizardData.envVariables = envVars;
+    }
+    
+    // Validate project name
+    try {
+      const validation = await window.electronAPI.validateProjectName(projectName);
+      if (!validation.valid) {
+        showNotification(validation.errors.join(', '), 'error');
+        return;
+      }
+      projectWizardData.projectName = validation.sanitized;
+    } catch (err) {
+      showNotification('Failed to validate project name', 'error');
+      return;
+    }
+    
+    projectWizardData.parentDirectory = projectLocation;
+    
+    // Start creation
+    setWizardStep(3);
+    await createNewProject();
+  }
+}
+
+async function createNewProject() {
+  if (creationLog) creationLog.innerHTML = '';
+  
+  const logMessage = (msg, type = 'info') => {
+    if (creationLog) {
+      const line = document.createElement('div');
+      line.style.marginBottom = '4px';
+      if (type === 'success') line.style.color = '#10b981';
+      else if (type === 'error') line.style.color = '#f43f5e';
+      else if (type === 'warning') line.style.color = '#f59e0b';
+      line.textContent = msg;
+      creationLog.appendChild(line);
+      creationLog.scrollTop = creationLog.scrollHeight;
+    }
+  };
+  
+  logMessage('→ Starting project creation...');
+  logMessage(`→ Stack: ${projectWizardData.stack || 'From Git'}`);
+  logMessage(`→ Location: ${projectWizardData.parentDirectory}`);
+  
+  try {
+    const result = await window.electronAPI.createProject({
+      projectName: projectWizardData.projectName,
+      parentDirectory: projectWizardData.parentDirectory,
+      stack: projectWizardData.stack,
+      template: projectWizardData.template,
+      packageManager: projectWizardData.packageManager,
+      useTypeScript: projectWizardData.useTypeScript,
+      gitRepoUrl: projectWizardData.gitRepoUrl,
+      envVariables: projectWizardData.envVariables,
+    });
+    
+    if (result.success) {
+      logMessage('✓ Project created successfully!', 'success');
+      createdProjectData = result;
+      
+      // Show success state
+      if (creationSpinner) creationSpinner.style.display = 'none';
+      if (creationTitle) creationTitle.style.display = 'none';
+      if (creationMessage) creationMessage.style.display = 'none';
+      if (creationLog) creationLog.style.display = 'none';
+      if (creationSuccess) {
+        creationSuccess.style.display = 'block';
+        if (successProjectPath) {
+          successProjectPath.textContent = result.projectPath;
+        }
+      }
+      
+      // Add to projects list
+      if (result.project) {
+        currentProjects.unshift(result.project);
+        filterAndRenderProjects();
+      } else {
+        // Refresh projects list to pick up the new project
+        await renderProjects();
+      }
+      
+      showNotification(`Project "${result.projectName}" created successfully!`, 'success');
+      
+    } else {
+      logMessage(`✗ ${result.error}`, 'error');
+      
+      // Show error state
+      if (creationSpinner) creationSpinner.style.display = 'none';
+      if (creationTitle) creationTitle.style.display = 'none';
+      if (creationMessage) creationMessage.style.display = 'none';
+      if (creationLog) creationLog.style.display = 'none';
+      if (creationError) {
+        creationError.style.display = 'block';
+        if (errorMessage) {
+          errorMessage.textContent = result.error;
+        }
+      }
+      
+      showNotification(`Failed: ${result.error}`, 'error');
+    }
+    
+  } catch (err) {
+    console.error('Project creation error:', err);
+    logMessage(`✗ ${err.message || 'Unknown error'}`, 'error');
+    
+    if (creationSpinner) creationSpinner.style.display = 'none';
+    if (creationTitle) creationTitle.style.display = 'none';
+    if (creationMessage) creationMessage.style.display = 'none';
+    if (creationLog) creationLog.style.display = 'none';
+    if (creationError) {
+      creationError.style.display = 'block';
+      if (errorMessage) {
+        errorMessage.textContent = err.message || 'An unexpected error occurred';
+      }
+    }
+    
+    showNotification('Project creation failed', 'error');
+  }
+}
+
+// Expose globally for command palette and buttons
+window.showCreateProjectModal = showCreateProjectModal;
 
 // =====================================================
 // Expose Blueprint Functions Globally for HTML onclick
