@@ -2,7 +2,7 @@
   "version": 1,
   "projectPath": "/Users/sodaclick/Desktop/projects/Own Projects/node-project-manager/electron-node-manager",
   "createdAt": "2025-12-16T04:40:55.447Z",
-  "updatedAt": "2025-12-16T05:49:35.403Z",
+  "updatedAt": "2025-12-17T17:51:02.134Z",
   "modules": [
     {
       "id": "1765860073364_d70b3fc2aaca",
@@ -10,7 +10,7 @@
       "description": "",
       "order": 0,
       "createdAt": "2025-12-16T04:41:13.365Z",
-      "updatedAt": "2025-12-16T05:49:35.403Z",
+      "updatedAt": "2025-12-17T17:51:02.134Z",
       "color": "#8b5cf6",
       "icon": "📦"
     },
@@ -20,7 +20,7 @@
       "description": "",
       "order": 1,
       "createdAt": "2025-12-16T04:51:46.448Z",
-      "updatedAt": "2025-12-16T04:51:46.448Z",
+      "updatedAt": "2025-12-17T16:56:03.137Z",
       "color": "#8b5cf6",
       "icon": "📦"
     },
@@ -30,7 +30,7 @@
       "description": "",
       "order": 2,
       "createdAt": "2025-12-16T05:03:04.495Z",
-      "updatedAt": "2025-12-16T05:49:29.421Z",
+      "updatedAt": "2025-12-17T16:56:04.886Z",
       "color": "#8b5cf6",
       "icon": "📦"
     },
@@ -40,7 +40,7 @@
       "description": "",
       "order": 3,
       "createdAt": "2025-12-16T05:35:27.853Z",
-      "updatedAt": "2025-12-16T05:35:46.760Z",
+      "updatedAt": "2025-12-17T16:59:43.141Z",
       "color": "#8b5cf6",
       "icon": "📦"
     }

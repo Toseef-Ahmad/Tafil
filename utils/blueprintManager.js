@@ -9,6 +9,7 @@ const crypto = require('crypto');
 const TAFIL_DIR = '.tafil';
 const BLUEPRINTS_FILE = 'blueprints.json';
 const MODULES_DIR = 'modules';
+const MODULE_EDITOR_FILE = 'editor.js';
 const VERSION = 1;
 
 // ========================================
@@ -69,11 +70,13 @@ Blueprint structure:
 
 Module folder structure (.tafil/modules/{moduleId}/):
 - goal.md              - Markdown content for goals/description
+- editor.js            - Code scratchpad per module (Blueprint Editor tab)
 - tasks.json           - Kanban tasks data
 - canvas.json          - Excalidraw canvas data
 - resources.json       - Links and file references
 - history/             - Versioned history of changes
   - {timestamp}_goal.md
+  - {timestamp}_editor.js
   - {timestamp}_tasks.json
   - {timestamp}_canvas.json
 */
@@ -294,6 +297,41 @@ async function saveModuleGoal(projectPath, moduleId, content, saveHistory = true
   }
   
   await fs.writeFile(goalPath, content);
+  await updateModule(projectPath, moduleId, {});
+  return true;
+}
+
+async function getModuleEditor(projectPath, moduleId) {
+  const modulePath = getModulePath(projectPath, moduleId);
+  const editorPath = path.join(modulePath, MODULE_EDITOR_FILE);
+  
+  try {
+    if (await fs.pathExists(editorPath)) {
+      return await fs.readFile(editorPath, 'utf-8');
+    }
+  } catch (err) {
+    console.error('Error reading editor.js:', err);
+  }
+  
+  // Default starter content
+  return `// Module Editor Scratchpad\n// Saved in .tafil/modules/${moduleId}/editor.js\n\nconsole.log('Hello from Blueprint Editor');\n`;
+}
+
+async function saveModuleEditor(projectPath, moduleId, content, saveHistory = true) {
+  const modulePath = getModulePath(projectPath, moduleId);
+  const editorPath = path.join(modulePath, MODULE_EDITOR_FILE);
+  
+  await fs.ensureDir(modulePath);
+  await fs.ensureDir(path.join(modulePath, 'history'));
+  
+  // Save to history before updating
+  if (saveHistory && await fs.pathExists(editorPath)) {
+    const historyPath = path.join(modulePath, 'history', `${Date.now()}_editor.js`);
+    const oldContent = await fs.readFile(editorPath, 'utf-8');
+    await fs.writeFile(historyPath, oldContent);
+  }
+  
+  await fs.writeFile(editorPath, content || '');
   await updateModule(projectPath, moduleId, {});
   return true;
 }
@@ -689,6 +727,10 @@ async function restoreFromHistory(projectPath, moduleId, filename) {
     const content = await fs.readFile(historyPath, 'utf-8');
     await saveModuleGoal(projectPath, moduleId, content, true);
     return { type: 'goal', content };
+  } else if (filename.includes('_editor.')) {
+    const content = await fs.readFile(historyPath, 'utf-8');
+    await saveModuleEditor(projectPath, moduleId, content, true);
+    return { type: 'editor', content };
   } else if (filename.includes('_tasks.')) {
     const data = await fs.readJson(historyPath);
     await saveModuleTasks(projectPath, moduleId, data, true);
@@ -717,6 +759,7 @@ async function exportModule(projectPath, moduleId) {
   return {
     module,
     goal: await getModuleGoal(projectPath, moduleId),
+    editor: await getModuleEditor(projectPath, moduleId),
     tasks: await getModuleTasks(projectPath, moduleId),
     canvas: await getModuleCanvas(projectPath, moduleId),
     resources: await getModuleResources(projectPath, moduleId),
@@ -747,6 +790,10 @@ module.exports = {
   // Goal/Description
   getModuleGoal,
   saveModuleGoal,
+  
+  // Editor (Code Scratchpad)
+  getModuleEditor,
+  saveModuleEditor,
   
   // Tasks/Kanban
   getModuleTasks,

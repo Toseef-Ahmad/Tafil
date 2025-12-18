@@ -44,6 +44,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   disconnectSSH: (sessionId) => ipcRenderer.invoke('disconnect-ssh', sessionId),
   sendSSHInput: (sessionId, data) => ipcRenderer.invoke('send-ssh-input', sessionId, data),
   onSSHData: (callback) => ipcRenderer.on('ssh-data', callback),
+  onSSHTunnelEstablished: (callback) => ipcRenderer.on('ssh-tunnel-established', callback),
 
   // ~~~~~~~~~~~~~~ Permission Management ~~~~~~~~~~~~~~
   fixProjectPermissions: (projectPath) => ipcRenderer.invoke('fix-project-permissions', projectPath),
@@ -75,6 +76,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Module Goal/Description
   getModuleGoal: (projectPath, moduleId) => ipcRenderer.invoke('get-module-goal', projectPath, moduleId),
   saveModuleGoal: (projectPath, moduleId, content) => ipcRenderer.invoke('save-module-goal', projectPath, moduleId, content),
+
+  // Module Editor (Code Scratchpad)
+  getModuleEditor: (projectPath, moduleId) => ipcRenderer.invoke('get-module-editor', projectPath, moduleId),
+  saveModuleEditor: (projectPath, moduleId, content) => ipcRenderer.invoke('save-module-editor', projectPath, moduleId, content),
   
   // Module Tasks (Kanban)
   getModuleTasks: (projectPath, moduleId) => ipcRenderer.invoke('get-module-tasks', projectPath, moduleId),

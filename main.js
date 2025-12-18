@@ -122,6 +122,7 @@ const portfinder = require('portfinder');
 const { detectExternalNodeProcesses, getProcessOnPort } = require('./utils/externalProcessDetector');
 const { scanNodeProjects } = require('./utils/gitScanner');
 const { Client } = require('ssh2');
+const net = require('net');
 
 const {
   installDependencies,
@@ -1411,6 +1412,14 @@ const sshSessions = new Map();
 ipcMain.handle('connect-ssh-host', async (_event, host) => {
   try {
     console.log('Connecting to SSH host:', host.hostname);
+    console.log('Host config:', {
+      hostname: host.hostname,
+      port: host.port,
+      username: host.username,
+      authMethod: host.authMethod,
+      hasKeyPath: !!host.keyPath,
+      hasTunnel: !!host.tunnel
+    });
     
     const sessionId = `ssh-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     const conn = new Client();
@@ -1426,7 +1435,12 @@ ipcMain.handle('connect-ssh-host', async (_event, host) => {
     // Add authentication
     if (host.authMethod === 'key' && host.keyPath) {
       try {
-        const keyData = fs.readFileSync(host.keyPath, 'utf8');
+        // Handle key paths with spaces - they might be quoted in the original command
+        const keyPath = host.keyPath.trim().replace(/^["']|["']$/g, '');
+        if (!fs.existsSync(keyPath)) {
+          return { success: false, error: `SSH key file not found: ${keyPath}` };
+        }
+        const keyData = fs.readFileSync(keyPath, 'utf8');
         config.privateKey = keyData;
         // Try to detect if it's a passphrase-protected key
         if (keyData.includes('ENCRYPTED')) {
@@ -1434,7 +1448,8 @@ ipcMain.handle('connect-ssh-host', async (_event, host) => {
           console.warn('Encrypted key detected - passphrase support coming soon');
         }
       } catch (keyErr) {
-        return { success: false, error: `Failed to read key file: ${keyErr.message}` };
+        const errorMsg = keyErr.message || keyErr.toString() || 'Failed to read key file';
+        return { success: false, error: `Failed to read key file: ${errorMsg}` };
       }
     } else if (host.authMethod === 'password' && host.password) {
       config.password = host.password;
@@ -1442,15 +1457,75 @@ ipcMain.handle('connect-ssh-host', async (_event, host) => {
       return { success: false, error: 'No authentication method provided' };
     }
     
-    return new Promise((resolve, reject) => {
-      conn.on('ready', () => {
+    try {
+      return await new Promise((resolve, reject) => {
+        let tunnelServer = null;
+        
+        conn.on('ready', () => {
         console.log('SSH connection established:', host.hostname);
+        
+        // Set up port forwarding if configured
+        if (host.tunnel && host.tunnel.localPort && host.tunnel.remoteHost && host.tunnel.remotePort) {
+          try {
+            // Create local server that forwards to remote host
+            tunnelServer = net.createServer((localConn) => {
+              conn.forwardOut(
+                localConn.remoteAddress,
+                localConn.remotePort,
+                host.tunnel.remoteHost,
+                host.tunnel.remotePort,
+                (err, remoteConn) => {
+                  if (err) {
+                    console.error('SSH tunnel forward error:', err);
+                    localConn.end();
+                    return;
+                  }
+                  
+                  localConn.pipe(remoteConn).pipe(localConn);
+                }
+              );
+            });
+
+            tunnelServer.listen(host.tunnel.localPort, '127.0.0.1', () => {
+              console.log(`SSH tunnel established: localhost:${host.tunnel.localPort} -> ${host.tunnel.remoteHost}:${host.tunnel.remotePort}`);
+              if (mainWindow && mainWindow.webContents) {
+                mainWindow.webContents.send('ssh-tunnel-established', {
+                  sessionId,
+                  localPort: host.tunnel.localPort,
+                  remoteHost: host.tunnel.remoteHost,
+                  remotePort: host.tunnel.remotePort
+                });
+              }
+            });
+
+            tunnelServer.on('error', (err) => {
+              console.error('SSH tunnel server error:', err);
+              if (err.code === 'EADDRINUSE') {
+                console.warn(`Port ${host.tunnel.localPort} is already in use`);
+                // Don't reject the connection if tunnel port is in use, just warn
+              } else {
+                console.error('Tunnel server error:', err.message);
+              }
+            });
+          } catch (tunnelErr) {
+            console.error('Error setting up SSH tunnel:', tunnelErr);
+            // Don't fail the connection if tunnel setup fails, just log it
+          }
+        }
         
         // Create shell session
         conn.shell((err, stream) => {
           if (err) {
+            if (tunnelServer) {
+              try {
+                tunnelServer.close();
+              } catch (closeErr) {
+                console.error('Error closing tunnel server:', closeErr);
+              }
+            }
             conn.end();
-            return reject({ success: false, error: `Failed to create shell: ${err.message}` });
+            const errorMsg = err.message || err.toString() || 'Failed to create shell';
+            return reject({ success: false, error: errorMsg });
           }
           
           // Store session
@@ -1459,7 +1534,8 @@ ipcMain.handle('connect-ssh-host', async (_event, host) => {
             hostId: host.id,
             host: host,
             connection: conn,
-            stream: stream
+            stream: stream,
+            tunnelServer: tunnelServer
           });
           
           // Handle stream data
@@ -1485,6 +1561,10 @@ ipcMain.handle('connect-ssh-host', async (_event, host) => {
           
           stream.on('close', () => {
             console.log('SSH stream closed:', sessionId);
+            const session = sshSessions.get(sessionId);
+            if (session && session.tunnelServer) {
+              session.tunnelServer.close();
+            }
             sshSessions.delete(sessionId);
             if (mainWindow && mainWindow.webContents) {
               mainWindow.webContents.send('ssh-data', {
@@ -1499,16 +1579,43 @@ ipcMain.handle('connect-ssh-host', async (_event, host) => {
         });
       });
       
-      conn.on('error', (err) => {
-        console.error('SSH connection error:', err);
-        reject({ success: false, error: err.message });
+        conn.on('error', (err) => {
+          console.error('SSH connection error:', err);
+          if (tunnelServer) {
+            try {
+              tunnelServer.close();
+            } catch (closeErr) {
+              console.error('Error closing tunnel server on connection error:', closeErr);
+            }
+          }
+          const errorMessage = err.message || err.toString() || 'Unknown SSH connection error';
+          reject({ success: false, error: errorMessage });
+        });
+        
+        // Handle connection timeout
+        conn.on('timeout', () => {
+          console.error('SSH connection timeout');
+          if (tunnelServer) {
+            try {
+              tunnelServer.close();
+            } catch (closeErr) {
+              console.error('Error closing tunnel server on timeout:', closeErr);
+            }
+          }
+          reject({ success: false, error: 'Connection timeout - server did not respond' });
+        });
+        
+        conn.connect(config);
       });
-      
-      conn.connect(config);
-    });
+    } catch (promiseErr) {
+      console.error('Error in SSH connection promise:', promiseErr);
+      const errorMsg = promiseErr && promiseErr.error ? promiseErr.error : (promiseErr.message || promiseErr.toString() || 'Unknown error');
+      return { success: false, error: errorMsg };
+    }
   } catch (err) {
     console.error('Error connecting to SSH host:', err);
-    return { success: false, error: err.message };
+    const errorMessage = err.message || err.toString() || 'Unknown error';
+    return { success: false, error: errorMessage };
   }
 });
 
@@ -1516,6 +1623,11 @@ ipcMain.handle('disconnect-ssh', async (_event, sessionId) => {
   try {
     const session = sshSessions.get(sessionId);
     if (session) {
+      // Close tunnel server if exists
+      if (session.tunnelServer) {
+        session.tunnelServer.close();
+        console.log('SSH tunnel closed for session:', sessionId);
+      }
       if (session.stream) session.stream.end();
       if (session.connection) session.connection.end();
       sshSessions.delete(sessionId);
@@ -3942,6 +4054,28 @@ ipcMain.handle('save-module-goal', async (_event, projectPath, moduleId, content
     return { success: true };
   } catch (err) {
     console.error('Error saving module goal:', err);
+    return { success: false, error: err.message };
+  }
+});
+
+// Get module editor (code scratchpad)
+ipcMain.handle('get-module-editor', async (_event, projectPath, moduleId) => {
+  try {
+    const content = await blueprintManager.getModuleEditor(projectPath, moduleId);
+    return { success: true, content };
+  } catch (err) {
+    console.error('Error getting module editor:', err);
+    return { success: false, error: err.message };
+  }
+});
+
+// Save module editor (code scratchpad)
+ipcMain.handle('save-module-editor', async (_event, projectPath, moduleId, content) => {
+  try {
+    await blueprintManager.saveModuleEditor(projectPath, moduleId, content);
+    return { success: true };
+  } catch (err) {
+    console.error('Error saving module editor:', err);
     return { success: false, error: err.message };
   }
 });

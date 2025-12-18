@@ -3841,6 +3841,25 @@ function initSSH() {
     });
   });
 
+  // Parse SSH command button
+  const parseSSHCommandBtn = document.getElementById('parseSSHCommandBtn');
+  if (parseSSHCommandBtn) {
+    parseSSHCommandBtn.addEventListener('click', parseSSHCommandFromInput);
+  }
+
+  // Tunnel toggle
+  const sshTunnelEnabled = document.getElementById('sshTunnelEnabled');
+  const sshTunnelSection = document.getElementById('sshTunnelSection');
+  if (sshTunnelEnabled && sshTunnelSection) {
+    sshTunnelEnabled.addEventListener('change', (e) => {
+      if (e.target.checked) {
+        sshTunnelSection.classList.remove('hidden');
+      } else {
+        sshTunnelSection.classList.add('hidden');
+      }
+    });
+  }
+
   // SSH data listener
   window.electronAPI.onSSHData((_event, data) => {
     if (currentSSHSession && data.sessionId === currentSSHSession.id && terminal) {
@@ -3853,6 +3872,14 @@ function initSSH() {
         currentSSHSession = null;
         renderSSHHosts();
       }
+    }
+  });
+
+  // SSH tunnel established listener
+  window.electronAPI.onSSHTunnelEstablished((_event, data) => {
+    if (currentSSHSession && data.sessionId === currentSSHSession.id && terminal) {
+      terminal.write(`\r\n\x1b[32m✓ Tunnel established: localhost:${data.localPort} → ${data.remoteHost}:${data.remotePort}\x1b[0m\r\n`);
+      showNotification(`Tunnel active: localhost:${data.localPort} → ${data.remoteHost}:${data.remotePort}`, 'success');
     }
   });
 }
@@ -3907,6 +3934,7 @@ function renderSSHHosts() {
 function createSSHHostCard(host) {
   const isConnected = currentSSHSession && currentSSHSession.hostId === host.id;
   const authIcon = host.authMethod === 'key' ? '🔑' : '🔒';
+  const tunnelInfo = host.tunnel ? `<span class="text-xs px-2 py-0.5 rounded" style="background: rgba(59, 130, 246, 0.15); color: #3b82f6; border: 1px solid rgba(59, 130, 246, 0.3);" title="Tunnel: localhost:${host.tunnel.localPort} → ${host.tunnel.remoteHost}:${host.tunnel.remotePort}">🔗 Tunnel</span>` : '';
 
   return `
     <div class="ssh-host-card ${isConnected ? 'connected' : ''}" data-host-id="${host.id}">
@@ -3915,6 +3943,7 @@ function createSSHHostCard(host) {
           <div class="flex items-center gap-2 mb-1">
             <h3 class="font-semibold text-sm truncate" style="color: #fafafa;">${escapeHtml(host.name)}</h3>
             ${isConnected ? '<span class="text-xs px-1.5 py-0.5 rounded" style="background: rgba(16, 185, 129, 0.2); color: #10b981;">Connected</span>' : ''}
+            ${tunnelInfo}
           </div>
           <p class="text-xs truncate" style="color: #71717a;">${escapeHtml(host.hostname)}:${host.port}</p>
         </div>
@@ -3974,10 +4003,16 @@ async function connectSSHHost(host) {
         terminal.writeln(`\x1b[36m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\x1b[0m`);
         terminal.writeln(`\x1b[90m  Host:\x1b[0m ${host.hostname}:${host.port}`);
         terminal.writeln(`\x1b[90m  User:\x1b[0m ${host.username}`);
+        if (host.tunnel) {
+          terminal.writeln(`\x1b[90m  Tunnel:\x1b[0m \x1b[36mlocalhost:${host.tunnel.localPort}\x1b[0m → \x1b[36m${host.tunnel.remoteHost}:${host.tunnel.remotePort}\x1b[0m`);
+        }
         terminal.writeln(`\x1b[36m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\x1b[0m`);
         terminal.writeln('');
         terminal.writeln('\x1b[1;32m🚀 Interactive SSH Terminal Ready!\x1b[0m');
         terminal.writeln('\x1b[90mYou can now type commands and interact with your server.\x1b[0m');
+        if (host.tunnel) {
+          terminal.writeln(`\x1b[90m🔗 Port forwarding active: \x1b[0m\x1b[33mlocalhost:${host.tunnel.localPort}\x1b[0m\x1b[90m → \x1b[0m\x1b[33m${host.tunnel.remoteHost}:${host.tunnel.remotePort}\x1b[0m`);
+        }
         terminal.writeln('\x1b[90mTry: \x1b[0m\x1b[33mls\x1b[0m\x1b[90m, \x1b[0m\x1b[33mpwd\x1b[0m\x1b[90m, \x1b[0m\x1b[33mcd\x1b[0m\x1b[90m, etc.\x1b[0m');
         terminal.writeln('');
         terminal.focus();
@@ -4003,9 +4038,19 @@ async function connectSSHHost(host) {
     }
   } catch (err) {
     console.error('Error connecting to SSH:', err);
-    showNotification('Connection failed', 'error');
+    let errorMessage = 'Connection failed';
+    if (err && err.message) {
+      errorMessage = err.message;
+    } else if (err && typeof err === 'string') {
+      errorMessage = err;
+    } else if (err && err.error) {
+      errorMessage = err.error;
+    } else if (err && err.toString) {
+      errorMessage = err.toString();
+    }
+    showNotification(errorMessage, 'error');
     if (terminal) {
-      terminal.writeln(`\x1b[31m✗ Error: ${err.message}\x1b[0m`);
+      terminal.writeln(`\x1b[31m✗ Error: ${errorMessage}\x1b[0m`);
     }
   }
 }
@@ -4063,10 +4108,150 @@ async function disconnectSSH() {
   renderSSHHosts();
 }
 
+// Parse SSH command and extract connection details
+function parseSSHCommand(command) {
+  const result = {
+    hostname: null,
+    username: null,
+    port: 22,
+    keyPath: null,
+    password: null,
+    tunnel: null
+  };
+
+  try {
+    // Remove sudo if present
+    command = command.replace(/^sudo\s+/, '');
+    
+    // Extract key file (-i "path" or -i path) - handle quoted strings with spaces
+    const keyMatchQuoted = command.match(/-i\s+["']([^"']+)["']/);
+    const keyMatchUnquoted = command.match(/-i\s+([^\s]+)/);
+    if (keyMatchQuoted) {
+      result.keyPath = keyMatchQuoted[1];
+    } else if (keyMatchUnquoted) {
+      result.keyPath = keyMatchUnquoted[1];
+    }
+
+    // Extract port (-p port)
+    const portMatch = command.match(/-p\s+(\d+)/);
+    if (portMatch) {
+      result.port = parseInt(portMatch[1]);
+    }
+
+    // Extract tunnel (-L localPort:remoteHost:remotePort)
+    const tunnelMatch = command.match(/-L\s+(\d+):([^:]+):(\d+)/);
+    if (tunnelMatch) {
+      result.tunnel = {
+        localPort: parseInt(tunnelMatch[1]),
+        remoteHost: tunnelMatch[2],
+        remotePort: parseInt(tunnelMatch[3])
+      };
+    }
+
+    // Extract username@hostname - find the pattern directly
+    // Look for user@host pattern - capture everything after @ until space or end
+    const userHostMatch = command.match(/([a-zA-Z0-9_-]+)@([^\s@]+)/);
+    if (userHostMatch) {
+      result.username = userHostMatch[1];
+      result.hostname = userHostMatch[2];
+    } else {
+      // Fallback: remove all flags and get the last argument
+      let cleaned = command
+        .replace(/^sudo\s+/g, '')
+        .replace(/^ssh\s+/g, '')
+        .replace(/-L\s+\d+:[^:]+:\d+/g, '') // Remove -L tunnel
+        .replace(/-i\s+["'][^"']+["']/g, '') // Remove -i with quoted value
+        .replace(/-i\s+[^\s]+/g, '') // Remove -i with unquoted value
+        .replace(/-p\s+\d+/g, '') // Remove -p flag
+        .replace(/-[a-zA-Z]+\s+[^\s]+/g, '') // Remove flags with values
+        .replace(/-[a-zA-Z]+/g, '') // Remove standalone flags
+        .replace(/["'][^"']+["']/g, '') // Remove quoted strings
+        .trim();
+      
+      // Get the last non-empty word
+      const parts = cleaned.split(/\s+/).filter(p => p.trim() && !p.startsWith('-'));
+      if (parts.length > 0) {
+        const lastPart = parts[parts.length - 1];
+        if (lastPart.includes('@')) {
+          const [username, hostname] = lastPart.split('@');
+          result.username = username.trim();
+          result.hostname = hostname.trim();
+        } else {
+          result.hostname = lastPart.trim();
+        }
+      }
+    }
+  } catch (err) {
+    console.error('Error parsing SSH command:', err);
+  }
+
+  return result;
+}
+
+// Parse SSH command from input field and populate form
+function parseSSHCommandFromInput() {
+  const commandInput = document.getElementById('sshCommandInput');
+  if (!commandInput || !commandInput.value.trim()) {
+    showNotification('Please paste an SSH command', 'error');
+    return;
+  }
+
+  const parsed = parseSSHCommand(commandInput.value.trim());
+  console.log('Parsed SSH command:', parsed);
+
+  // Populate form fields
+  if (parsed.hostname && sshHostname) {
+    sshHostname.value = parsed.hostname;
+  }
+  if (parsed.username && sshUsername) {
+    sshUsername.value = parsed.username;
+  }
+  if (parsed.port && sshPort) {
+    sshPort.value = parsed.port;
+  }
+  if (parsed.keyPath && sshKeyPath) {
+    sshKeyPath.value = parsed.keyPath;
+    // Set auth method to key
+    const keyRadio = document.querySelector('input[name="sshAuth"][value="key"]');
+    if (keyRadio) {
+      keyRadio.checked = true;
+      if (sshKeyFileSection) sshKeyFileSection.classList.remove('hidden');
+      if (sshPasswordSection) sshPasswordSection.classList.add('hidden');
+    }
+  }
+
+  // Handle tunnel configuration
+  if (parsed.tunnel) {
+    const sshTunnelEnabled = document.getElementById('sshTunnelEnabled');
+    const sshTunnelSection = document.getElementById('sshTunnelSection');
+    const sshTunnelLocalPort = document.getElementById('sshTunnelLocalPort');
+    const sshTunnelRemoteHost = document.getElementById('sshTunnelRemoteHost');
+    const sshTunnelRemotePort = document.getElementById('sshTunnelRemotePort');
+
+    if (sshTunnelEnabled) {
+      sshTunnelEnabled.checked = true;
+      if (sshTunnelSection) sshTunnelSection.classList.remove('hidden');
+    }
+    if (sshTunnelLocalPort) sshTunnelLocalPort.value = parsed.tunnel.localPort;
+    if (sshTunnelRemoteHost) sshTunnelRemoteHost.value = parsed.tunnel.remoteHost;
+    if (sshTunnelRemotePort) sshTunnelRemotePort.value = parsed.tunnel.remotePort;
+  }
+
+  // Generate a default host name if not set
+  if (!sshHostName || !sshHostName.value.trim()) {
+    const defaultName = parsed.hostname || 'SSH Host';
+    if (sshHostName) sshHostName.value = defaultName;
+  }
+
+  showNotification('SSH command parsed successfully!', 'success');
+}
+
 function showSSHHostModal() {
   if (!sshHostModal) return;
 
   // Reset form
+  const sshCommandInput = document.getElementById('sshCommandInput');
+  if (sshCommandInput) sshCommandInput.value = '';
   if (sshHostName) sshHostName.value = '';
   if (sshHostname) sshHostname.value = '';
   if (sshUsername) sshUsername.value = '';
@@ -4078,6 +4263,19 @@ function showSSHHostModal() {
   if (keyRadio) keyRadio.checked = true;
   if (sshKeyFileSection) sshKeyFileSection.classList.remove('hidden');
   if (sshPasswordSection) sshPasswordSection.classList.add('hidden');
+
+  // Reset tunnel fields
+  const sshTunnelEnabled = document.getElementById('sshTunnelEnabled');
+  const sshTunnelSection = document.getElementById('sshTunnelSection');
+  if (sshTunnelEnabled) sshTunnelEnabled.checked = false;
+  if (sshTunnelSection) sshTunnelSection.classList.add('hidden');
+  
+  const sshTunnelLocalPort = document.getElementById('sshTunnelLocalPort');
+  const sshTunnelRemoteHost = document.getElementById('sshTunnelRemoteHost');
+  const sshTunnelRemotePort = document.getElementById('sshTunnelRemotePort');
+  if (sshTunnelLocalPort) sshTunnelLocalPort.value = '';
+  if (sshTunnelRemoteHost) sshTunnelRemoteHost.value = '';
+  if (sshTunnelRemotePort) sshTunnelRemotePort.value = '';
 
   sshHostModal.classList.remove('hidden');
 }
@@ -4107,6 +4305,32 @@ async function saveSSHHost() {
   const keyPath = sshKeyPath?.value.trim();
   const password = sshPassword?.value;
 
+  // Get tunnel configuration
+  const sshTunnelEnabled = document.getElementById('sshTunnelEnabled');
+  const tunnelEnabled = sshTunnelEnabled?.checked || false;
+  let tunnel = null;
+
+  if (tunnelEnabled) {
+    const sshTunnelLocalPort = document.getElementById('sshTunnelLocalPort');
+    const sshTunnelRemoteHost = document.getElementById('sshTunnelRemoteHost');
+    const sshTunnelRemotePort = document.getElementById('sshTunnelRemotePort');
+
+    const localPort = parseInt(sshTunnelLocalPort?.value);
+    const remoteHost = sshTunnelRemoteHost?.value.trim();
+    const remotePort = parseInt(sshTunnelRemotePort?.value);
+
+    if (!localPort || !remoteHost || !remotePort) {
+      showNotification('Please fill in all tunnel configuration fields', 'error');
+      return;
+    }
+
+    tunnel = {
+      localPort,
+      remoteHost,
+      remotePort
+    };
+  }
+
   if (!name || !hostname || !username) {
     showNotification('Please fill in all required fields', 'error');
     return;
@@ -4131,6 +4355,7 @@ async function saveSSHHost() {
     authMethod,
     keyPath: authMethod === 'key' ? keyPath : null,
     password: authMethod === 'password' ? password : null,
+    tunnel: tunnel
   };
 
   try {
@@ -4194,11 +4419,22 @@ const createFirstModuleBtn = document.getElementById('createFirstModuleBtn');
 const goalView = document.getElementById('goalView');
 const kanbanView = document.getElementById('kanbanView');
 const canvasView = document.getElementById('canvasView');
+const editorView = document.getElementById('editorView');
 const resourcesView = document.getElementById('resourcesView');
 
 // Goal View
 const goalEditor = document.getElementById('goalEditor');
+const goalMonacoEditorEl = document.getElementById('goalMonacoEditor');
 const goalSaveStatus = document.getElementById('goalSaveStatus');
+
+// Editor View (Code Scratchpad)
+const blueprintEditorContainer = document.getElementById('blueprintEditorContainer');
+const blueprintMonacoEditorEl = document.getElementById('blueprintMonacoEditor');
+const blueprintEditorTextarea = document.getElementById('blueprintEditorTextarea');
+const editorSaveStatus = document.getElementById('editorSaveStatus');
+const runEditorBtn = document.getElementById('runEditorBtn');
+const clearEditorOutputBtn = document.getElementById('clearEditorOutputBtn');
+const editorOutput = document.getElementById('editorOutput');
 
 // Kanban View
 const kanbanBoard = document.getElementById('kanbanBoard');
@@ -4252,11 +4488,207 @@ let blueprintData = null;
 let selectedModule = null;
 let currentBlueprintView = 'goal';
 let goalSaveTimeout = null;
+let editorSaveTimeout = null;
 let canvasSaveTimeout = null;
 let selectedModuleIcon = '📦';
 let selectedModuleColor = '#8b5cf6';
 let draggedTask = null;
 let draggedModule = null;
+
+// Blueprint Goal Live Editor (Monaco)
+let blueprintGoalMonacoEditor = null;
+
+// Blueprint Editor Live Editor (Monaco)
+let blueprintCodeMonacoEditor = null;
+
+function getBlueprintGoalValue() {
+  try {
+    if (blueprintGoalMonacoEditor) return blueprintGoalMonacoEditor.getValue();
+  } catch {}
+  return goalEditor ? goalEditor.value : '';
+}
+
+function setBlueprintGoalValue(content) {
+  const value = typeof content === 'string' ? content : '';
+  if (goalEditor) goalEditor.value = value;
+  try {
+    if (blueprintGoalMonacoEditor) blueprintGoalMonacoEditor.setValue(value);
+  } catch {}
+}
+
+async function ensureBlueprintGoalMonacoEditor() {
+  if (!goalMonacoEditorEl || !goalEditor) return false;
+
+  // Already initialized
+  if (blueprintGoalMonacoEditor) return true;
+
+  // If Monaco isn't available, keep textarea fallback
+  let monaco = null;
+  try {
+    monaco = monacoInstance || await loadMonacoEditor();
+    monacoInstance = monacoInstance || monaco;
+  } catch (err) {
+    console.warn('⚠️ Blueprint Goal: Monaco failed, using textarea fallback:', err?.message || err);
+    goalMonacoEditorEl.style.display = 'none';
+    goalEditor.style.display = '';
+    return false;
+  }
+
+  if (!monaco || !monaco.editor) {
+    goalMonacoEditorEl.style.display = 'none';
+    goalEditor.style.display = '';
+    return false;
+  }
+
+  try {
+    // Swap UI: show Monaco, hide textarea
+    goalMonacoEditorEl.style.display = '';
+    goalEditor.style.display = 'none';
+
+    blueprintGoalMonacoEditor = monaco.editor.create(goalMonacoEditorEl, {
+      value: goalEditor.value || '',
+      language: 'markdown',
+      theme: 'vs-dark',
+      minimap: { enabled: false },
+      wordWrap: 'on',
+      fontFamily: "'JetBrains Mono', monospace",
+      fontSize: 14,
+      lineHeight: 22,
+      padding: { top: 16, bottom: 16 },
+      scrollBeyondLastLine: false,
+      automaticLayout: true,
+      renderLineHighlight: 'none',
+      roundedSelection: true,
+    });
+
+    // Cmd/Ctrl+S saves
+    blueprintGoalMonacoEditor.addCommand(
+      monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS,
+      () => saveGoalContent()
+    );
+
+    // Auto-save debounce
+    blueprintGoalMonacoEditor.onDidChangeModelContent(() => {
+      clearTimeout(goalSaveTimeout);
+      if (goalSaveStatus) goalSaveStatus.textContent = 'Unsaved changes...';
+      goalSaveTimeout = setTimeout(saveGoalContent, 1000);
+    });
+
+    // Ensure layout after paint (modal/tab switches)
+    setTimeout(() => {
+      try { blueprintGoalMonacoEditor?.layout(); } catch {}
+    }, 50);
+
+    return true;
+  } catch (err) {
+    console.error('Error initializing Blueprint Goal Monaco:', err);
+    goalMonacoEditorEl.style.display = 'none';
+    goalEditor.style.display = '';
+    blueprintGoalMonacoEditor = null;
+    return false;
+  }
+}
+
+function appendEditorOutputLine(line) {
+  if (!editorOutput) return;
+  const text = typeof line === 'string' ? line : String(line);
+  editorOutput.textContent = (editorOutput.textContent ? editorOutput.textContent + '\n' : '') + text;
+  editorOutput.scrollTop = editorOutput.scrollHeight;
+}
+
+function clearEditorOutput() {
+  if (editorOutput) editorOutput.textContent = '';
+}
+
+function getBlueprintEditorValue() {
+  try {
+    if (blueprintCodeMonacoEditor) return blueprintCodeMonacoEditor.getValue();
+  } catch {}
+  return blueprintEditorTextarea ? blueprintEditorTextarea.value : '';
+}
+
+function setBlueprintEditorValue(content) {
+  const value = typeof content === 'string' ? content : '';
+  if (blueprintEditorTextarea) blueprintEditorTextarea.value = value;
+  try {
+    if (blueprintCodeMonacoEditor) blueprintCodeMonacoEditor.setValue(value);
+  } catch {}
+}
+
+async function ensureBlueprintCodeMonacoEditor() {
+  if (!blueprintMonacoEditorEl || !blueprintEditorTextarea) return false;
+
+  if (blueprintCodeMonacoEditor) return true;
+
+  let monaco = null;
+  try {
+    monaco = monacoInstance || await loadMonacoEditor();
+    monacoInstance = monacoInstance || monaco;
+  } catch (err) {
+    console.warn('⚠️ Blueprint Editor: Monaco failed, using textarea fallback:', err?.message || err);
+    blueprintMonacoEditorEl.style.display = 'none';
+    blueprintEditorTextarea.style.display = '';
+    return false;
+  }
+
+  if (!monaco || !monaco.editor) {
+    blueprintMonacoEditorEl.style.display = 'none';
+    blueprintEditorTextarea.style.display = '';
+    return false;
+  }
+
+  try {
+    blueprintMonacoEditorEl.style.display = '';
+    blueprintEditorTextarea.style.display = 'none';
+
+    blueprintCodeMonacoEditor = monaco.editor.create(blueprintMonacoEditorEl, {
+      value: blueprintEditorTextarea.value || '',
+      language: 'javascript',
+      theme: 'vs-dark',
+      minimap: { enabled: false },
+      wordWrap: 'off',
+      fontFamily: "'JetBrains Mono', monospace",
+      fontSize: 13,
+      lineHeight: 20,
+      padding: { top: 14, bottom: 14 },
+      scrollBeyondLastLine: false,
+      automaticLayout: true,
+      renderLineHighlight: 'none',
+      roundedSelection: true,
+    });
+
+    // Cmd/Ctrl+S saves
+    blueprintCodeMonacoEditor.addCommand(
+      monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS,
+      () => saveEditorContent()
+    );
+
+    // Cmd/Ctrl+Enter runs
+    blueprintCodeMonacoEditor.addCommand(
+      monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter,
+      () => runEditorCode()
+    );
+
+    // Auto-save debounce
+    blueprintCodeMonacoEditor.onDidChangeModelContent(() => {
+      clearTimeout(editorSaveTimeout);
+      if (editorSaveStatus) editorSaveStatus.textContent = 'Unsaved changes...';
+      editorSaveTimeout = setTimeout(saveEditorContent, 1000);
+    });
+
+    setTimeout(() => {
+      try { blueprintCodeMonacoEditor?.layout(); } catch {}
+    }, 50);
+
+    return true;
+  } catch (err) {
+    console.error('Error initializing Blueprint Editor Monaco:', err);
+    blueprintMonacoEditorEl.style.display = 'none';
+    blueprintEditorTextarea.style.display = '';
+    blueprintCodeMonacoEditor = null;
+    return false;
+  }
+}
 
 // =====================================================
 // Blueprint Core Functions
@@ -4296,6 +4728,14 @@ async function openBlueprints(projectPath) {
     if (blueprintModal) {
       blueprintModal.classList.remove('hidden');
     }
+
+    // Prepare live editor (safe no-op if Monaco unavailable)
+    if (currentBlueprintView === 'goal') {
+      await ensureBlueprintGoalMonacoEditor();
+    }
+    if (currentBlueprintView === 'editor') {
+      await ensureBlueprintCodeMonacoEditor();
+    }
     
     // Reset selection
     selectedModule = null;
@@ -4322,15 +4762,6 @@ function closeBlueprints() {
   excalidrawReady = false;
   
   console.log('📦 Blueprints closed');
-}
-
-function closeBlueprints() {
-  if (blueprintModal) {
-    blueprintModal.classList.add('hidden');
-  }
-  blueprintProjectPath = null;
-  blueprintData = null;
-  selectedModule = null;
 }
 
 function renderModuleList() {
@@ -4455,6 +4886,7 @@ function showModuleEmptyState() {
   if (goalView) goalView.style.display = 'none';
   if (kanbanView) kanbanView.style.display = 'none';
   if (canvasView) canvasView.style.display = 'none';
+  if (editorView) editorView.style.display = 'none';
   if (resourcesView) resourcesView.style.display = 'none';
   
   // Reset header
@@ -4482,13 +4914,17 @@ async function switchBlueprintView(view) {
   if (goalView) goalView.style.display = 'none';
   if (kanbanView) kanbanView.style.display = 'none';
   if (canvasView) canvasView.style.display = 'none';
+  if (editorView) editorView.style.display = 'none';
   if (resourcesView) resourcesView.style.display = 'none';
   
   // Show and load selected view
   switch (view) {
     case 'goal':
       if (goalView) goalView.style.display = '';
+      await ensureBlueprintGoalMonacoEditor();
       await loadGoalContent();
+      // Layout after becoming visible
+      try { blueprintGoalMonacoEditor?.layout(); } catch {}
       break;
     case 'kanban':
       if (kanbanView) kanbanView.style.display = '';
@@ -4497,6 +4933,12 @@ async function switchBlueprintView(view) {
     case 'canvas':
       if (canvasView) canvasView.style.display = '';
       await loadCanvasContent();
+      break;
+    case 'editor':
+      if (editorView) editorView.style.display = '';
+      await ensureBlueprintCodeMonacoEditor();
+      await loadEditorContent();
+      try { blueprintCodeMonacoEditor?.layout(); } catch {}
       break;
     case 'resources':
       if (resourcesView) resourcesView.style.display = '';
@@ -4514,16 +4956,14 @@ async function loadGoalContent() {
   
   try {
     const result = await window.electronAPI.getModuleGoal(blueprintProjectPath, selectedModule.id);
-    if (result.success && goalEditor) {
-      goalEditor.value = result.goal || '';
-    }
+    if (result.success) setBlueprintGoalValue(result.goal || '');
   } catch (err) {
     console.error('Error loading goal:', err);
   }
 }
 
 async function saveGoalContent() {
-  if (!selectedModule || !blueprintProjectPath || !goalEditor) return;
+  if (!selectedModule || !blueprintProjectPath) return;
   
   if (goalSaveStatus) goalSaveStatus.textContent = 'Saving...';
   
@@ -4531,7 +4971,7 @@ async function saveGoalContent() {
     const result = await window.electronAPI.saveModuleGoal(
       blueprintProjectPath, 
       selectedModule.id, 
-      goalEditor.value
+      getBlueprintGoalValue()
     );
     
     if (result.success) {
@@ -4543,6 +4983,75 @@ async function saveGoalContent() {
   } catch (err) {
     console.error('Error saving goal:', err);
     if (goalSaveStatus) goalSaveStatus.textContent = 'Error saving';
+  }
+}
+
+// =====================================================
+// Editor View (Code Scratchpad)
+// =====================================================
+
+async function loadEditorContent() {
+  if (!selectedModule || !blueprintProjectPath) return;
+
+  try {
+    const result = await window.electronAPI.getModuleEditor(blueprintProjectPath, selectedModule.id);
+    if (result.success) setBlueprintEditorValue(result.content || '');
+  } catch (err) {
+    console.error('Error loading editor:', err);
+  }
+}
+
+async function saveEditorContent() {
+  if (!selectedModule || !blueprintProjectPath) return;
+
+  if (editorSaveStatus) editorSaveStatus.textContent = 'Saving...';
+
+  try {
+    const result = await window.electronAPI.saveModuleEditor(
+      blueprintProjectPath,
+      selectedModule.id,
+      getBlueprintEditorValue()
+    );
+
+    if (result.success) {
+      if (editorSaveStatus) editorSaveStatus.textContent = 'Saved';
+      setTimeout(() => {
+        if (editorSaveStatus) editorSaveStatus.textContent = 'Auto-saved';
+      }, 1500);
+    } else {
+      if (editorSaveStatus) editorSaveStatus.textContent = 'Error saving';
+    }
+  } catch (err) {
+    console.error('Error saving editor:', err);
+    if (editorSaveStatus) editorSaveStatus.textContent = 'Error saving';
+  }
+}
+
+async function runEditorCode() {
+  const code = getBlueprintEditorValue();
+  if (!code || !code.trim()) return;
+
+  appendEditorOutputLine('> Running...');
+
+  try {
+    const result = await window.electronAPI.executeJS(code);
+    if (!result.success) {
+      appendEditorOutputLine(`Error: ${result.error || 'Unknown error'}`);
+      return;
+    }
+
+    if (Array.isArray(result.logs)) {
+      for (const l of result.logs) {
+        const prefix = l?.type ? `[${l.type}] ` : '';
+        appendEditorOutputLine(prefix + (l?.message ?? ''));
+      }
+    }
+
+    if (result.result !== undefined) {
+      appendEditorOutputLine(`Result: ${result.result}`);
+    }
+  } catch (err) {
+    appendEditorOutputLine(`Error: ${err?.message || err}`);
   }
 }
 
@@ -5586,12 +6095,41 @@ function initBlueprintListeners() {
     });
   });
   
+  // Editor actions
+  if (runEditorBtn) runEditorBtn.addEventListener('click', runEditorCode);
+  if (clearEditorOutputBtn) clearEditorOutputBtn.addEventListener('click', clearEditorOutput);
+
   // Goal editor auto-save
   if (goalEditor) {
     goalEditor.addEventListener('input', () => {
+      // If Monaco is active, ignore textarea events (textarea is hidden but kept as fallback).
+      if (blueprintGoalMonacoEditor) return;
       clearTimeout(goalSaveTimeout);
       if (goalSaveStatus) goalSaveStatus.textContent = 'Unsaved changes...';
       goalSaveTimeout = setTimeout(saveGoalContent, 1000);
+    });
+  }
+
+  // Editor textarea fallback auto-save + keybinds
+  if (blueprintEditorTextarea) {
+    blueprintEditorTextarea.addEventListener('input', () => {
+      if (blueprintCodeMonacoEditor) return;
+      clearTimeout(editorSaveTimeout);
+      if (editorSaveStatus) editorSaveStatus.textContent = 'Unsaved changes...';
+      editorSaveTimeout = setTimeout(saveEditorContent, 1000);
+    });
+
+    blueprintEditorTextarea.addEventListener('keydown', (e) => {
+      const isCmdOrCtrl = e.metaKey || e.ctrlKey;
+      if (!isCmdOrCtrl) return;
+      if (e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        saveEditorContent();
+      }
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        runEditorCode();
+      }
     });
   }
   
