@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "columns": [
+    {
+      "id": "todo",
+      "title": "To Do",
+      "tasks": []
+    },
+    {
+      "id": "inprogress",
+      "title": "In Progress",
+      "tasks": []
+    },
+    {
+      "id": "done",
+      "title": "Done",
+      "tasks": []
+    }
+  ],
+  "createdAt": "2025-12-18T14:07:38.597Z",
+  "updatedAt": "2025-12-18T14:07:38.597Z"
+}

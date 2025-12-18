@@ -4615,7 +4615,105 @@ const resourcesView = document.getElementById('resourcesView');
 // Goal View
 const goalEditor = document.getElementById('goalEditor');
 const goalMonacoEditorEl = document.getElementById('goalMonacoEditor');
+const goalLiveEditor = document.getElementById('goalLiveEditor');
 const goalSaveStatus = document.getElementById('goalSaveStatus');
+const goalPreviewContainer = document.getElementById('goalPreviewContainer');
+const goalPreview = document.getElementById('goalPreview');
+const goalLinkedSection = document.getElementById('goalLinkedSection');
+const goalLinkedModules = document.getElementById('goalLinkedModules');
+const goalLinkedByModules = document.getElementById('goalLinkedByModules');
+
+// Live editor state
+let goalMarkdownSource = ''; // Stores the markdown source
+let goalMarkdownEngine = null; // ProseMirror-based live editor (when available)
+let goalMarkdownEngineEl = null;
+let goalLinkedUpdateTimeout = null;
+let goalMarkdownEngineWarned = false;
+
+function isGoalMarkdownEngineAvailable() {
+  return !!(window.TafilGoalMarkdownEditor && typeof window.TafilGoalMarkdownEditor.mount === 'function');
+}
+
+function destroyGoalMarkdownEngine() {
+  try { goalMarkdownEngine?.destroy?.(); } catch {}
+  goalMarkdownEngine = null;
+  if (goalMarkdownEngineEl) {
+    try { goalMarkdownEngineEl.remove(); } catch {}
+    goalMarkdownEngineEl = null;
+  }
+}
+
+function ensureGoalMarkdownEngineMounted() {
+  const goalEditorContainer = document.getElementById('goalEditorContainer');
+  if (!goalEditorContainer) return false;
+  if (!isGoalMarkdownEngineAvailable()) {
+    // Make the failure mode obvious: if the bundle didn't load, users will see "plain" editing.
+    if (!goalMarkdownEngineWarned) {
+      goalMarkdownEngineWarned = true;
+      try {
+        showNotification('Live Markdown engine not loaded. Run: npm run build-goal-editor, then restart Tafil.', 'warning');
+      } catch {}
+    }
+    return false;
+  }
+
+  if (goalMarkdownEngine && goalMarkdownEngine.isMounted?.()) return true;
+
+  if (!goalMarkdownEngineEl) {
+    goalMarkdownEngineEl = document.createElement('div');
+    goalMarkdownEngineEl.id = 'goalRichEditor';
+    goalMarkdownEngineEl.className = 'tafil-goal-md-editor';
+    Object.assign(goalMarkdownEngineEl.style, {
+      position: 'absolute',
+      inset: '0',
+      overflow: 'auto',
+    });
+    goalEditorContainer.appendChild(goalMarkdownEngineEl);
+  }
+
+  // Hide legacy layers; keep textarea as hidden storage for backward compatibility.
+  if (goalMonacoEditorEl) goalMonacoEditorEl.style.display = 'none';
+  if (goalEditor) goalEditor.style.display = 'none';
+  if (goalLiveEditor) goalLiveEditor.style.display = 'none';
+
+  try {
+    goalMarkdownEngine = window.TafilGoalMarkdownEditor.mount({
+      el: goalMarkdownEngineEl,
+      markdown: (goalEditor?.value || goalMarkdownSource || ''),
+      onDocChanged: () => {
+        clearTimeout(goalSaveTimeout);
+        if (goalSaveStatus) goalSaveStatus.textContent = 'Unsaved changes...';
+        goalSaveTimeout = setTimeout(saveGoalContent, 1000);
+
+        clearTimeout(goalLinkedUpdateTimeout);
+        goalLinkedUpdateTimeout = setTimeout(() => {
+          try { updateLinkedModules(); } catch {}
+        }, 250);
+      },
+      onSave: () => saveGoalContent(),
+    });
+
+    setTimeout(() => {
+      try { goalMarkdownEngine?.focus?.(); } catch {}
+    }, 0);
+
+    // Quick visual confirmation that the rich editor is active.
+    if (goalSaveStatus) {
+      goalSaveStatus.textContent = 'Live Markdown';
+      setTimeout(() => {
+        if (goalSaveStatus && goalSaveStatus.textContent === 'Live Markdown') {
+          goalSaveStatus.textContent = 'Auto-saved';
+        }
+      }, 1200);
+    }
+
+    return true;
+  } catch (err) {
+    console.warn('⚠️ Goal Markdown engine failed, falling back to legacy textarea:', err?.message || err);
+    destroyGoalMarkdownEngine();
+    return false;
+  }
+}
 
 // Editor View (Code Scratchpad)
 const blueprintEditorContainer = document.getElementById('blueprintEditorContainer');
@@ -4692,15 +4790,44 @@ let blueprintGoalMonacoEditor = null;
 let blueprintCodeMonacoEditor = null;
 
 function getBlueprintGoalValue() {
+  // Prefer structured editor state when available (ProseMirror).
+  try {
+    if (goalMarkdownEngine && goalMarkdownEngine.isMounted?.()) {
+      const md = goalMarkdownEngine.getMarkdown?.() || '';
+      // Keep hidden textarea + legacy buffers in sync for backward compatibility.
+      if (goalEditor) goalEditor.value = md;
+      goalMarkdownSource = md;
+      return md;
+    }
+  } catch {}
+
+  // Fallback: textarea value (legacy/Monaco syncs to it).
+  if (goalEditor) return goalEditor.value;
   try {
     if (blueprintGoalMonacoEditor) return blueprintGoalMonacoEditor.getValue();
   } catch {}
-  return goalEditor ? goalEditor.value : '';
+  return '';
 }
 
 function setBlueprintGoalValue(content) {
   const value = typeof content === 'string' ? content : '';
-  if (goalEditor) goalEditor.value = value;
+  if (goalEditor) {
+    goalEditor.value = value;
+    goalMarkdownSource = value;
+    // Only render legacy preview when the legacy overlay is in use.
+    try {
+      if (!(goalMarkdownEngine && goalMarkdownEngine.isMounted?.())) {
+        renderLivePreview();
+      }
+    } catch {
+      renderLivePreview();
+    }
+  }
+  try {
+    if (goalMarkdownEngine && goalMarkdownEngine.isMounted?.()) {
+      goalMarkdownEngine.setMarkdown?.(value);
+    }
+  } catch {}
   try {
     if (blueprintGoalMonacoEditor) blueprintGoalMonacoEditor.setValue(value);
   } catch {}
@@ -4749,6 +4876,53 @@ async function ensureBlueprintGoalMonacoEditor() {
       automaticLayout: true,
       renderLineHighlight: 'none',
       roundedSelection: true,
+      quickSuggestions: true,
+      suggestOnTriggerCharacters: true,
+    });
+
+    // Register wiki-link autocomplete provider
+    monaco.languages.registerCompletionItemProvider('markdown', {
+      triggerCharacters: ['[', '['],
+      provideCompletionItems: (model, position) => {
+        const textUntilPosition = model.getValueInRange({
+          startLineNumber: 1,
+          startColumn: 1,
+          endLineNumber: position.lineNumber,
+          endColumn: position.column
+        });
+        
+        // Check if we're inside [[...]]
+        const lastBracketIndex = textUntilPosition.lastIndexOf('[[');
+        if (lastBracketIndex === -1) return { suggestions: [] };
+        
+        // Check if we haven't closed the bracket yet
+        const textAfterBracket = textUntilPosition.substring(lastBracketIndex + 2);
+        if (textAfterBracket.includes(']]')) return { suggestions: [] };
+        
+        // Get current search term
+        const searchTerm = textAfterBracket.toLowerCase();
+        
+        // Get all modules except current one
+        if (!blueprintData || !blueprintData.modules) return { suggestions: [] };
+        const availableModules = blueprintData.modules.filter(m => m.id !== selectedModule?.id);
+        
+        const suggestions = availableModules
+          .filter(m => m.title.toLowerCase().includes(searchTerm))
+          .map(m => ({
+            label: m.title,
+            kind: monaco.languages.CompletionItemKind.Reference,
+            insertText: m.title,
+            detail: `Module: ${m.title}`,
+            range: {
+              startLineNumber: position.lineNumber,
+              startColumn: lastBracketIndex + 3,
+              endLineNumber: position.lineNumber,
+              endColumn: position.column
+            }
+          }));
+        
+        return { suggestions };
+      }
     });
 
     // Cmd/Ctrl+S saves
@@ -4757,11 +4931,19 @@ async function ensureBlueprintGoalMonacoEditor() {
       () => saveGoalContent()
     );
 
-    // Auto-save debounce
+    // Auto-save debounce and update preview
     blueprintGoalMonacoEditor.onDidChangeModelContent(() => {
       clearTimeout(goalSaveTimeout);
       if (goalSaveStatus) goalSaveStatus.textContent = 'Unsaved changes...';
       goalSaveTimeout = setTimeout(saveGoalContent, 1000);
+      
+      // Update live preview and linked modules
+      if (goalEditor) {
+        goalEditor.value = blueprintGoalMonacoEditor.getValue();
+        goalMarkdownSource = goalEditor.value;
+        renderLivePreview();
+      }
+      updateLinkedModules();
     });
 
     // Ensure layout after paint (modal/tab switches)
@@ -4943,6 +5125,9 @@ function closeBlueprints() {
   if (blueprintModal) {
     blueprintModal.classList.add('hidden');
   }
+
+  // Tear down the rich Goal editor (it will be re-mounted when needed).
+  destroyGoalMarkdownEngine();
   
   // Reset state
   blueprintProjectPath = null;
@@ -5119,10 +5304,31 @@ async function switchBlueprintView(view) {
   switch (view) {
     case 'goal':
       if (goalView) goalView.style.display = '';
-      await ensureBlueprintGoalMonacoEditor();
       await loadGoalContent();
-      // Layout after becoming visible
-      try { blueprintGoalMonacoEditor?.layout(); } catch {}
+      // Prefer Obsidian-style editable rendered output (ProseMirror).
+      if (!ensureGoalMarkdownEngineMounted()) {
+        // Legacy fallback: textarea overlay + rendered preview behind it.
+        if (goalMonacoEditorEl) goalMonacoEditorEl.style.display = 'none';
+        if (goalEditor) {
+          goalEditor.style.display = '';
+          goalEditor.style.position = 'absolute';
+          goalEditor.style.inset = '0';
+          goalEditor.style.color = 'transparent'; // Make text transparent but cursor visible
+          goalEditor.style.zIndex = '2';
+          goalEditor.style.caretColor = '#a78bfa';
+          goalEditor.style.setProperty('caret-color', '#a78bfa', 'important');
+          setTimeout(() => {
+            if (goalEditor && document.activeElement !== goalEditor) goalEditor.focus();
+          }, 100);
+        }
+        if (goalLiveEditor) {
+          goalLiveEditor.style.display = '';
+          goalLiveEditor.style.position = 'absolute';
+          goalLiveEditor.style.inset = '0';
+          goalLiveEditor.style.pointerEvents = 'none';
+          goalLiveEditor.style.zIndex = '1';
+        }
+      }
       break;
     case 'kanban':
       if (kanbanView) kanbanView.style.display = '';
@@ -5149,12 +5355,257 @@ async function switchBlueprintView(view) {
 // Goal/Description View
 // =====================================================
 
+// Render markdown inline in live editor (Obsidian-style)
+function renderLivePreview() {
+  if (!goalLiveEditor || !goalEditor) return;
+  
+  const markdown = goalMarkdownSource || '';
+  const lines = markdown.split('\n');
+  const rendered = [];
+  
+  for (let i = 0; i < lines.length; i++) {
+    let line = lines[i];
+    const originalLine = line;
+    
+    // Store original markdown in data attribute for editing
+    const lineElement = document.createElement('div');
+    lineElement.setAttribute('data-markdown', originalLine);
+    lineElement.style.minHeight = '1.8em';
+    lineElement.style.marginBottom = '0';
+    lineElement.style.padding = '0';
+    lineElement.style.margin = '0';
+    lineElement.style.lineHeight = '1.8';
+    lineElement.style.fontSize = '14px';
+    lineElement.style.fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+    
+    // Headers - adjust margins to match line height
+    if (line.match(/^### (.*)$/)) {
+      const text = line.replace(/^### /, '');
+      lineElement.innerHTML = `<h3 style="margin: 0; padding: 0; font-size: 18px; font-weight: 600; color: #fafafa; cursor: text; line-height: 1.8;">${escapeHtml(text)}</h3>`;
+      lineElement.classList.add('live-heading', 'live-h3');
+    } else if (line.match(/^## (.*)$/)) {
+      const text = line.replace(/^## /, '');
+      lineElement.innerHTML = `<h2 style="margin: 0; padding: 0; font-size: 20px; font-weight: 600; color: #fafafa; cursor: text; line-height: 1.8;">${escapeHtml(text)}</h2>`;
+      lineElement.classList.add('live-heading', 'live-h2');
+    } else if (line.match(/^# (.*)$/)) {
+      const text = line.replace(/^# /, '');
+      lineElement.innerHTML = `<h1 style="margin: 0; padding: 0; font-size: 24px; font-weight: 700; color: #fafafa; cursor: text; line-height: 1.8;">${escapeHtml(text)}</h1>`;
+      lineElement.classList.add('live-heading', 'live-h1');
+    } else {
+      // Regular line - process inline formatting
+      let html = escapeHtml(line);
+      
+      // Bold
+      html = html.replace(/\*\*(.*?)\*\*/g, '<strong style="font-weight: 600; color: #fafafa;">$1</strong>');
+      html = html.replace(/__(.*?)__/g, '<strong style="font-weight: 600; color: #fafafa;">$1</strong>');
+      
+      // Italic
+      html = html.replace(/\*(.*?)\*/g, '<em style="font-style: italic;">$1</em>');
+      html = html.replace(/_(.*?)_/g, '<em style="font-style: italic;">$1</em>');
+      
+      // Inline code
+      html = html.replace(/`([^`]+)`/g, '<code style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: \'JetBrains Mono\', monospace; font-size: 13px;">$1</code>');
+      
+      // Wiki links [[Module Name]]
+      html = html.replace(/\[\[([^\]]+)\]\]/g, (match, moduleName) => {
+        const module = blueprintData?.modules?.find(m => m.title === moduleName.trim());
+        if (module) {
+          return `<a href="#" class="wiki-link-live" data-module-id="${module.id}" style="color: #a78bfa; text-decoration: none; border-bottom: 1px solid rgba(167,139,250,0.3); cursor: pointer; background: ${module.color}20; padding: 2px 4px; border-radius: 3px;">${escapeHtml(moduleName)}</a>`;
+        } else {
+          return `<span class="wiki-link-broken" style="color: #f43f5e; text-decoration: line-through; opacity: 0.6;" title="Module not found">${escapeHtml(moduleName)}</span>`;
+        }
+      });
+      
+      // Regular markdown links
+      html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" style="color: #a78bfa; text-decoration: none; border-bottom: 1px solid rgba(167,139,250,0.3);" target="_blank">$1</a>');
+      
+      // Lists
+      if (line.match(/^[\-\+\*] /)) {
+        const text = line.replace(/^[\-\+\*] /, '');
+        lineElement.innerHTML = `<span style="margin-left: 24px; display: block; line-height: 1.8; margin: 0; padding: 0;">• ${html.replace(/^[\-\+\*] /, '')}</span>`;
+        lineElement.classList.add('live-list-item');
+      } else if (line.match(/^\d+\. /)) {
+        const text = line.replace(/^\d+\. /, '');
+        const num = line.match(/^(\d+)\./)[1];
+        lineElement.innerHTML = `<span style="margin-left: 24px; display: block; line-height: 1.8; margin: 0; padding: 0;">${num}. ${html.replace(/^\d+\. /, '')}</span>`;
+        lineElement.classList.add('live-list-item');
+      } else {
+        lineElement.innerHTML = html || '<span style="line-height: 1.8; display: block; margin: 0; padding: 0;">&nbsp;</span>';
+      }
+    }
+    
+    // Add click handler - in live mode, clicking focuses the textarea at that position
+    lineElement.addEventListener('click', (e) => {
+      if (e.target.closest('.wiki-link-live')) {
+        // Don't edit if clicking on a wiki link
+        const moduleId = e.target.closest('.wiki-link-live')?.dataset.moduleId;
+        if (moduleId) {
+          e.preventDefault();
+          selectModule(moduleId);
+          return;
+        }
+      }
+      
+      // Focus textarea and position cursor at the clicked line
+      if (goalEditor) {
+        const lines = goalMarkdownSource.split('\n');
+        const lineIndex = rendered.indexOf(lineElement);
+        if (lineIndex >= 0 && lineIndex < lines.length) {
+          goalEditor.focus();
+          // Calculate cursor position
+          let cursorPos = 0;
+          for (let i = 0; i < lineIndex; i++) {
+            cursorPos += lines[i].length + 1; // +1 for newline
+          }
+          goalEditor.setSelectionRange(cursorPos, cursorPos);
+        }
+      }
+    });
+    
+    rendered.push(lineElement);
+  }
+  
+  // Update content
+  goalLiveEditor.innerHTML = '';
+  rendered.forEach(el => goalLiveEditor.appendChild(el));
+}
+
+// Edit a specific element (switch to markdown source)
+function editLiveElement(element, markdownSource) {
+  if (isEditingElement) return;
+  isEditingElement = true;
+  
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.value = markdownSource;
+  input.style.width = '100%';
+  input.style.padding = '4px 8px';
+  input.style.background = 'rgba(139, 92, 246, 0.15)';
+  input.style.border = '1px solid rgba(139, 92, 246, 0.3)';
+  input.style.borderRadius = '4px';
+  input.style.color = '#fafafa';
+  input.style.fontFamily = "'JetBrains Mono', monospace";
+  input.style.fontSize = '13px';
+  
+  const originalHTML = element.innerHTML;
+  element.innerHTML = '';
+  element.appendChild(input);
+  input.focus();
+  input.select();
+  
+  const finishEdit = () => {
+    const newValue = input.value;
+    const lines = goalMarkdownSource.split('\n');
+    const lineIndex = lines.findIndex(l => l === markdownSource);
+    if (lineIndex !== -1) {
+      lines[lineIndex] = newValue;
+      goalMarkdownSource = lines.join('\n');
+    }
+    
+    renderLivePreview();
+    isEditingElement = false;
+    
+    // Trigger save
+    clearTimeout(goalSaveTimeout);
+    if (goalSaveStatus) goalSaveStatus.textContent = 'Unsaved changes...';
+    goalSaveTimeout = setTimeout(saveGoalContent, 1000);
+  };
+  
+  input.addEventListener('blur', finishEdit);
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      finishEdit();
+    } else if (e.key === 'Escape') {
+      renderLivePreview();
+      isEditingElement = false;
+    }
+  });
+}
+
+// Initialize goal editor with live preview
+function initGoalEditor() {
+  if (!goalEditor || !goalLiveEditor) return;
+  // If we have a rich editor, don't attach legacy overlay listeners/styles.
+  if (goalMarkdownEngine && goalMarkdownEngine.isMounted?.()) return;
+  
+  // Ensure both have identical styling for perfect alignment
+  const commonStyles = {
+    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    fontSize: '14px',
+    lineHeight: '1.8',
+    padding: '20px',
+    letterSpacing: '0',
+    wordSpacing: '0'
+  };
+  
+  Object.assign(goalEditor.style, commonStyles, {
+    color: 'transparent',
+    caretColor: '#a78bfa',
+    whiteSpace: 'pre-wrap',
+    wordWrap: 'break-word'
+  });
+  
+  Object.assign(goalLiveEditor.style, commonStyles, {
+    pointerEvents: 'none',
+    whiteSpace: 'pre-wrap',
+    wordWrap: 'break-word'
+  });
+  
+  // Set up live preview rendering
+  const syncScroll = () => {
+    if (goalLiveEditor && goalEditor) {
+      goalLiveEditor.scrollTop = goalEditor.scrollTop;
+      goalLiveEditor.scrollLeft = goalEditor.scrollLeft;
+    }
+  };
+  
+  const updateRender = () => {
+    goalMarkdownSource = goalEditor.value;
+    renderLivePreview();
+    // Sync scroll after render
+    requestAnimationFrame(() => {
+      syncScroll();
+    });
+    
+    // Trigger save
+    clearTimeout(goalSaveTimeout);
+    if (goalSaveStatus) goalSaveStatus.textContent = 'Unsaved changes...';
+    goalSaveTimeout = setTimeout(saveGoalContent, 1000);
+  };
+  
+  // Remove old listeners if any
+  goalEditor.removeEventListener('scroll', syncScroll);
+  goalEditor.removeEventListener('input', updateRender);
+  goalEditor.removeEventListener('keyup', syncScroll);
+  
+  // Add new listeners
+  goalEditor.addEventListener('scroll', syncScroll, { passive: true });
+  goalEditor.addEventListener('input', updateRender);
+  goalEditor.addEventListener('keyup', syncScroll);
+  
+  // Initial render
+  goalMarkdownSource = goalEditor.value;
+  renderLivePreview();
+  
+  // Sync scroll on initial load
+  setTimeout(() => {
+    syncScroll();
+  }, 50);
+}
+
 async function loadGoalContent() {
   if (!selectedModule || !blueprintProjectPath) return;
   
   try {
     const result = await window.electronAPI.getModuleGoal(blueprintProjectPath, selectedModule.id);
-    if (result.success) setBlueprintGoalValue(result.goal || '');
+    if (result.success) {
+      const content = result.goal || '';
+      goalMarkdownSource = content;
+      setBlueprintGoalValue(content);
+      updateLinkedModules();
+      if (!ensureGoalMarkdownEngineMounted()) initGoalEditor();
+    }
   } catch (err) {
     console.error('Error loading goal:', err);
   }
@@ -5177,10 +5628,262 @@ async function saveGoalContent() {
       setTimeout(() => {
         if (goalSaveStatus) goalSaveStatus.textContent = 'Auto-saved';
       }, 2000);
+      // Update linked modules after save
+      updateLinkedModules();
     }
   } catch (err) {
     console.error('Error saving goal:', err);
     if (goalSaveStatus) goalSaveStatus.textContent = 'Error saving';
+  }
+}
+
+// Parse wiki links from markdown content
+function parseWikiLinks(content) {
+  if (!content) return [];
+  const linkRegex = /\[\[([^\]]+)\]\]/g;
+  const links = [];
+  let match;
+  while ((match = linkRegex.exec(content)) !== null) {
+    links.push(match[1].trim());
+  }
+  return [...new Set(links)]; // Remove duplicates
+}
+
+// Find modules that link to the current module
+function findLinkedByModules(currentModuleTitle) {
+  if (!blueprintData || !blueprintData.modules || !currentModuleTitle) return [];
+  
+  const linkedBy = [];
+  for (const module of blueprintData.modules) {
+    if (module.id === selectedModule?.id) continue;
+    
+    // We need to check the goal content of each module
+    // For now, we'll check this when loading - but we need async access
+    // So we'll do this in updateLinkedModules which is async
+  }
+  return linkedBy;
+}
+
+// Update markdown preview with rendered content
+function updateGoalPreview() {
+  if (!goalPreview || !selectedModule) return;
+  
+  const content = getBlueprintGoalValue();
+  if (!content) {
+    goalPreview.innerHTML = '<div style="color: #52525b; font-style: italic;">Start typing to see preview...</div>';
+    return;
+  }
+  
+  // Simple markdown to HTML converter (basic implementation)
+  let html = escapeHtml(content);
+  
+  // Headers
+  html = html.replace(/^### (.*$)/gim, '<h3 style="margin-top: 24px; margin-bottom: 12px; font-size: 18px; font-weight: 600; color: #fafafa;">$1</h3>');
+  html = html.replace(/^## (.*$)/gim, '<h2 style="margin-top: 32px; margin-bottom: 16px; font-size: 20px; font-weight: 600; color: #fafafa;">$1</h2>');
+  html = html.replace(/^# (.*$)/gim, '<h1 style="margin-top: 32px; margin-bottom: 16px; font-size: 24px; font-weight: 700; color: #fafafa;">$1</h1>');
+  
+  // Bold
+  html = html.replace(/\*\*(.*?)\*\*/g, '<strong style="font-weight: 600; color: #fafafa;">$1</strong>');
+  html = html.replace(/__(.*?)__/g, '<strong style="font-weight: 600; color: #fafafa;">$1</strong>');
+  
+  // Italic
+  html = html.replace(/\*(.*?)\*/g, '<em style="font-style: italic;">$1</em>');
+  html = html.replace(/_(.*?)_/g, '<em style="font-style: italic;">$1</em>');
+  
+  // Code blocks
+  html = html.replace(/```([\s\S]*?)```/g, '<pre style="background: rgba(255,255,255,0.05); padding: 12px; border-radius: 6px; overflow-x: auto; margin: 16px 0;"><code style="font-family: \'JetBrains Mono\', monospace; font-size: 13px;">$1</code></pre>');
+  
+  // Inline code
+  html = html.replace(/`([^`]+)`/g, '<code style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: \'JetBrains Mono\', monospace; font-size: 13px;">$1</code>');
+  
+  // Links (regular markdown links)
+  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" style="color: #a78bfa; text-decoration: none; border-bottom: 1px solid rgba(167,139,250,0.3);" target="_blank">$1</a>');
+  
+  // Wiki links [[Module Name]]
+  html = html.replace(/\[\[([^\]]+)\]\]/g, (match, moduleName) => {
+    // Find module by name
+    const module = blueprintData?.modules?.find(m => m.title === moduleName.trim());
+    if (module) {
+      return `<a href="#" class="wiki-link" data-module-id="${module.id}" style="color: #a78bfa; text-decoration: none; border-bottom: 1px solid rgba(167,139,250,0.3); cursor: pointer; background: ${module.color}20; padding: 2px 4px; border-radius: 3px;">${escapeHtml(moduleName)}</a>`;
+    } else {
+      // Broken link (module not found)
+      return `<span class="wiki-link-broken" style="color: #f43f5e; text-decoration: line-through; opacity: 0.6;" title="Module not found">${escapeHtml(moduleName)}</span>`;
+    }
+  });
+  
+  // Lists - process line by line to handle properly
+  const lines = html.split('\n');
+  let inList = false;
+  let listType = null;
+  let listItems = [];
+  const processedLines = [];
+  
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const unorderedMatch = line.match(/^[\-\+\*] (.*)$/);
+    const orderedMatch = line.match(/^\d+\. (.*)$/);
+    
+    if (unorderedMatch) {
+      if (!inList || listType !== 'ul') {
+        if (inList && listItems.length > 0) {
+          processedLines.push(`<${listType} style="margin: 12px 0; padding-left: 24px;">${listItems.join('')}</${listType}>`);
+          listItems = [];
+        }
+        inList = true;
+        listType = 'ul';
+      }
+      listItems.push(`<li style="margin: 4px 0; padding-left: 8px;">${unorderedMatch[1]}</li>`);
+    } else if (orderedMatch) {
+      if (!inList || listType !== 'ol') {
+        if (inList && listItems.length > 0) {
+          processedLines.push(`<${listType} style="margin: 12px 0; padding-left: 24px;">${listItems.join('')}</${listType}>`);
+          listItems = [];
+        }
+        inList = true;
+        listType = 'ol';
+      }
+      listItems.push(`<li style="margin: 4px 0; padding-left: 8px;">${orderedMatch[1]}</li>`);
+    } else {
+      if (inList && listItems.length > 0) {
+        processedLines.push(`<${listType} style="margin: 12px 0; padding-left: 24px;">${listItems.join('')}</${listType}>`);
+        listItems = [];
+        inList = false;
+        listType = null;
+      }
+      processedLines.push(line);
+    }
+  }
+  
+  // Close any remaining list
+  if (inList && listItems.length > 0) {
+    processedLines.push(`<${listType} style="margin: 12px 0; padding-left: 24px;">${listItems.join('')}</${listType}>`);
+  }
+  
+  html = processedLines.join('\n');
+  
+  // Paragraphs (wrap consecutive lines that aren't already wrapped)
+  html = html.split('\n').map(line => {
+    const trimmed = line.trim();
+    if (!trimmed) return '';
+    // Don't wrap if already a tag or empty
+    if (trimmed.match(/^<[h|u|o|l|p|d|s|b|e|i|a|c]/) || trimmed.match(/^<\/[h|u|o|l|p|d|s|b|e|i|a|c]/)) {
+      return line;
+    }
+    return '<p style="margin: 12px 0;">' + line + '</p>';
+  }).join('\n');
+  
+  // Clean up empty paragraphs and multiple newlines
+  html = html.replace(/<p style="margin: 12px 0;"><\/p>/g, '');
+  html = html.replace(/\n{3,}/g, '\n\n');
+  
+  goalPreview.innerHTML = html;
+  
+  // Add click handlers for wiki links
+  goalPreview.querySelectorAll('.wiki-link').forEach(link => {
+    link.addEventListener('click', (e) => {
+      e.preventDefault();
+      const moduleId = link.dataset.moduleId;
+      if (moduleId) {
+        selectModule(moduleId);
+      }
+    });
+  });
+  
+  // Update view based on current mode
+  updateGoalViewMode();
+}
+
+// Update linked modules section (bidirectional links)
+async function updateLinkedModules() {
+  if (!goalLinkedSection || !goalLinkedModules || !goalLinkedByModules || !selectedModule || !blueprintData) return;
+  
+  const content = getBlueprintGoalValue();
+  const linkedModuleNames = parseWikiLinks(content);
+  
+  // Find linked modules
+  const linkedModules = [];
+  for (const moduleName of linkedModuleNames) {
+    const module = blueprintData.modules.find(m => m.title === moduleName);
+    if (module) {
+      linkedModules.push(module);
+    }
+  }
+  
+  // Render linked modules
+  if (linkedModules.length > 0) {
+    goalLinkedModules.innerHTML = linkedModules.map(m => `
+      <a href="#" class="wiki-link-badge" data-module-id="${m.id}" style="display: inline-flex; align-items: center; gap: 4px; padding: 4px 8px; background: ${m.color}20; color: ${m.color}; border: 1px solid ${m.color}40; border-radius: 4px; font-size: 11px; text-decoration: none; cursor: pointer;">
+        <span>${m.icon}</span>
+        <span>${escapeHtml(m.title)}</span>
+      </a>
+    `).join('');
+    
+    // Add click handlers
+    goalLinkedModules.querySelectorAll('.wiki-link-badge').forEach(link => {
+      link.addEventListener('click', (e) => {
+        e.preventDefault();
+        const moduleId = link.dataset.moduleId;
+        if (moduleId) {
+          selectModule(moduleId);
+        }
+      });
+    });
+  } else {
+    goalLinkedModules.innerHTML = '<span style="color: #52525b; font-size: 11px; font-style: italic;">No links</span>';
+  }
+  
+  // Find modules that link to this module (linked by) - optimized with Promise.all
+  const linkedByModules = [];
+  const checkPromises = blueprintData.modules
+    .filter(m => m.id !== selectedModule.id)
+    .map(async (module) => {
+      try {
+        const result = await window.electronAPI.getModuleGoal(blueprintProjectPath, module.id);
+        if (result.success && result.goal) {
+          const moduleLinks = parseWikiLinks(result.goal);
+          if (moduleLinks.includes(selectedModule.title)) {
+            return module;
+          }
+        }
+      } catch (err) {
+        // Skip if error loading module goal
+      }
+      return null;
+    });
+  
+  const results = await Promise.all(checkPromises);
+  results.forEach(module => {
+    if (module) linkedByModules.push(module);
+  });
+  
+  // Render linked by modules
+  if (linkedByModules.length > 0) {
+    goalLinkedByModules.innerHTML = linkedByModules.map(m => `
+      <a href="#" class="wiki-link-badge" data-module-id="${m.id}" style="display: inline-flex; align-items: center; gap: 4px; padding: 4px 8px; background: ${m.color}20; color: ${m.color}; border: 1px solid ${m.color}40; border-radius: 4px; font-size: 11px; text-decoration: none; cursor: pointer;">
+        <span>${m.icon}</span>
+        <span>${escapeHtml(m.title)}</span>
+      </a>
+    `).join('');
+    
+    // Add click handlers
+    goalLinkedByModules.querySelectorAll('.wiki-link-badge').forEach(link => {
+      link.addEventListener('click', (e) => {
+        e.preventDefault();
+        const moduleId = link.dataset.moduleId;
+        if (moduleId) {
+          selectModule(moduleId);
+        }
+      });
+    });
+  } else {
+    goalLinkedByModules.innerHTML = '<span style="color: #52525b; font-size: 11px; font-style: italic;">No backlinks</span>';
+  }
+  
+  // Show linked section if there are any links
+  if (linkedModules.length > 0 || linkedByModules.length > 0) {
+    goalLinkedSection.style.display = '';
+  } else {
+    goalLinkedSection.style.display = 'none';
   }
 }
 
@@ -5673,6 +6376,7 @@ let isCanvasFullscreen = false;
 
 function toggleCanvasFullscreen() {
   const canvasViewEl = document.getElementById('canvasView');
+  const blueprintModal = document.getElementById('blueprintModal');
   if (!canvasViewEl) return;
   
   isCanvasFullscreen = !isCanvasFullscreen;
@@ -5689,9 +6393,13 @@ function toggleCanvasFullscreen() {
     canvasViewEl.style.zIndex = '9999';
     canvasViewEl.style.borderRadius = '0';
     document.body.style.overflow = 'hidden';
+    // Ensure blueprint modal stays visible
+    if (blueprintModal) {
+      blueprintModal.style.zIndex = '10000';
+    }
     showNotification('Press Esc to exit fullscreen', 'info');
   } else {
-    // Exit fullscreen mode
+    // Exit fullscreen mode - restore to original container
     canvasViewEl.style.position = '';
     canvasViewEl.style.top = '';
     canvasViewEl.style.left = '';
@@ -5702,6 +6410,23 @@ function toggleCanvasFullscreen() {
     canvasViewEl.style.zIndex = '';
     canvasViewEl.style.borderRadius = '';
     document.body.style.overflow = '';
+    // Restore blueprint modal z-index
+    if (blueprintModal) {
+      blueprintModal.style.zIndex = '200';
+    }
+    
+    // Force layout recalculation to prevent UI collapse
+    setTimeout(() => {
+      if (canvasViewEl) {
+        canvasViewEl.style.display = 'none';
+        canvasViewEl.offsetHeight; // Force reflow
+        canvasViewEl.style.display = '';
+      }
+      // Reinitialize canvas if needed
+      if (currentBlueprintView === 'canvas') {
+        loadCanvasContent();
+      }
+    }, 50);
   }
 }
 
@@ -6397,6 +7122,9 @@ function initBlueprintListeners() {
   if (runEditorBtn) runEditorBtn.addEventListener('click', runEditorCode);
   if (clearEditorOutputBtn) clearEditorOutputBtn.addEventListener('click', clearEditorOutput);
 
+  // Initialize goal editor with live preview
+  initGoalEditor();
+  
   // Goal editor auto-save
   if (goalEditor) {
     goalEditor.addEventListener('input', () => {
@@ -6405,6 +7133,11 @@ function initBlueprintListeners() {
       clearTimeout(goalSaveTimeout);
       if (goalSaveStatus) goalSaveStatus.textContent = 'Unsaved changes...';
       goalSaveTimeout = setTimeout(saveGoalContent, 1000);
+      
+      // Update live preview and linked modules
+      goalMarkdownSource = goalEditor.value;
+      renderLivePreview();
+      updateLinkedModules();
     });
   }
 
