@@ -76,6 +76,8 @@ const sshHostsView = document.getElementById("sshHostsView");
 const closeTerminalBtn = document.getElementById("closeTerminalBtn");
 const disconnectSSHBtn = document.getElementById("disconnectSSHBtn");
 const terminalHostName = document.getElementById("terminalHostName");
+const activeSessionsList = document.getElementById("activeSessionsList");
+const activeSessionsCount = document.getElementById("activeSessionsCount");
 const terminalStatus = document.getElementById("terminalStatus");
 
 // Header elements
@@ -295,9 +297,12 @@ function applyInlineResults(inlineResults) {
 
 // SSH state
 let sshHosts = [];
-let currentSSHSession = null;
+let currentSSHSession = null; // Currently active/visible session in terminal
+let sshSessions = new Map(); // All active SSH sessions (hostId -> session)
 let terminal = null;
 let terminalFitAddon = null;
+let terminalInputDisposable = null; // Disposable for terminal input handler
+let lastShownSessionId = null; // Track which session info was last shown to avoid duplicates
 
 // Settings
 let defaultIDE = null;
@@ -3860,26 +3865,57 @@ function initSSH() {
     });
   }
 
-  // SSH data listener
+  // SSH data listener - handle data for all sessions, but only display for active one
   window.electronAPI.onSSHData((_event, data) => {
-    if (currentSSHSession && data.sessionId === currentSSHSession.id && terminal) {
+    // Find which session this data belongs to
+    let sessionForData = null;
+    for (const [hostId, session] of sshSessions.entries()) {
+      if (session.id === data.sessionId) {
+        sessionForData = session;
+        break;
+      }
+    }
+    
+    // If session closed, remove it
+    if (data.type === 'close' && sessionForData) {
+      sshSessions.delete(sessionForData.hostId);
+      // If it was the current session, clear it
+      if (currentSSHSession && currentSSHSession.hostId === sessionForData.hostId) {
+        if (terminal) {
+          terminal.write(data.data);
+        }
+        currentSSHSession = null;
+      }
+      renderSSHHosts();
+      renderActiveSessionsSidebar();
+    } else if (currentSSHSession && data.sessionId === currentSSHSession.id && terminal) {
+      // Only display data if this is the currently active session
       if (data.type === 'stdout') {
         terminal.write(data.data);
       } else if (data.type === 'stderr') {
         terminal.write(`\x1b[31m${data.data}\x1b[0m`);
-      } else if (data.type === 'close') {
-        terminal.write(data.data);
-        currentSSHSession = null;
-        renderSSHHosts();
       }
     }
   });
 
   // SSH tunnel established listener
   window.electronAPI.onSSHTunnelEstablished((_event, data) => {
-    if (currentSSHSession && data.sessionId === currentSSHSession.id && terminal) {
-      terminal.write(`\r\n\x1b[32m✓ Tunnel established: localhost:${data.localPort} → ${data.remoteHost}:${data.remotePort}\x1b[0m\r\n`);
+    // Find which session this belongs to
+    let sessionForData = null;
+    for (const [hostId, session] of sshSessions.entries()) {
+      if (session.id === data.sessionId) {
+        sessionForData = session;
+        break;
+      }
+    }
+    
+    if (sessionForData) {
+      // Show notification for any tunnel
       showNotification(`Tunnel active: localhost:${data.localPort} → ${data.remoteHost}:${data.remotePort}`, 'success');
+      // Only write to terminal if it's the active session
+      if (currentSSHSession && data.sessionId === currentSSHSession.id && terminal) {
+        terminal.write(`\r\n\x1b[32m✓ Tunnel established: localhost:${data.localPort} → ${data.remoteHost}:${data.remotePort}\x1b[0m\r\n`);
+      }
     }
   });
 }
@@ -3929,20 +3965,84 @@ function renderSSHHosts() {
   // Update count
   const sshHostCount = document.getElementById('sshHostCount');
   if (sshHostCount) sshHostCount.textContent = sshHosts.length;
+  
+  // Update active sessions sidebar
+  renderActiveSessionsSidebar();
+}
+
+// Render active sessions in the sidebar
+function renderActiveSessionsSidebar() {
+  if (!activeSessionsList || !activeSessionsCount) return;
+
+  const sessions = Array.from(sshSessions.values());
+  
+  // Update count
+  if (activeSessionsCount) {
+    activeSessionsCount.textContent = sessions.length;
+  }
+
+  if (sessions.length === 0) {
+    activeSessionsList.innerHTML = `
+      <div class="px-2 py-3 text-center">
+        <p class="text-xs" style="color: #52525b;">No active sessions</p>
+      </div>
+    `;
+    return;
+  }
+
+  // Render session list as sidebar items
+  activeSessionsList.innerHTML = sessions.map(session => {
+    const isActive = currentSSHSession && currentSSHSession.hostId === session.hostId;
+    const host = session.host;
+    const tunnelIcon = host.tunnel ? '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-left: 4px;"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>' : '';
+    
+    return `
+      <div 
+        id="sidebar-session-${session.hostId}" 
+        class="sidebar-item ${isActive ? 'active' : ''}" 
+        style="cursor: pointer; position: relative;"
+        title="Click to switch to ${escapeHtml(host.name)}"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: ${isActive ? '#10b981' : 'currentColor'};"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        <span class="sidebar-text" style="color: ${isActive ? '#10b981' : 'inherit'};">
+          ${escapeHtml(host.name)}
+          ${tunnelIcon}
+        </span>
+        ${isActive ? '<span class="w-1.5 h-1.5 rounded-full absolute right-2" style="background: #10b981;"></span>' : ''}
+      </div>
+    `;
+  }).join('');
+
+  // Add click handlers
+  sessions.forEach(session => {
+    const sessionItem = document.getElementById(`sidebar-session-${session.hostId}`);
+    if (sessionItem) {
+      sessionItem.addEventListener('click', () => {
+        // Switch to this session
+        currentSSHSession = session;
+        // Reset last shown session so it will show the info when switching
+        lastShownSessionId = null;
+        showTerminal(session.host.name);
+        renderActiveSessionsSidebar(); // Re-render to update active state
+        showNotification(`Switched to ${session.host.name}`, 'info');
+      });
+    }
+  });
 }
 
 function createSSHHostCard(host) {
-  const isConnected = currentSSHSession && currentSSHSession.hostId === host.id;
+  const hasSession = sshSessions.has(host.id);
+  const isActive = currentSSHSession && currentSSHSession.hostId === host.id;
   const authIcon = host.authMethod === 'key' ? '🔑' : '🔒';
   const tunnelInfo = host.tunnel ? `<span class="text-xs px-2 py-0.5 rounded" style="background: rgba(59, 130, 246, 0.15); color: #3b82f6; border: 1px solid rgba(59, 130, 246, 0.3);" title="Tunnel: localhost:${host.tunnel.localPort} → ${host.tunnel.remoteHost}:${host.tunnel.remotePort}">🔗 Tunnel</span>` : '';
 
   return `
-    <div class="ssh-host-card ${isConnected ? 'connected' : ''}" data-host-id="${host.id}">
+    <div class="ssh-host-card ${hasSession ? 'connected' : ''}" data-host-id="${host.id}">
       <div class="flex items-start justify-between mb-3">
         <div class="flex-1 min-w-0">
           <div class="flex items-center gap-2 mb-1">
             <h3 class="font-semibold text-sm truncate" style="color: #fafafa;">${escapeHtml(host.name)}</h3>
-            ${isConnected ? '<span class="text-xs px-1.5 py-0.5 rounded" style="background: rgba(16, 185, 129, 0.2); color: #10b981;">Connected</span>' : ''}
+            ${hasSession ? `<span class="text-xs px-1.5 py-0.5 rounded" style="background: rgba(16, 185, 129, 0.2); color: #10b981;">${isActive ? 'Active' : 'Connected'}</span>` : ''}
             ${tunnelInfo}
           </div>
           <p class="text-xs truncate" style="color: #71717a;">${escapeHtml(host.hostname)}:${host.port}</p>
@@ -3958,8 +4058,8 @@ function createSSHHostCard(host) {
       </div>
 
       <div class="flex items-center gap-2">
-        <button id="ssh-connect-${host.id}" class="flex-1 px-4 py-2.5 rounded-lg text-xs font-semibold transition-all hover:scale-[1.02]" style="background: ${isConnected ? 'rgba(16, 185, 129, 0.15)' : 'linear-gradient(135deg, #10b981, #059669)'}; color: ${isConnected ? '#10b981' : 'white'}; border: ${isConnected ? '1px solid rgba(16, 185, 129, 0.3)' : 'none'};">
-          ${isConnected ? 'Open Terminal' : 'Connect'}
+        <button id="ssh-connect-${host.id}" class="flex-1 px-4 py-2.5 rounded-lg text-xs font-semibold transition-all hover:scale-[1.02]" style="background: ${hasSession ? 'rgba(16, 185, 129, 0.15)' : 'linear-gradient(135deg, #10b981, #059669)'}; color: ${hasSession ? '#10b981' : 'white'}; border: ${hasSession ? '1px solid rgba(16, 185, 129, 0.3)' : 'none'};">
+          ${hasSession ? (isActive ? 'Active' : 'Switch to Terminal') : 'Connect'}
         </button>
         <button id="ssh-delete-${host.id}" class="px-3 py-2.5 rounded-lg text-xs font-medium transition-all" style="background: rgba(244, 63, 94, 0.15); color: #f43f5e; border: 1px solid rgba(244, 63, 94, 0.2);" title="Delete">
           <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
@@ -3971,9 +4071,13 @@ function createSSHHostCard(host) {
 
 async function connectSSHHost(host) {
   try {
-    // If already connected, just show terminal
-    if (currentSSHSession && currentSSHSession.hostId === host.id) {
+    // If already connected, just switch to that terminal
+    if (sshSessions.has(host.id)) {
+      const existingSession = sshSessions.get(host.id);
+      currentSSHSession = existingSession;
       showTerminal(host.name);
+      renderActiveSessionsSidebar(); // Update sidebar to show active state
+      showNotification(`Switched to ${host.name}`, 'info');
       return;
     }
 
@@ -3989,11 +4093,20 @@ async function connectSSHHost(host) {
     const result = await window.electronAPI.connectSSHHost(host);
 
     if (result.success) {
-      currentSSHSession = {
+      const newSession = {
         id: result.sessionId,
         hostId: host.id,
         host: host
       };
+      
+      // Store session in map
+      sshSessions.set(host.id, newSession);
+      // Set as current active session
+      currentSSHSession = newSession;
+      lastShownSessionId = newSession.id; // Mark this session as shown
+      
+      // Update sidebar
+      renderActiveSessionsSidebar();
 
       showNotification(`Connected to ${host.name}`, 'success');
 
@@ -4019,14 +4132,20 @@ async function connectSSHHost(host) {
         setTimeout(() => terminal.write('\x1b[1;36m▶ \x1b[0m'), 200);
       }
 
-      // Handle terminal input
+      // Handle terminal input - use single handler that checks current session
       if (terminal) {
-        const inputHandler = (data) => {
-          if (currentSSHSession && currentSSHSession.id === result.sessionId) {
-            window.electronAPI.sendSSHInput(result.sessionId, data);
+        // Dispose previous handler if exists
+        if (terminalInputDisposable) {
+          terminalInputDisposable.dispose();
+        }
+        
+        // Create single input handler that always checks current session
+        terminalInputDisposable = terminal.onData((data) => {
+          // Only send input to the currently active session
+          if (currentSSHSession && currentSSHSession.id) {
+            window.electronAPI.sendSSHInput(currentSSHSession.id, data);
           }
-        };
-        terminal.onData(inputHandler);
+        });
       }
 
       renderSSHHosts();
@@ -4060,8 +4179,53 @@ function showTerminal(hostName) {
 
   sshHostsView.style.display = 'none';
   sshTerminalPanel.classList.add('active');
+  
+  // Update sidebar when showing terminal
+  renderActiveSessionsSidebar();
 
-  if (terminalHostName) terminalHostName.textContent = hostName || 'Connected';
+  // Use the host name from current session if available
+  const displayName = hostName || (currentSSHSession && currentSSHSession.host ? currentSSHSession.host.name : 'Connected');
+  if (terminalHostName) terminalHostName.textContent = displayName;
+
+  // If there's an active session, ensure input handler is set up
+  if (currentSSHSession && currentSSHSession.host && terminal) {
+    const host = currentSSHSession.host;
+    
+    // Ensure input handler is set up (it should already be, but make sure)
+    if (!terminalInputDisposable) {
+      terminalInputDisposable = terminal.onData((data) => {
+        // Only send input to the currently active session
+        if (currentSSHSession && currentSSHSession.id) {
+          window.electronAPI.sendSSHInput(currentSSHSession.id, data);
+        }
+      });
+    }
+    
+    // Show session info only when switching to a different session
+    // Don't show if this is the same session that was already shown
+    if (lastShownSessionId !== currentSSHSession.id) {
+      terminal.writeln('');
+      terminal.writeln(`\x1b[90m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\x1b[0m`);
+      terminal.writeln(`\x1b[90m  Session active: \x1b[0m\x1b[36m${host.name}\x1b[0m`);
+      terminal.writeln(`\x1b[90m  Host:\x1b[0m ${host.hostname}:${host.port}`);
+      if (host.tunnel) {
+        terminal.writeln(`\x1b[90m  Tunnel:\x1b[0m \x1b[36mlocalhost:${host.tunnel.localPort}\x1b[0m → \x1b[36m${host.tunnel.remoteHost}:${host.tunnel.remotePort}\x1b[0m`);
+      }
+      terminal.writeln(`\x1b[90m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\x1b[0m`);
+      terminal.writeln('');
+      lastShownSessionId = currentSSHSession.id;
+      
+      // Send a newline to trigger the prompt to appear
+      // This ensures the cursor is positioned correctly when switching sessions
+      // The newline will either execute a pending command or just refresh the prompt
+      setTimeout(() => {
+        if (currentSSHSession && currentSSHSession.id && terminal) {
+          // Send a newline to get the prompt
+          window.electronAPI.sendSSHInput(currentSSHSession.id, '\n');
+        }
+      }, 150);
+    }
+  }
 
   setTimeout(() => {
     if (terminalFitAddon) {
@@ -4082,7 +4246,8 @@ function showTerminal(hostName) {
 function closeTerminal() {
   if (!sshTerminalPanel || !sshHostsView) return;
 
-  disconnectSSH();
+  // Just hide the terminal view, don't disconnect
+  // The connection stays alive so user can switch back and forth
   sshTerminalPanel.classList.remove('active');
   sshHostsView.style.display = 'block';
 
@@ -4091,18 +4256,43 @@ function closeTerminal() {
 
 async function disconnectSSH() {
   if (currentSSHSession) {
+    const hostId = currentSSHSession.hostId;
     try {
       await window.electronAPI.disconnectSSH(currentSSHSession.id);
       showNotification('SSH connection closed', 'info');
     } catch (err) {
       console.error('Error disconnecting SSH:', err);
     }
+    
+    // Remove from sessions map
+    sshSessions.delete(hostId);
     currentSSHSession = null;
-  }
-
-  if (terminal) {
-    terminal.writeln('\r\n\x1b[33mDisconnected.\x1b[0m');
-    terminal.writeln('Terminal ready. Connect to an SSH host to begin.');
+    
+    // If there are other active sessions, switch to one of them
+    if (sshSessions.size > 0) {
+      const firstSession = sshSessions.values().next().value;
+      currentSSHSession = firstSession;
+      showTerminal(firstSession.host.name);
+      renderActiveSessionsSidebar(); // Update sidebar
+      showNotification(`Switched to ${firstSession.host.name}`, 'info');
+    } else {
+      // No more sessions, dispose input handler and clear terminal
+      if (terminalInputDisposable) {
+        terminalInputDisposable.dispose();
+        terminalInputDisposable = null;
+      }
+      
+      if (terminal) {
+        terminal.writeln('\r\n\x1b[33mDisconnected.\x1b[0m');
+        terminal.writeln('Terminal ready. Connect to an SSH host to begin.');
+      }
+      
+      // Go back to hosts view
+      if (sshTerminalPanel && sshHostsView) {
+        sshTerminalPanel.classList.remove('active');
+        sshHostsView.style.display = 'block';
+      }
+    }
   }
 
   renderSSHHosts();

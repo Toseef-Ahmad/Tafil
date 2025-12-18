@@ -830,6 +830,19 @@
             <span class="sidebar-text">Add Host</span>
           </div>
         </div>
+        
+        <!-- Active Sessions Section -->
+        <div class="mt-4 pt-4" style="border-top: 1px solid rgba(255,255,255,0.06);">
+          <div class="px-2 mb-2">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-semibold" style="color: #71717a;">Active Sessions</span>
+              <span id="activeSessionsCount" class="text-xs px-1.5 py-0.5 rounded" style="background: rgba(16, 185, 129, 0.15); color: #10b981;">0</span>
+            </div>
+          </div>
+          <div id="activeSessionsList" style="max-height: 300px; overflow-y: auto;">
+            <!-- Active sessions will be rendered here -->
+          </div>
+        </div>
       </div>
     </nav>
     
@@ -1002,28 +1015,29 @@
       <!-- Terminal Panel (hidden by default) -->
       <div id="sshTerminalPanel" class="terminal-panel">
         <div class="terminal-header">
-          <div class="flex items-center gap-3">
-            <button id="closeTerminalBtn" class="action-btn" title="Close Terminal">
-              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
-            </button>
-            <div class="flex items-center gap-2">
-              <span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-              <span id="terminalHostName" class="text-sm font-medium" style="color: #fafafa;">Connected</span>
+            <div class="flex items-center gap-3">
+              <button id="closeTerminalBtn" class="action-btn" title="Close Terminal">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+              </button>
+              <div class="flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+                <span id="terminalHostName" class="text-sm font-medium" style="color: #fafafa;">Connected</span>
+              </div>
+              <span class="text-xs px-2 py-1 rounded flex items-center gap-1.5" style="background: rgba(16, 185, 129, 0.1); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.2);">
+                <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" x2="20" y1="19" y2="19"/></svg>
+                Interactive Terminal
+              </span>
             </div>
-            <span class="text-xs px-2 py-1 rounded flex items-center gap-1.5" style="background: rgba(16, 185, 129, 0.1); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.2);">
-              <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" x2="20" y1="19" y2="19"/></svg>
-              Interactive Terminal
-            </span>
+            <div class="flex items-center gap-2">
+              <span id="terminalStatus" class="text-xs px-2 py-1 rounded" style="background: rgba(16, 185, 129, 0.15); color: #10b981;">SSH Connected</span>
+              <button id="disconnectSSHBtn" class="px-3 py-1.5 rounded-lg text-xs font-medium transition-all hover:bg-opacity-90" style="background: rgba(244, 63, 94, 0.15); color: #f43f5e; border: 1px solid rgba(244, 63, 94, 0.2);">
+                Disconnect
+              </button>
+            </div>
           </div>
-          <div class="flex items-center gap-2">
-            <span id="terminalStatus" class="text-xs px-2 py-1 rounded" style="background: rgba(16, 185, 129, 0.15); color: #10b981;">SSH Connected</span>
-            <button id="disconnectSSHBtn" class="px-3 py-1.5 rounded-lg text-xs font-medium transition-all hover:bg-opacity-90" style="background: rgba(244, 63, 94, 0.15); color: #f43f5e; border: 1px solid rgba(244, 63, 94, 0.2);">
-              Disconnect
-            </button>
+          <div class="terminal-container">
+            <div id="terminal"></div>
           </div>
-        </div>
-        <div class="terminal-container">
-          <div id="terminal"></div>
         </div>
       </div>
     </main>
