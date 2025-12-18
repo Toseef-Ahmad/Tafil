@@ -5052,7 +5052,11 @@ async function selectModule(moduleId) {
   
   // Update header
   if (moduleIcon) moduleIcon.textContent = module.icon;
-  if (moduleTitle) moduleTitle.textContent = module.title;
+  if (moduleTitle) {
+    moduleTitle.textContent = module.title;
+    // Make sure contenteditable is enabled when a module is selected
+    moduleTitle.contentEditable = 'true';
+  }
   if (moduleUpdatedAt) moduleUpdatedAt.textContent = `Updated ${formatRelativeTime(module.updatedAt)}`;
   
   // Show action buttons
@@ -5081,7 +5085,11 @@ function showModuleEmptyState() {
   
   // Reset header
   if (moduleIcon) moduleIcon.textContent = '📦';
-  if (moduleTitle) moduleTitle.textContent = 'Select a Module';
+  if (moduleTitle) {
+    moduleTitle.textContent = 'Select a Module';
+    // Disable editing when no module is selected
+    moduleTitle.contentEditable = 'false';
+  }
   if (moduleUpdatedAt) moduleUpdatedAt.textContent = 'Create or select a module to get started';
   
   // Hide action buttons
@@ -5975,6 +5983,58 @@ async function createModule() {
   }
 }
 
+async function saveModuleTitle() {
+  if (!selectedModule || !blueprintProjectPath || !moduleTitle) return;
+  
+  const newTitle = moduleTitle.textContent.trim();
+  if (!newTitle) {
+    // Restore original title if empty
+    moduleTitle.textContent = selectedModule.title;
+    return;
+  }
+  
+  // Don't save if title hasn't changed
+  if (newTitle === selectedModule.title) return;
+  
+  try {
+    const result = await window.electronAPI.updateModule(blueprintProjectPath, selectedModule.id, {
+      title: newTitle
+    });
+    
+    if (result.success) {
+      // Update local data
+      selectedModule.title = newTitle;
+      const moduleIndex = blueprintData.modules.findIndex(m => m.id === selectedModule.id);
+      if (moduleIndex !== -1) {
+        blueprintData.modules[moduleIndex].title = newTitle;
+        blueprintData.modules[moduleIndex].updatedAt = result.module.updatedAt;
+      }
+      
+      // Update selectedModule reference
+      selectedModule = blueprintData.modules.find(m => m.id === selectedModule.id);
+      
+      // Update updatedAt display
+      if (moduleUpdatedAt && selectedModule) {
+        moduleUpdatedAt.textContent = `Updated ${formatRelativeTime(selectedModule.updatedAt)}`;
+      }
+      
+      // Update sidebar
+      renderModuleList();
+      
+      showNotification('Module title updated', 'success');
+    } else {
+      // Restore original title on error
+      moduleTitle.textContent = selectedModule.title;
+      showNotification(result.error || 'Failed to update module title', 'error');
+    }
+  } catch (err) {
+    console.error('Error updating module title:', err);
+    // Restore original title on error
+    moduleTitle.textContent = selectedModule.title;
+    showNotification('Failed to update module title', 'error');
+  }
+}
+
 async function deleteCurrentModule() {
   if (!selectedModule || !blueprintProjectPath) return;
   
@@ -6276,6 +6336,54 @@ function initBlueprintListeners() {
   // Delete module button
   if (deleteModuleBtn) {
     deleteModuleBtn.addEventListener('click', deleteCurrentModule);
+  }
+  
+  // Module title editing
+  if (moduleTitle) {
+    // Add hover and focus styles
+    moduleTitle.addEventListener('mouseenter', () => {
+      if (!moduleTitle.matches(':focus')) {
+        moduleTitle.style.backgroundColor = 'rgba(255,255,255,0.05)';
+      }
+    });
+    
+    moduleTitle.addEventListener('mouseleave', () => {
+      if (!moduleTitle.matches(':focus')) {
+        moduleTitle.style.backgroundColor = 'transparent';
+      }
+    });
+    
+    moduleTitle.addEventListener('focus', () => {
+      moduleTitle.style.backgroundColor = 'rgba(255,255,255,0.08)';
+    });
+    
+    moduleTitle.addEventListener('blur', () => {
+      moduleTitle.style.backgroundColor = 'transparent';
+      saveModuleTitle();
+    });
+    
+    // Save on Enter key, prevent newline
+    moduleTitle.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        moduleTitle.blur(); // This will trigger the blur event which saves
+      }
+      // Prevent Escape from doing anything special
+      if (e.key === 'Escape') {
+        // Restore original title and blur
+        if (selectedModule) {
+          moduleTitle.textContent = selectedModule.title;
+        }
+        moduleTitle.blur();
+      }
+    });
+    
+    // Prevent paste of HTML/formatting, only allow plain text
+    moduleTitle.addEventListener('paste', (e) => {
+      e.preventDefault();
+      const text = (e.clipboardData || window.clipboardData).getData('text');
+      document.execCommand('insertText', false, text);
+    });
   }
   
   // View tabs
