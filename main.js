@@ -1125,27 +1125,89 @@ app.on('window-all-closed', () => {
 // -------------------------------------------------
 
 // 1) Scan all Node.js projects in the home dir
-ipcMain.handle('scan-all-projects', async (_event, paths = null) => {
+ipcMain.handle('scan-all-projects', async (_event, customPaths = null) => {
   try {
     const homeDir = process.env.HOME || process.env.USERPROFILE;
-
-    const targets = Array.isArray(paths) && paths.length
-      ? paths.filter(p => typeof p === 'string' && p.trim().length > 0)
-      : [homeDir];
+    
+    // Comprehensive list of directories to scan
+    const defaultScanDirs = [
+      // User home directory
+      homeDir,
+      
+      // Common project locations
+      path.join(homeDir, 'Desktop'),
+      path.join(homeDir, 'Documents'),
+      path.join(homeDir, 'Downloads'),
+      path.join(homeDir, 'Developer'),        // macOS Xcode default
+      path.join(homeDir, 'Projects'),
+      path.join(homeDir, 'projects'),
+      path.join(homeDir, 'Code'),
+      path.join(homeDir, 'code'),
+      path.join(homeDir, 'repos'),
+      path.join(homeDir, 'Repos'),
+      path.join(homeDir, 'workspace'),
+      path.join(homeDir, 'Workspace'),
+      path.join(homeDir, 'dev'),
+      path.join(homeDir, 'Dev'),
+      path.join(homeDir, 'src'),
+      path.join(homeDir, 'Sites'),           // macOS Sites folder
+      path.join(homeDir, 'www'),
+      
+      // System-level common locations
+      '/var/www',                            // Linux web server
+      '/var/www/html',
+      '/opt/projects',
+      '/private/var/root/Downloads',         // Root downloads (if accessible)
+      '/root/Downloads',                     // Linux root downloads
+      '/root/projects',
+      
+      // Windows common locations (cross-platform safety)
+      'C:\\Users\\Public\\Projects',
+      'C:\\Projects',
+      'C:\\dev',
+    ];
+    
+    // Combine default paths with custom paths from renderer
+    const customPathsList = Array.isArray(customPaths) 
+      ? customPaths.filter(p => typeof p === 'string' && p.trim().length > 0)
+      : [];
+    
+    // Merge all paths and remove duplicates
+    const allPaths = [...new Set([...defaultScanDirs, ...customPathsList])];
+    
+    console.log(`🔍 Scanning ${allPaths.length} locations for Node.js projects...`);
 
     const allProjects = [];
-    for (const p of targets) {
+    let scannedCount = 0;
+    let projectsFound = 0;
+    
+    for (const p of allPaths) {
       try {
         const normalized = path.normalize(p);
+        
+        // Skip if doesn't exist or not accessible
         if (!fs.existsSync(normalized)) continue;
+        
         const stat = fs.statSync(normalized);
         if (!stat.isDirectory()) continue;
+        
+        scannedCount++;
         const projects = await scanNodeProjects(normalized);
-        if (Array.isArray(projects)) allProjects.push(...projects);
+        
+        if (Array.isArray(projects) && projects.length > 0) {
+          projectsFound += projects.length;
+          allProjects.push(...projects);
+          console.log(`  ✓ Found ${projects.length} projects in: ${normalized}`);
+        }
       } catch (e) {
-        console.warn(`scan-all-projects: failed scanning ${p}:`, e?.message || e);
+        // Silently skip permission denied and other errors
+        if (e.code !== 'EACCES' && e.code !== 'EPERM') {
+          console.warn(`scan-all-projects: failed scanning ${p}:`, e?.message || e);
+        }
       }
     }
+    
+    console.log(`📊 Scanned ${scannedCount} directories, found ${projectsFound} total projects`);
 
     // De-dupe by path (renderer expects unique project paths)
     const byPath = new Map();
@@ -1156,6 +1218,8 @@ ipcMain.handle('scan-all-projects', async (_event, paths = null) => {
     }
 
     const projects = Array.from(byPath.values());
+    console.log(`📋 After de-duplication: ${projects.length} unique projects`);
+    
     projects.sort((a, b) => b.timestamp - a.timestamp);
     return projects;
   } catch (err) {
@@ -1181,7 +1245,12 @@ ipcMain.handle('scan-custom-folder', async () => {
     
     const projects = await scanNodeProjects(selectedPath);
     projects.sort((a, b) => b.timestamp - a.timestamp);
-    return projects;
+    
+    // Return both the path and projects so renderer can save the path
+    return {
+      scannedPath: selectedPath,
+      projects: projects,
+    };
   } catch (err) {
     console.error('Error scanning custom folder:', err);
     throw err;

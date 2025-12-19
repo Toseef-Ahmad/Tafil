@@ -1093,6 +1093,29 @@ function loadScanPaths() {
   }
 }
 
+// Add a path to scan paths (for created projects)
+function addCreatedProjectPath(parentDir) {
+  if (!parentDir) return;
+  
+  try {
+    // Load existing paths
+    const existingPaths = loadScanPaths();
+    
+    // Check if path or a parent is already included
+    const isAlreadyIncluded = existingPaths.some(p => 
+      parentDir.startsWith(p) || p.startsWith(parentDir)
+    );
+    
+    if (!isAlreadyIncluded) {
+      existingPaths.push(parentDir);
+      saveScanPaths(existingPaths);
+      console.log('Added scan path:', parentDir, 'Total paths:', existingPaths.length);
+    }
+  } catch (err) {
+    console.error('Error adding created project path:', err);
+  }
+}
+
 function saveAppState() {
   try {
     const state = {
@@ -2616,27 +2639,49 @@ async function renderProjects() {
 
 async function renderCustomProjects() {
   try {
-    const projects = await window.electronAPI.scanCustomFolder();
+    const result = await window.electronAPI.scanCustomFolder();
     
-    if (!projects) {
+    if (!result) {
       showNotification('Scan cancelled', 'info');
       return;
     }
 
-    if (projects.length === 0) {
+    const { scannedPath, projects } = result;
+
+    if (!projects || projects.length === 0) {
       showNotification('No projects found in folder', 'warning');
       return;
     }
 
-    currentProjects = projects;
+    // Save the scanned path for future scans
+    if (scannedPath) {
+      addCreatedProjectPath(scannedPath);
+    }
+
+    // Merge with existing projects instead of replacing
+    const existingPaths = new Set(currentProjects.map(p => p.path));
+    let newCount = 0;
+    
+    for (const project of projects) {
+      if (!existingPaths.has(project.path)) {
+        currentProjects.unshift(project);
+        newCount++;
+      }
+    }
+    
     saveProjects(); // Persist for next launch
     filteredProjects = [];
-    allProjectsCountEl.textContent = projects.length;
-    viewSubtitleEl.textContent = `${projects.length} projects`;
-    renderProjectCards(projects);
+    allProjectsCountEl.textContent = currentProjects.length;
+    viewSubtitleEl.textContent = `${currentProjects.length} projects`;
+    renderProjectCards(currentProjects);
     renderCollections();
     updateEmptyState();
-    showNotification(`Found ${projects.length} projects`, 'success');
+    
+    if (newCount > 0) {
+      showNotification(`Found ${newCount} new projects (${currentProjects.length} total)`, 'success');
+    } else {
+      showNotification(`${projects.length} projects already in list`, 'info');
+    }
   } catch (err) {
     console.error("Error scanning folder:", err);
     showNotification('Failed to scan folder', 'error');
@@ -8058,13 +8103,36 @@ async function createNewProject() {
         }
       }
       
+      // Save the parent directory to scanPaths for future scans
+      addCreatedProjectPath(projectWizardData.parentDirectory);
+      
       // Add to projects list
       if (result.project) {
-        currentProjects.unshift(result.project);
+        // Check if project already exists (by path)
+        const existingIndex = currentProjects.findIndex(p => p.path === result.project.path);
+        if (existingIndex === -1) {
+          currentProjects.unshift(result.project);
+        } else {
+          currentProjects[existingIndex] = result.project;
+        }
+        saveProjects(); // Persist to localStorage
         filterAndRenderProjects();
+        updateRunningCount();
+        renderCollections();
       } else {
-        // Refresh projects list to pick up the new project
-        await renderProjects();
+        // Create a minimal project object from the result
+        const newProject = {
+          path: result.projectPath,
+          name: result.projectName,
+          framework: result.framework || result.stack,
+          hasPackageJson: true,
+          timestamp: Date.now(),
+        };
+        currentProjects.unshift(newProject);
+        saveProjects();
+        filterAndRenderProjects();
+        updateRunningCount();
+        renderCollections();
       }
       
       showNotification(`Project "${result.projectName}" created successfully!`, 'success');
