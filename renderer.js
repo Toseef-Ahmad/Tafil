@@ -388,61 +388,214 @@ function restoreLastSession() {
 }
 
 // =====================================================
-// Snippet History Panel
+// Snippet History Panel (Sidebar)
 // =====================================================
 
 function renderSnippetHistory() {
-  if (!codeOutput) return;
+  // Render in sidebar
+  const snippetHistoryList = document.getElementById('snippetHistoryList');
+  const snippetCount = document.getElementById('snippetCount');
   const snippets = getSavedSnippets();
   
+  // Update count badge
+  if (snippetCount) {
+    snippetCount.textContent = snippets.length;
+  }
+  
+  if (!snippetHistoryList) return;
+  
   if (snippets.length === 0) {
-    codeOutput.innerHTML = `
-      <div style="text-align: center; padding: 40px 20px;">
-        <div style="font-size: 32px; margin-bottom: 12px; opacity: 0.5;">📝</div>
-        <div style="font-size: 13px; color: #71717a; margin-bottom: 8px;">No saved snippets yet</div>
-        <div style="font-size: 11px; color: #52525b;">Click "Save" to save your current code</div>
+    snippetHistoryList.innerHTML = `
+      <div class="px-2 py-4 text-center" style="color: #52525b; font-size: 11px;">
+        No saved snippets yet.<br>Click "Save Snippet" to save your code.
       </div>
     `;
     return;
   }
 
-  codeOutput.innerHTML = `
-    <div style="padding: 4px 0;">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,0.06);">
-        <div style="font-size:13px;font-weight:600;color:#fafafa;">Saved Snippets</div>
-        <div style="font-size:11px;color:#52525b;">${snippets.length} saved</div>
+  snippetHistoryList.innerHTML = snippets.map(s => {
+    const isActive = s.id === currentSnippetId;
+    const timeAgo = formatRelativeTime(s.lastRunAt || s.createdAt);
+    const preview = (s.code || '').split('\n')[0].slice(0, 25).replace(/[^a-zA-Z0-9 ]/g, '').trim() || 'Empty';
+    
+    return `
+      <div class="sidebar-item snippet-sidebar-item ${isActive ? 'active' : ''}" 
+           data-snippet-id="${s.id}"
+           style="display:flex;flex-direction:column;gap:2px;padding:8px 10px;margin:2px 4px;border-radius:6px;cursor:pointer;${isActive ? 'background:rgba(139, 92, 246, 0.15);' : ''}">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;">
+          <div style="font-size:12px;color:${isActive ? '#a78bfa' : '#e4e4e7'};font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;">
+            ${escapeHtml(s.name)}
+          </div>
+          <button class="snippet-delete-btn" data-snippet-id="${s.id}" 
+                  style="padding:2px 4px;background:transparent;border:none;color:#71717a;font-size:10px;cursor:pointer;opacity:0.5;transition:opacity 0.15s;"
+                  title="Delete">✕</button>
+        </div>
+        <div style="font-size:10px;color:#71717a;">${timeAgo}</div>
       </div>
-      <div style="display:flex;flex-direction:column;gap:8px;max-height:300px;overflow-y:auto;">
-        ${snippets.map(s => {
-          const isActive = s.id === currentSnippetId;
-          const timeAgo = formatRelativeTime(s.lastRunAt || s.createdAt);
-          return `
-            <div class="snippet-item ${isActive ? 'active' : ''}" 
-                 style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid ${isActive ? 'rgba(139, 92, 246, 0.3)' : 'rgba(255,255,255,0.06)'};border-radius:10px;background:${isActive ? 'rgba(139, 92, 246, 0.1)' : 'rgba(255,255,255,0.02)'};cursor:pointer;transition:all 0.15s ease;">
-              <div style="width:32px;height:32px;border-radius:8px;background:rgba(139, 92, 246, 0.15);display:flex;align-items:center;justify-content:center;font-size:14px;">
-                📄
-              </div>
-              <div style="flex:1;min-width:0;">
-                <div style="font-size:13px;color:#fafafa;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(s.name)}</div>
-                <div style="font-size:11px;color:#71717a;">${timeAgo} • ${s.runCount || 1} runs</div>
-              </div>
-              <div style="display:flex;gap:4px;flex-shrink:0;">
-                <button data-snippet-action="load" data-snippet-id="${s.id}" 
-                        style="padding:6px 12px;background:rgba(139, 92, 246, 0.15);border:none;border-radius:6px;color:#a78bfa;font-size:11px;font-weight:500;cursor:pointer;">
-                  Load
-                </button>
-                <button data-snippet-action="delete" data-snippet-id="${s.id}" 
-                        style="padding:6px 8px;background:rgba(244, 63, 94, 0.1);border:none;border-radius:6px;color:#f43f5e;font-size:11px;cursor:pointer;"
-                        title="Delete">
-                  ✕
-                </button>
-              </div>
-            </div>
-          `;
-        }).join('')}
-      </div>
-    </div>
-  `;
+    `;
+  }).join('');
+  
+  // Add click handlers for snippet items
+  snippetHistoryList.querySelectorAll('.snippet-sidebar-item').forEach(item => {
+    item.addEventListener('click', (e) => {
+      // Don't load if delete button was clicked
+      if (e.target.classList.contains('snippet-delete-btn')) return;
+      
+      const id = Number(item.getAttribute('data-snippet-id'));
+      const snippet = loadSnippet(id);
+      if (snippet) {
+        showNotification(`Loaded: ${snippet.name}`, 'success');
+        renderSnippetHistory(); // Re-render to update active state
+      }
+    });
+  });
+  
+  // Add click handlers for delete buttons
+  snippetHistoryList.querySelectorAll('.snippet-delete-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const id = Number(btn.getAttribute('data-snippet-id'));
+      const snippets = getSavedSnippets();
+      const snippet = snippets.find(s => s.id === id);
+      if (snippet && confirm(`Delete "${snippet.name}"?`)) {
+        deleteSnippet(id);
+        renderSnippetHistory();
+        showNotification('Snippet deleted', 'info');
+      }
+    });
+  });
+}
+
+// Show save snippet dialog
+// Snippet save modal state
+let pendingSnippetCode = '';
+let pendingSnippetDefaultName = '';
+
+function showSaveSnippetDialog() {
+  console.log('showSaveSnippetDialog called');
+  
+  if (!monacoEditor) {
+    showNotification('Editor not ready', 'error');
+    return;
+  }
+  
+  const code = monacoEditor.getValue();
+  
+  if (!code.trim()) {
+    showNotification('Nothing to save - write some code first', 'warning');
+    return;
+  }
+  
+  // Generate smart default name from first meaningful line
+  const lines = code.split('\n');
+  let defaultName = '';
+  for (const line of lines) {
+    const cleaned = line.replace(/^\/\/\s*/, '').replace(/[^a-zA-Z0-9 ]/g, '').trim();
+    if (cleaned && cleaned.length > 2) {
+      defaultName = cleaned.slice(0, 30);
+      break;
+    }
+  }
+  defaultName = defaultName || `Snippet ${new Date().toLocaleTimeString()}`;
+  
+  // Store for modal callback
+  pendingSnippetCode = code;
+  pendingSnippetDefaultName = defaultName;
+  
+  // Show modal
+  const modal = document.getElementById('saveSnippetModal');
+  const input = document.getElementById('snippetNameInput');
+  
+  if (modal && input) {
+    input.value = defaultName;
+    modal.classList.remove('hidden');
+    modal.style.display = 'flex';
+    
+    // Focus input after a small delay
+    setTimeout(() => {
+      input.focus();
+      input.select();
+    }, 100);
+  } else {
+    console.error('Save snippet modal not found');
+    // Fallback to prompt
+    const name = prompt('Save Snippet - Enter a name:', defaultName);
+    if (name !== null) {
+      const snippet = saveSnippet(name.trim() || defaultName, code);
+      showNotification(`✓ Saved "${snippet.name}"`, 'success');
+      renderSnippetHistory();
+    }
+  }
+}
+
+function closeSaveSnippetModal() {
+  const modal = document.getElementById('saveSnippetModal');
+  if (modal) {
+    modal.classList.add('hidden');
+    modal.style.display = 'none';
+  }
+  pendingSnippetCode = '';
+  pendingSnippetDefaultName = '';
+}
+
+function confirmSaveSnippet() {
+  const input = document.getElementById('snippetNameInput');
+  const name = input ? input.value.trim() : '';
+  
+  if (!pendingSnippetCode) {
+    closeSaveSnippetModal();
+    return;
+  }
+  
+  const finalName = name || pendingSnippetDefaultName || `Snippet ${Date.now()}`;
+  const snippet = saveSnippet(finalName, pendingSnippetCode);
+  
+  console.log('Snippet saved:', snippet);
+  showNotification(`✓ Saved "${snippet.name}"`, 'success');
+  renderSnippetHistory();
+  closeSaveSnippetModal();
+}
+
+// Initialize save snippet modal handlers
+function initSaveSnippetModal() {
+  const modal = document.getElementById('saveSnippetModal');
+  const closeBtn = document.getElementById('closeSaveSnippetModal');
+  const cancelBtn = document.getElementById('cancelSaveSnippet');
+  const confirmBtn = document.getElementById('confirmSaveSnippet');
+  const input = document.getElementById('snippetNameInput');
+  
+  if (closeBtn) {
+    closeBtn.addEventListener('click', closeSaveSnippetModal);
+  }
+  
+  if (cancelBtn) {
+    cancelBtn.addEventListener('click', closeSaveSnippetModal);
+  }
+  
+  if (confirmBtn) {
+    confirmBtn.addEventListener('click', confirmSaveSnippet);
+  }
+  
+  if (input) {
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        confirmSaveSnippet();
+      }
+      if (e.key === 'Escape') {
+        closeSaveSnippetModal();
+      }
+    });
+  }
+  
+  // Close modal when clicking outside
+  if (modal) {
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) {
+        closeSaveSnippetModal();
+      }
+    });
+  }
 }
 
 // =====================================================
@@ -595,6 +748,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     loadSettings();
     loadAppState();
     loadScanPaths();
+    initSaveSnippetModal(); // Initialize save snippet modal
     
     // Initialize modules
     initModuleTabs();
@@ -3912,38 +4066,43 @@ console.log('Ready to code!')
         });
       }
 
-      // Save snippet with better UX
-      if (saveSnippetBtn) {
-        saveSnippetBtn.addEventListener('click', () => {
-          const code = monacoEditor ? monacoEditor.getValue() : '';
-          if (!code.trim()) {
-            showNotification('Nothing to save', 'warning');
-            return;
-          }
-          
-          // Generate smart default name from code
-          const firstLine = code.split('\n')[0].slice(0, 30).replace(/[^a-zA-Z0-9 ]/g, '').trim();
-          const defaultName = firstLine || `Snippet ${new Date().toLocaleTimeString()}`;
-          
-          const name = window.prompt('Snippet name:', defaultName);
-          if (name === null) return; // Cancelled
-          
-          const snippet = saveSnippet(name.trim() || defaultName, code);
-          showNotification(`✓ Saved "${snippet.name}"`, 'success');
-          renderSnippetHistory();
+      // Save snippet button (toolbar) - re-query to ensure we get the element
+      const saveBtn = document.getElementById('saveSnippetBtn');
+      console.log('Save button found:', saveBtn);
+      if (saveBtn) {
+        saveBtn.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          console.log('Save button clicked!');
+          showSaveSnippetDialog();
         });
       }
 
       // Playground sidebar actions
       const navNewSnippet = document.getElementById('navNewSnippet');
-      const navSnippetHistory = document.getElementById('navSnippetHistory');
+      const navSaveSnippet = document.getElementById('navSaveSnippet');
+      console.log('Sidebar save button found:', navSaveSnippet);
 
+      // Save Snippet (sidebar)
+      if (navSaveSnippet) {
+        navSaveSnippet.addEventListener('click', (e) => {
+          e.preventDefault();
+          console.log('Sidebar save clicked!');
+          showSaveSnippetDialog();
+        });
+      }
+
+      // New Snippet
       if (navNewSnippet) {
         navNewSnippet.addEventListener('click', () => {
-          // Auto-save current work as draft before clearing
           const currentCode = monacoEditor ? monacoEditor.getValue() : '';
-          if (currentCode.trim()) {
-            saveDraft();
+          
+          // If there's unsaved code, offer to save it first
+          if (currentCode.trim() && currentCode !== '// New snippet\n') {
+            const shouldSave = confirm('Save current snippet before creating new?');
+            if (shouldSave) {
+              showSaveSnippetDialog();
+            }
           }
           
           if (monacoEditor) {
@@ -3956,39 +4115,19 @@ console.log('Ready to code!')
           }
           clearInlineWidgets();
           currentSnippetId = null;
+          renderSnippetHistory(); // Update active state
           showNotification('New snippet created', 'info');
         });
       }
+      
+      // Render initial snippet history in sidebar
+      renderSnippetHistory();
+      
+      // Legacy history button (if exists)
+      const navSnippetHistory = document.getElementById('navSnippetHistory');
       if (navSnippetHistory) {
         navSnippetHistory.addEventListener('click', () => {
           renderSnippetHistory();
-        });
-      }
-
-      // Snippet history event delegation
-      if (codeOutput) {
-        codeOutput.addEventListener('click', (e) => {
-          const btn = e.target?.closest?.('button[data-snippet-action]');
-          if (!btn) return;
-          const action = btn.getAttribute('data-snippet-action');
-          const id = Number(btn.getAttribute('data-snippet-id'));
-          const snippets = getSavedSnippets();
-          const idx = snippets.findIndex(s => s.id === id);
-          if (idx === -1) return;
-
-          if (action === 'load') {
-            if (monacoEditor) monacoEditor.setValue(snippets[idx].code || '');
-            showNotification(`Loaded: ${snippets[idx].name}`, 'success');
-            clearInlineWidgets();
-            return;
-          }
-
-          if (action === 'delete') {
-            snippets.splice(idx, 1);
-            localStorage.setItem(PLAYGROUND_SNIPPETS_KEY, JSON.stringify(snippets));
-            renderSnippetHistory();
-            showNotification('Snippet deleted', 'info');
-          }
         });
       }
 

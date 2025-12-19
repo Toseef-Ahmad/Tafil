@@ -1926,18 +1926,44 @@ body[data-theme="solarized-light"] .project-card:hover {
   border: 1px solid rgba(245, 158, 11, 0.2);
 }
 
-/* Snippet history item hover */
-.snippet-item:hover {
-  background: rgba(255, 255, 255, 0.04) !important;
-  border-color: rgba(255, 255, 255, 0.1) !important;
+/* Snippet sidebar items */
+.snippet-sidebar-item {
+  transition: background 0.15s ease;
 }
 
-.snippet-item.active {
-  background: rgba(139, 92, 246, 0.1) !important;
-  border-color: rgba(139, 92, 246, 0.3) !important;
+.snippet-sidebar-item:hover {
+  background: rgba(255, 255, 255, 0.06) !important;
+}
+
+.snippet-sidebar-item.active {
+  background: rgba(139, 92, 246, 0.15) !important;
+}
+
+.snippet-sidebar-item:hover .snippet-delete-btn {
+  opacity: 1 !important;
+}
+
+.snippet-delete-btn:hover {
+  color: #f43f5e !important;
+  opacity: 1 !important;
 }
 
 /* Auto-run status indicator */
 #autoRunStatus {
   transition: all 0.15s ease;
+}
+
+/* Snippet history scroll */
+#snippetHistoryList {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.1) transparent;
+}
+
+#snippetHistoryList::-webkit-scrollbar {
+  width: 4px;
+}
+
+#snippetHistoryList::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.1);
+  border-radius: 2px;
 }
