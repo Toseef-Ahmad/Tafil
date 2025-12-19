@@ -2344,6 +2344,105 @@
   <!-- Monaco Editor CSS (local for offline reliability) -->
   <link rel="stylesheet" href="./node_modules/monaco-editor/min/vs/editor/editor.main.css" />
 
+  <!-- License Activation Modal -->
+  <div id="licenseModal" class="modal-overlay hidden" style="position:fixed;inset:0;background:rgba(0,0,0,0.85);display:flex;align-items:center;justify-content:center;z-index:10000;">
+    <div class="modal-content" style="background:#18181b;border:1px solid rgba(139, 92, 246, 0.3);border-radius:16px;padding:32px;width:440px;max-width:90vw;box-shadow:0 25px 50px rgba(0,0,0,0.5);">
+      <!-- Header -->
+      <div style="text-align:center;margin-bottom:24px;">
+        <div style="width:64px;height:64px;margin:0 auto 16px;background:linear-gradient(135deg, #8b5cf6, #6366f1);border-radius:16px;display:flex;align-items:center;justify-content:center;">
+          <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21 2-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0 3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
+        </div>
+        <h2 id="licenseModalTitle" style="margin:0 0 8px;font-size:20px;font-weight:700;color:#fafafa;">Activate Tafil</h2>
+        <p id="licenseModalSubtitle" style="margin:0;font-size:13px;color:#a1a1aa;">Enter your license key to unlock all features</p>
+      </div>
+      
+      <!-- Status Message -->
+      <div id="licenseStatusMessage" class="hidden" style="margin-bottom:16px;padding:12px 16px;border-radius:8px;font-size:13px;"></div>
+      
+      <!-- Device ID Display -->
+      <div style="margin-bottom:20px;padding:12px 16px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:8px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;">
+          <span style="font-size:11px;color:#71717a;">Device ID</span>
+          <span id="licenseDeviceId" style="font-size:12px;font-family:'JetBrains Mono',monospace;color:#a1a1aa;">Loading...</span>
+        </div>
+      </div>
+      
+      <!-- Form -->
+      <div id="licenseFormSection">
+        <div style="margin-bottom:16px;">
+          <label style="display:block;font-size:12px;color:#a1a1aa;margin-bottom:6px;">License Key</label>
+          <input type="text" id="licenseKeyInput" placeholder="TAFIL-XXXX-XXXX-XXXX" 
+                 style="width:100%;padding:12px 14px;background:#111113;border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#fafafa;font-size:14px;font-family:'JetBrains Mono',monospace;text-transform:uppercase;outline:none;transition:border-color 0.2s;"
+                 autocomplete="off" spellcheck="false" />
+        </div>
+        <div style="margin-bottom:20px;">
+          <label style="display:block;font-size:12px;color:#a1a1aa;margin-bottom:6px;">Email</label>
+          <input type="email" id="licenseEmailInput" placeholder="your@email.com" 
+                 style="width:100%;padding:12px 14px;background:#111113;border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#fafafa;font-size:14px;outline:none;transition:border-color 0.2s;"
+                 autocomplete="email" />
+        </div>
+        
+        <!-- Buttons -->
+        <div style="display:flex;gap:12px;">
+          <button id="licenseActivateBtn" style="flex:1;padding:12px 20px;background:linear-gradient(135deg, #8b5cf6, #6366f1);border:none;border-radius:8px;color:#fff;font-size:14px;font-weight:600;cursor:pointer;transition:transform 0.15s, box-shadow 0.15s;">
+            Activate License
+          </button>
+        </div>
+        
+        <!-- Skip for later (only if not critical) -->
+        <div id="licenseSkipSection" style="margin-top:16px;text-align:center;">
+          <button id="licenseSkipBtn" style="background:none;border:none;color:#71717a;font-size:12px;cursor:pointer;text-decoration:underline;">
+            Continue without license (limited features)
+          </button>
+        </div>
+      </div>
+      
+      <!-- Active License View -->
+      <div id="licenseActiveSection" class="hidden">
+        <div style="padding:16px;background:rgba(16, 185, 129, 0.1);border:1px solid rgba(16, 185, 129, 0.2);border-radius:8px;margin-bottom:16px;">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+            <span style="color:#10b981;font-weight:600;font-size:14px;">License Active</span>
+          </div>
+          <div style="font-size:12px;color:#a1a1aa;">
+            <div>Key: <span id="activeLicenseKey" style="font-family:'JetBrains Mono',monospace;">-</span></div>
+            <div>Email: <span id="activeLicenseEmail">-</span></div>
+          </div>
+        </div>
+        <div style="display:flex;gap:12px;">
+          <button id="licenseCloseBtn" style="flex:1;padding:12px 20px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#a1a1aa;font-size:14px;cursor:pointer;">
+            Close
+          </button>
+          <button id="licenseDeactivateBtn" style="padding:12px 20px;background:rgba(244, 63, 94, 0.1);border:1px solid rgba(244, 63, 94, 0.2);border-radius:8px;color:#f43f5e;font-size:14px;cursor:pointer;">
+            Deactivate
+          </button>
+        </div>
+      </div>
+      
+      <!-- Loading State -->
+      <div id="licenseLoadingSection" class="hidden" style="text-align:center;padding:20px;">
+        <div style="width:40px;height:40px;margin:0 auto 16px;border:3px solid rgba(139, 92, 246, 0.2);border-top-color:#8b5cf6;border-radius:50%;animation:spin 1s linear infinite;"></div>
+        <p style="color:#a1a1aa;font-size:13px;">Activating license...</p>
+      </div>
+    </div>
+  </div>
+  
+  <style>
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    #licenseKeyInput:focus, #licenseEmailInput:focus {
+      border-color: rgba(139, 92, 246, 0.5);
+    }
+    #licenseActivateBtn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(139, 92, 246, 0.4);
+    }
+    #licenseActivateBtn:active {
+      transform: translateY(0);
+    }
+  </style>
+
   <!-- Save Snippet Modal -->
   <div id="saveSnippetModal" class="modal-overlay hidden" style="position:fixed;inset:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:9999;">
     <div class="modal-content" style="background:#18181b;border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:24px;width:400px;max-width:90vw;">

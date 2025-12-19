@@ -127,4 +127,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onTrayOpenBrowser: (callback) => ipcRenderer.on('tray-open-browser', callback),
   onTrayOpenEditor: (callback) => ipcRenderer.on('tray-open-editor', callback),
   onTrayStopProject: (callback) => ipcRenderer.on('tray-stop-project', callback),
+  
+  // ~~~~~~~~~~~~~~ Licensing ~~~~~~~~~~~~~~
+  licenseGetStatus: () => ipcRenderer.invoke('license-get-status'),
+  licenseGetDeviceId: () => ipcRenderer.invoke('license-get-device-id'),
+  licenseActivate: (licenseKey, email) => ipcRenderer.invoke('license-activate', { licenseKey, email }),
+  licenseDeactivate: (licenseKey, email) => ipcRenderer.invoke('license-deactivate', { licenseKey, email }),
+  licenseCheckAction: (actionName) => ipcRenderer.invoke('license-check-action', actionName),
+  licenseGetInfo: () => ipcRenderer.invoke('license-get-info'),
+  licenseCheckServer: () => ipcRenderer.invoke('license-check-server'),
 });

@@ -425,14 +425,14 @@ function renderSnippetHistory() {
         <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;">
           <div style="font-size:12px;color:${isActive ? '#a78bfa' : '#e4e4e7'};font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;">
             ${escapeHtml(s.name)}
-          </div>
+    </div>
           <button class="snippet-delete-btn" data-snippet-id="${s.id}" 
                   style="padding:2px 4px;background:transparent;border:none;color:#71717a;font-size:10px;cursor:pointer;opacity:0.5;transition:opacity 0.15s;"
                   title="Delete">✕</button>
-        </div>
+          </div>
         <div style="font-size:10px;color:#71717a;">${timeAgo}</div>
-      </div>
-    `;
+    </div>
+  `;
   }).join('');
   
   // Add click handlers for snippet items
@@ -599,6 +599,317 @@ function initSaveSnippetModal() {
 }
 
 // =====================================================
+// License Modal & Activation
+// =====================================================
+
+let licenseStatus = { status: 'unknown', needsActivation: true };
+
+// Check license on startup (OFFLINE - no network call)
+async function checkLicenseOnStartup() {
+  try {
+    licenseStatus = await window.electronAPI.licenseGetStatus();
+    console.log('License status:', licenseStatus.status);
+    
+    // If no license, show activation modal after a short delay
+    if (licenseStatus.needsActivation) {
+      setTimeout(() => {
+        showLicenseModal(false); // false = allow skip
+      }, 1500);
+    }
+    
+    // Update any license status indicators in the UI
+    updateLicenseStatusUI();
+    
+  } catch (e) {
+    console.error('Error checking license:', e);
+  }
+}
+
+// Show license modal
+async function showLicenseModal(required = false) {
+  const modal = document.getElementById('licenseModal');
+  const formSection = document.getElementById('licenseFormSection');
+  const activeSection = document.getElementById('licenseActiveSection');
+  const loadingSection = document.getElementById('licenseLoadingSection');
+  const skipSection = document.getElementById('licenseSkipSection');
+  const statusMessage = document.getElementById('licenseStatusMessage');
+  const deviceIdEl = document.getElementById('licenseDeviceId');
+  
+  if (!modal) return;
+  
+  // Reset state
+  formSection?.classList.remove('hidden');
+  activeSection?.classList.add('hidden');
+  loadingSection?.classList.add('hidden');
+  statusMessage?.classList.add('hidden');
+  
+  // Show/hide skip button based on requirement
+  if (skipSection) {
+    if (required) {
+      skipSection.classList.add('hidden');
+    } else {
+      skipSection.classList.remove('hidden');
+    }
+  }
+  
+  // Get device ID
+  try {
+    const deviceInfo = await window.electronAPI.licenseGetDeviceId();
+    if (deviceIdEl) {
+      deviceIdEl.textContent = deviceInfo.shortId;
+    }
+  } catch (e) {
+    if (deviceIdEl) deviceIdEl.textContent = 'Unknown';
+  }
+  
+  // Check current status
+  const status = await window.electronAPI.licenseGetStatus();
+  
+  if (status.status === 'active') {
+    // Show active license view
+    formSection?.classList.add('hidden');
+    activeSection?.classList.remove('hidden');
+    
+    document.getElementById('activeLicenseKey').textContent = status.licenseKey || '-';
+    document.getElementById('activeLicenseEmail').textContent = status.email || '-';
+  }
+  
+  // Show modal
+  modal.classList.remove('hidden');
+  modal.style.display = 'flex';
+  
+  // Focus first input
+  setTimeout(() => {
+    document.getElementById('licenseKeyInput')?.focus();
+  }, 100);
+}
+
+// Hide license modal
+function hideLicenseModal() {
+  const modal = document.getElementById('licenseModal');
+  if (modal) {
+    modal.classList.add('hidden');
+    modal.style.display = 'none';
+  }
+}
+
+// Show license status message
+function showLicenseMessage(message, type = 'info') {
+  const el = document.getElementById('licenseStatusMessage');
+  if (!el) return;
+  
+  const colors = {
+    success: { bg: 'rgba(16, 185, 129, 0.1)', border: 'rgba(16, 185, 129, 0.2)', color: '#10b981' },
+    error: { bg: 'rgba(244, 63, 94, 0.1)', border: 'rgba(244, 63, 94, 0.2)', color: '#f43f5e' },
+    info: { bg: 'rgba(139, 92, 246, 0.1)', border: 'rgba(139, 92, 246, 0.2)', color: '#a78bfa' },
+  };
+  
+  const c = colors[type] || colors.info;
+  el.style.background = c.bg;
+  el.style.border = `1px solid ${c.border}`;
+  el.style.color = c.color;
+  el.textContent = message;
+  el.classList.remove('hidden');
+}
+
+// Activate license
+async function activateLicense() {
+  const keyInput = document.getElementById('licenseKeyInput');
+  const emailInput = document.getElementById('licenseEmailInput');
+  const formSection = document.getElementById('licenseFormSection');
+  const loadingSection = document.getElementById('licenseLoadingSection');
+  const activeSection = document.getElementById('licenseActiveSection');
+  
+  const licenseKey = keyInput?.value?.trim();
+  const email = emailInput?.value?.trim();
+  
+  if (!licenseKey) {
+    showLicenseMessage('Please enter your license key', 'error');
+    keyInput?.focus();
+    return;
+  }
+  
+  if (!email) {
+    showLicenseMessage('Please enter your email', 'error');
+    emailInput?.focus();
+    return;
+  }
+  
+  // Show loading
+  formSection?.classList.add('hidden');
+  loadingSection?.classList.remove('hidden');
+  
+  try {
+    const result = await window.electronAPI.licenseActivate(licenseKey, email);
+    
+    loadingSection?.classList.add('hidden');
+    
+    if (result.success) {
+      // Success! Show active view
+      showLicenseMessage('License activated successfully!', 'success');
+      activeSection?.classList.remove('hidden');
+      
+      document.getElementById('activeLicenseKey').textContent = licenseKey;
+      document.getElementById('activeLicenseEmail').textContent = email;
+      
+      // Update global status
+      licenseStatus = await window.electronAPI.licenseGetStatus();
+      updateLicenseStatusUI();
+      
+      // Hide modal after delay
+      setTimeout(() => {
+        hideLicenseModal();
+        showNotification('License activated! All features unlocked.', 'success');
+      }, 1500);
+      
+    } else {
+      // Error
+      formSection?.classList.remove('hidden');
+      showLicenseMessage(result.error || 'Activation failed', 'error');
+    }
+    
+  } catch (e) {
+    loadingSection?.classList.add('hidden');
+    formSection?.classList.remove('hidden');
+    showLicenseMessage(e.message || 'Activation failed', 'error');
+  }
+}
+
+// Deactivate license
+async function deactivateLicense() {
+  const licenseKey = document.getElementById('activeLicenseKey')?.textContent;
+  const email = document.getElementById('activeLicenseEmail')?.textContent;
+  
+  if (!licenseKey || !email || licenseKey === '-') {
+    showLicenseMessage('No active license to deactivate', 'error');
+    return;
+  }
+  
+  if (!confirm('Are you sure you want to deactivate this license? You can reactivate it later.')) {
+    return;
+  }
+  
+  try {
+    const result = await window.electronAPI.licenseDeactivate(licenseKey, email);
+    
+    if (result.success) {
+      showNotification('License deactivated', 'info');
+      licenseStatus = { status: 'not_activated', needsActivation: true };
+      updateLicenseStatusUI();
+      
+      // Show activation form
+      document.getElementById('licenseActiveSection')?.classList.add('hidden');
+      document.getElementById('licenseFormSection')?.classList.remove('hidden');
+      document.getElementById('licenseKeyInput').value = '';
+      document.getElementById('licenseEmailInput').value = '';
+      
+    } else {
+      showLicenseMessage(result.error || 'Deactivation failed', 'error');
+    }
+    
+  } catch (e) {
+    showLicenseMessage(e.message || 'Deactivation failed', 'error');
+  }
+}
+
+// Update license status UI elements
+function updateLicenseStatusUI() {
+  // Add license indicator to settings or sidebar
+  const settingsBtn = document.getElementById('settingsBtn');
+  if (settingsBtn && licenseStatus.status !== 'active') {
+    // Could add a visual indicator here
+  }
+}
+
+// Initialize license modal
+function initLicenseModal() {
+  const modal = document.getElementById('licenseModal');
+  const activateBtn = document.getElementById('licenseActivateBtn');
+  const skipBtn = document.getElementById('licenseSkipBtn');
+  const closeBtn = document.getElementById('licenseCloseBtn');
+  const deactivateBtn = document.getElementById('licenseDeactivateBtn');
+  const keyInput = document.getElementById('licenseKeyInput');
+  const emailInput = document.getElementById('licenseEmailInput');
+  
+  // Activate button
+  if (activateBtn) {
+    activateBtn.addEventListener('click', activateLicense);
+  }
+  
+  // Skip button
+  if (skipBtn) {
+    skipBtn.addEventListener('click', () => {
+      hideLicenseModal();
+      showNotification('Continuing with limited features', 'info');
+    });
+  }
+  
+  // Close button (when license is active)
+  if (closeBtn) {
+    closeBtn.addEventListener('click', hideLicenseModal);
+  }
+  
+  // Deactivate button
+  if (deactivateBtn) {
+    deactivateBtn.addEventListener('click', deactivateLicense);
+  }
+  
+  // Enter key to activate
+  if (emailInput) {
+    emailInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        activateLicense();
+      }
+    });
+  }
+  
+  if (keyInput) {
+    keyInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        emailInput?.focus();
+      }
+    });
+    
+    // Auto-format license key
+    keyInput.addEventListener('input', (e) => {
+      let val = e.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, '');
+      e.target.value = val;
+    });
+  }
+  
+  // Close on background click (only if not required)
+  if (modal) {
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal && document.getElementById('licenseSkipSection')?.style.display !== 'none') {
+        hideLicenseModal();
+      }
+    });
+  }
+}
+
+// Check if action is allowed by license
+async function checkLicenseForAction(actionName, showModal = true) {
+  try {
+    const result = await window.electronAPI.licenseCheckAction(actionName);
+    
+    if (!result.allowed) {
+      if (showModal) {
+        showNotification(result.reason || 'License required for this feature', 'warning');
+        showLicenseModal(false);
+      }
+      return false;
+    }
+    
+    return true;
+  } catch (e) {
+    console.error('License check error:', e);
+    return true; // Fail open for now
+  }
+}
+
+// =====================================================
 // Inline Results (Quokka-style)
 // =====================================================
 
@@ -606,12 +917,12 @@ function clearInlineWidgets() {
   if (!monacoEditor) return;
   
   // Remove all content widgets
-  inlineWidgets.forEach(w => {
+    inlineWidgets.forEach(w => {
     try { 
       monacoEditor.removeContentWidget(w); 
     } catch (e) {}
-  });
-  inlineWidgets = [];
+    });
+    inlineWidgets = [];
   
   // Clear decorations
   if (inlineDecorations.length > 0) {
@@ -749,6 +1060,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     loadAppState();
     loadScanPaths();
     initSaveSnippetModal(); // Initialize save snippet modal
+    initLicenseModal(); // Initialize license modal
+    
+    // Check license status on startup (OFFLINE - no network call)
+    await checkLicenseOnStartup();
     
     // Initialize modules
     initModuleTabs();
@@ -3278,6 +3593,12 @@ async function attemptRunProject(projectPath) {
 }
 
 async function runProjectWithPort(projectPath, customPort = null) {
+  // License check for running projects
+  const allowed = await checkLicenseForAction('project.run');
+  if (!allowed) {
+    return;
+  }
+  
   setCardStatus(projectPath, customPort ? `Starting on :${customPort}...` : 'Starting...', 'info');
   updateSingleCard(projectPath);
   
@@ -4110,18 +4431,18 @@ console.log('Ready to code!')
             monacoEditor.setPosition({ lineNumber: 2, column: 1 });
             monacoEditor.focus();
           }
-          if (codeOutput) {
+      if (codeOutput) {
             codeOutput.innerHTML = '<p class="text-xs" style="color: #52525b;">Ready to code...</p>';
           }
-          clearInlineWidgets();
+            clearInlineWidgets();
           currentSnippetId = null;
           renderSnippetHistory(); // Update active state
           showNotification('New snippet created', 'info');
         });
-      }
-      
+          }
+
       // Render initial snippet history in sidebar
-      renderSnippetHistory();
+            renderSnippetHistory();
       
       // Legacy history button (if exists)
       const navSnippetHistory = document.getElementById('navSnippetHistory');
@@ -4240,6 +4561,12 @@ function updateAutoRunStatus() {
 
 async function runCode() {
   if (!monacoEditor || !codeOutput) return Promise.resolve();
+  
+  // License check for playground (silent - don't block auto-run)
+  // This check is intentionally lightweight for auto-run scenarios
+  if (licenseStatus.needsActivation) {
+    // Still allow execution but could limit features in the future
+  }
   
   // Prevent concurrent executions
   if (isExecuting) {
@@ -8491,6 +8818,12 @@ async function handleWizardNext() {
 }
 
 async function createNewProject() {
+  // License check for project creation
+  const allowed = await checkLicenseForAction('project.create');
+  if (!allowed) {
+    return;
+  }
+  
   if (creationLog) creationLog.innerHTML = '';
   
   const logMessage = (msg, type = 'info') => {

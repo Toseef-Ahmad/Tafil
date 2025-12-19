@@ -7,6 +7,9 @@ const fsPromises = require('fs').promises;
 const psTree = require('ps-tree');
 const projectBrain = require('./utils/projectBrain');
 
+// Licensing module
+const licensing = require('./licensing');
+
 // ========================================
 // Error Intelligence (deterministic, offline)
 // ========================================
@@ -1148,6 +1151,91 @@ app.on('activate', () => {
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
+});
+
+// -------------------------------------------------
+// Licensing IPC Handlers
+// -------------------------------------------------
+
+// Get license status (OFFLINE - no network call)
+ipcMain.handle('license-get-status', async () => {
+  try {
+    return licensing.getLicenseStatus();
+  } catch (e) {
+    console.error('Error getting license status:', e);
+    return { status: 'error', message: e.message, needsActivation: true };
+  }
+});
+
+// Get device ID for display
+ipcMain.handle('license-get-device-id', async () => {
+  try {
+    return {
+      deviceId: licensing.getDeviceId(),
+      shortId: licensing.getShortDeviceId(),
+    };
+  } catch (e) {
+    console.error('Error getting device ID:', e);
+    return { deviceId: 'unknown', shortId: 'UNKNOWN' };
+  }
+});
+
+// Activate license (requires network)
+ipcMain.handle('license-activate', async (_event, { licenseKey, email }) => {
+  try {
+    console.log('Activating license:', licenseKey, 'for', email);
+    const result = await licensing.activateLicense(licenseKey, email);
+    
+    if (result.success) {
+      console.log('License activated successfully');
+    } else {
+      console.error('License activation failed:', result.error);
+    }
+    
+    return result;
+  } catch (e) {
+    console.error('Error activating license:', e);
+    return { success: false, error: e.message };
+  }
+});
+
+// Deactivate license (requires network)
+ipcMain.handle('license-deactivate', async (_event, { licenseKey, email }) => {
+  try {
+    console.log('Deactivating license:', licenseKey);
+    const result = await licensing.deactivateLicense(licenseKey, email);
+    return result;
+  } catch (e) {
+    console.error('Error deactivating license:', e);
+    return { success: false, error: e.message };
+  }
+});
+
+// Check if specific action is allowed (OFFLINE)
+ipcMain.handle('license-check-action', async (_event, actionName) => {
+  try {
+    return licensing.guardAction(actionName);
+  } catch (e) {
+    return { allowed: false, reason: e.message };
+  }
+});
+
+// Get license info (OFFLINE)
+ipcMain.handle('license-get-info', async () => {
+  try {
+    return licensing.getLicenseInfo();
+  } catch (e) {
+    return null;
+  }
+});
+
+// Check server connectivity
+ipcMain.handle('license-check-server', async () => {
+  try {
+    return await licensing.checkServerConnection();
+  } catch (e) {
+    return { connected: false, error: e.message };
+  }
 });
 
 // -------------------------------------------------
