@@ -1882,3 +1882,62 @@ body[data-theme="solarized-light"] .project-card:hover {
 /* Fix list bullets hidden by global resets */
 .tafil-goal-md-editor .ProseMirror ul { list-style: disc; list-style-position: outside; }
 .tafil-goal-md-editor .ProseMirror ol { list-style: decimal; list-style-position: outside; }
+
+/* =====================================================
+   PLAYGROUND - Inline Results (Quokka-style)
+   ===================================================== */
+
+/* Fade in animation for inline results */
+@keyframes fadeInResult {
+  from {
+    opacity: 0;
+    transform: translateX(-4px);
+  }
+  to {
+    opacity: 0.95;
+    transform: translateX(0);
+  }
+}
+
+/* Inline result widget base */
+.inline-result-widget {
+  display: inline-block;
+  margin-left: 16px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  pointer-events: none;
+  animation: fadeInResult 0.15s ease;
+  z-index: 10;
+}
+
+.inline-result-widget.value {
+  color: #10b981;
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+}
+
+.inline-result-widget.error {
+  color: #f59e0b;
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.2);
+}
+
+/* Snippet history item hover */
+.snippet-item:hover {
+  background: rgba(255, 255, 255, 0.04) !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+.snippet-item.active {
+  background: rgba(139, 92, 246, 0.1) !important;
+  border-color: rgba(139, 92, 246, 0.3) !important;
+}
+
+/* Auto-run status indicator */
+#autoRunStatus {
+  transition: all 0.15s ease;
+}

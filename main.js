@@ -1379,178 +1379,289 @@ ipcMain.handle('get-installed-terminals', async () => {
 });
 
 // 1d) Execute JavaScript in sandbox (Playground) - WITH INLINE EVALUATION
-ipcMain.handle('execute-js', async (_event, code) => {
-  try {
-    const logs = [];
-    const inlineResults = []; // Store inline values per line
-    
-    // Create a custom console that captures logs
-    const customConsole = {
-      log: (...args) => logs.push({ type: 'log', message: args.map(a => formatValue(a)).join(' ') }),
-      error: (...args) => logs.push({ type: 'error', message: args.map(a => formatValue(a)).join(' ') }),
-      warn: (...args) => logs.push({ type: 'warn', message: args.map(a => formatValue(a)).join(' ') }),
-      info: (...args) => logs.push({ type: 'info', message: args.map(a => formatValue(a)).join(' ') }),
-      dir: (obj) => logs.push({ type: 'log', message: formatValue(obj) }),
-      table: (data) => logs.push({ type: 'log', message: JSON.stringify(data, null, 2) }),
-      clear: () => logs.length = 0,
-    };
-    
-    // Helper to format values for inline display
-    function formatValue(val) {
-      if (val === null) return 'null';
-      if (val === undefined) return 'undefined';
-      if (typeof val === 'function') return '[Function]';
-      if (typeof val === 'symbol') return val.toString();
-      if (typeof val === 'object') {
-        try {
-          const str = JSON.stringify(val, null, 0);
-          return str.length > 50 ? str.slice(0, 47) + '...' : str;
-        } catch {
-          return String(val);
-        }
+// ========================================
+// Playground Execution Engine v2.0
+// RunJS/Quokka-style instant evaluation
+// ========================================
+
+// Expression cache for incremental evaluation
+const playgroundCache = {
+  lastCode: '',
+  lastExpressions: new Map(), // expressionId -> { code, result, line, col }
+  context: null,
+};
+
+// Helper to format values for inline display
+function formatPlaygroundValue(val, maxLen = 80) {
+  if (val === null) return 'null';
+  if (val === undefined) return 'undefined';
+  if (typeof val === 'function') {
+    const name = val.name || 'anonymous';
+    return `ƒ ${name}()`;
+  }
+  if (typeof val === 'symbol') return val.toString();
+  if (val instanceof Error) return `Error: ${val.message}`;
+  if (val instanceof Date) return val.toISOString();
+  if (val instanceof RegExp) return val.toString();
+  if (val instanceof Map) return `Map(${val.size})`;
+  if (val instanceof Set) return `Set(${val.size})`;
+  if (Array.isArray(val)) {
+    if (val.length === 0) return '[]';
+    if (val.length <= 5) {
+      const items = val.map(v => formatPlaygroundValue(v, 20)).join(', ');
+      return items.length > maxLen ? `Array(${val.length})` : `[${items}]`;
+    }
+    return `Array(${val.length})`;
+  }
+  if (typeof val === 'object') {
+    try {
+      const keys = Object.keys(val);
+      if (keys.length === 0) return '{}';
+      if (keys.length <= 3) {
+        const pairs = keys.map(k => `${k}: ${formatPlaygroundValue(val[k], 15)}`).join(', ');
+        return pairs.length > maxLen ? `{${keys.length} keys}` : `{${pairs}}`;
       }
+      return `{${keys.length} keys}`;
+    } catch {
       return String(val);
     }
-    
-    // Instrument code to capture line-by-line values (simplified for reliability)
-    // RunJS-style "magic comment": add `//?` to force inline capture for that line.
-    const lines = code.split('\n');
-    const instrumentedLines = [];
-    
-    lines.forEach((line, index) => {
-      const trimmed = line.trim();
-      const lineNum = index + 1;
-      
-      // Always keep original line
-      instrumentedLines.push(line);
+  }
+  if (typeof val === 'string') {
+    if (val.length > maxLen) return `"${val.slice(0, maxLen - 3)}..."`;
+    return `"${val}"`;
+  }
+  return String(val);
+}
 
-      // Magic comment capture (RunJS-style)
-      // Example:
-      //   someExpression //?
-      // or:
-      //   name //?
-      if (line.includes('//?')) {
-        const expr = line.split('//?')[0].trim();
-        if (expr) {
-          instrumentedLines.push(`try { __captureValue(${lineNum}, (${expr})); } catch(e) { }`);
-        }
-        return;
+// Simple expression extractor (line-based with smarter detection)
+function extractExpressions(code) {
+  const expressions = [];
+  const lines = code.split('\n');
+  
+  lines.forEach((line, index) => {
+    const lineNum = index + 1;
+    const trimmed = line.trim();
+    
+    // Skip empty lines and comments
+    if (!trimmed || trimmed.startsWith('//') || trimmed.startsWith('/*') || trimmed.startsWith('*')) {
+      return;
+    }
+    
+    // Magic comment: //?  - Force capture this expression
+    if (line.includes('//?')) {
+      const expr = line.split('//?')[0].trim();
+      if (expr) {
+        expressions.push({
+          id: `magic-${lineNum}`,
+          line: lineNum,
+          col: line.length,
+          expr: expr,
+          type: 'magic',
+        });
       }
+      return;
+    }
+    
+    // Skip control structures and blocks
+    const skipPatterns = [
+      /^(if|else|for|while|do|switch|case|break|continue|return|throw|try|catch|finally)\b/,
+      /^(function|class|const|let|var)\s+\w+/,
+      /^(import|export)\b/,
+      /^[\{\}\(\)\[\];,]+$/,
+      /\{[\s]*$/,  // ends with {
+      /^[\}\)\]]+[;\s]*$/,  // just closing brackets
+    ];
+    
+    if (skipPatterns.some(p => p.test(trimmed))) {
+      return;
+    }
+    
+    // Variable declarations with assignment - capture the value
+    const varMatch = trimmed.match(/^(const|let|var)\s+(\w+)\s*=\s*(.+?)[;]?$/);
+    if (varMatch) {
+      expressions.push({
+        id: `var-${lineNum}-${varMatch[2]}`,
+        line: lineNum,
+        col: line.length,
+        expr: varMatch[2], // Just capture the variable name after declaration
+        varName: varMatch[2],
+        type: 'declaration',
+      });
+      return;
+    }
+    
+    // Assignment expressions
+    const assignMatch = trimmed.match(/^(\w+)\s*=\s*(.+?)[;]?$/);
+    if (assignMatch && !trimmed.includes('==') && !trimmed.includes('===')) {
+      expressions.push({
+        id: `assign-${lineNum}-${assignMatch[1]}`,
+        line: lineNum,
+        col: line.length,
+        expr: assignMatch[1],
+        type: 'assignment',
+      });
+      return;
+    }
+    
+    // Standalone expressions (function calls, variables, etc.)
+    // Must not be console.log or similar
+    if (!trimmed.includes('console.') && !trimmed.endsWith('{') && !trimmed.endsWith(',')) {
+      // Remove trailing semicolon for evaluation
+      const exprClean = trimmed.replace(/;$/, '').trim();
+      if (exprClean && !exprClean.includes('=')) {
+        expressions.push({
+          id: `expr-${lineNum}`,
+          line: lineNum,
+          col: line.length,
+          expr: exprClean,
+          type: 'expression',
+        });
+      }
+    }
+  });
+  
+  return expressions;
+}
 
-      // Skip punctuation-only lines like: }); )); ]); }
-      // These were causing syntax errors when we tried to evaluate them as expressions.
-      if (/^[\)\}\]\s;,.]+$/.test(trimmed)) {
-        return;
-      }
-      
-      // Skip empty lines, comments, keywords, brackets
-      if (!trimmed || 
-          trimmed.startsWith('//') || 
-          trimmed.startsWith('/*') ||
-          trimmed.startsWith('*') ||
-          trimmed.startsWith('function') ||
-          trimmed.startsWith('class') ||
-          trimmed.startsWith('if') ||
-          trimmed.startsWith('else') ||
-          trimmed.startsWith('for') ||
-          trimmed.startsWith('while') ||
-          trimmed.startsWith('do') ||
-          trimmed.startsWith('switch') ||
-          trimmed.startsWith('case') ||
-          trimmed.startsWith('break') ||
-          trimmed.startsWith('continue') ||
-          trimmed.startsWith('return') ||
-          trimmed.startsWith('throw') ||
-          trimmed === '}' ||
-          trimmed === '{' ||
-          trimmed.endsWith('{') ||
-          trimmed.endsWith('}') ||
-          trimmed.includes('console.')) {
-        // Skip instrumentation for these lines
-      } else if (trimmed.match(/^(const|let|var)\s+\w+\s*=/)) {
-        // Skip variable declarations with assignment
-      } else if (trimmed && !trimmed.includes('=')) {
-        // Capture standalone expressions (variables, function calls, etc.)
-        instrumentedLines.push(`try { __captureValue(${lineNum}, ${trimmed}); } catch(e) { }`);
-      }
-    });
+ipcMain.handle('execute-js', async (_event, code) => {
+  const startTime = Date.now();
+  
+  try {
+    const logs = [];
+    const inlineResults = [];
+    const errors = [];
     
-    const instrumentedCode = instrumentedLines.join('\n');
+    // Create custom console
+    const customConsole = {
+      log: (...args) => logs.push({ type: 'log', message: args.map(a => formatPlaygroundValue(a)).join(' ') }),
+      error: (...args) => logs.push({ type: 'error', message: args.map(a => formatPlaygroundValue(a)).join(' ') }),
+      warn: (...args) => logs.push({ type: 'warn', message: args.map(a => formatPlaygroundValue(a)).join(' ') }),
+      info: (...args) => logs.push({ type: 'info', message: args.map(a => formatPlaygroundValue(a)).join(' ') }),
+      dir: (obj) => logs.push({ type: 'log', message: formatPlaygroundValue(obj) }),
+      table: (data) => logs.push({ type: 'log', message: formatPlaygroundValue(data) }),
+      clear: () => logs.length = 0,
+      time: () => {},
+      timeEnd: () => {},
+      trace: () => {},
+      assert: () => {},
+      count: () => {},
+      group: () => {},
+      groupEnd: () => {},
+    };
     
-    // Wrap code to capture result and provide console
+    // Extract expressions for inline results
+    const expressions = extractExpressions(code);
+    
+    // Build instrumented code with expression capture
+    const captureCode = expressions.map(e => 
+      `try { __capture("${e.id}", ${e.line}, ${e.expr}); } catch(e) { __captureError("${e.id}", ${e.line}, e.message); }`
+    ).join('\n');
+    
     const wrappedCode = `
       (async () => {
-        const console = customConsole;
-        ${instrumentedCode}
+        const console = __console;
+        ${code}
+        ${captureCode}
       })()
     `;
     
-    // Execute with limited context
+    // Execute with sandboxed context
     const vm = require('vm');
-    const lineValues = new Map(); // Track multiple values per line
+    const capturedValues = new Map();
+    const capturedErrors = new Map();
     
     const context = vm.createContext({
-      customConsole,
-      __captureValue: (lineNum, value) => {
-        const formatted = formatValue(value);
-        if (!lineValues.has(lineNum)) {
-          lineValues.set(lineNum, []);
-        }
-        const values = lineValues.get(lineNum);
-        // Limit to 10 values per line to avoid clutter
-        if (values.length < 10) {
-          values.push(formatted);
-        }
+      __console: customConsole,
+      __capture: (id, line, value) => {
+        capturedValues.set(id, { line, value: formatPlaygroundValue(value) });
       },
-      setTimeout,
-      setInterval,
-      clearTimeout,
-      clearInterval,
-      Promise,
-      JSON,
-      Math,
-      Date,
-      Array,
-      Object,
-      String,
-      Number,
-      Boolean,
-      RegExp,
-      Error,
-      Map,
-      Set,
-      Buffer,
+      __captureError: (id, line, msg) => {
+        capturedErrors.set(id, { line, error: msg });
+      },
+      // Globals
+      setTimeout, setInterval, clearTimeout, clearInterval,
+      Promise, JSON, Math, Date, Array, Object, String, Number, Boolean,
+      RegExp, Error, Map, Set, WeakMap, WeakSet, Buffer,
+      Infinity, NaN, undefined, null: null,
+      parseInt, parseFloat, isNaN, isFinite, encodeURI, decodeURI,
+      encodeURIComponent, decodeURIComponent,
+      // Safe require
       require: (mod) => {
-        // Allow only safe modules
-        const allowedModules = ['path', 'url', 'querystring', 'util', 'crypto'];
-        if (allowedModules.includes(mod)) {
-          return require(mod);
-        }
-        throw new Error(`Module '${mod}' is not allowed in playground`);
+        const allowed = ['path', 'url', 'querystring', 'util', 'crypto', 'os'];
+        if (allowed.includes(mod)) return require(mod);
+        throw new Error(`Module '${mod}' not allowed`);
       },
-      fetch: global.fetch || require('node-fetch'),
+      fetch: global.fetch,
     });
-    
-    const script = new vm.Script(wrappedCode, { timeout: 10000 });
-    let result;
     
     try {
-      result = await script.runInContext(context, { timeout: 10000 });
+      const script = new vm.Script(wrappedCode, { 
+        timeout: 5000,
+        filename: 'playground.js',
+      });
+      await script.runInContext(context, { timeout: 5000 });
     } catch (execError) {
-      return { success: false, error: execError.message, logs, inlineResults };
+      // Parse error location if available
+      const lineMatch = execError.stack?.match(/:(\d+):/);
+      const errorLine = lineMatch ? parseInt(lineMatch[1]) : 1;
+      
+      errors.push({
+        line: errorLine,
+        message: execError.message,
+        type: execError.name || 'Error',
+      });
+      
+      return { 
+        success: false, 
+        error: execError.message, 
+        errorLine,
+        logs, 
+        inlineResults,
+        errors,
+        executionTime: Date.now() - startTime,
+      };
     }
     
-    // Convert Map to array of inline results
-    lineValues.forEach((values, lineNum) => {
-      const displayValue = values.length === 1 
-        ? values[0] 
-        : `[${values.join(', ')}]`;
-      inlineResults.push({ line: lineNum, value: displayValue });
+    // Build inline results from captured values
+    capturedValues.forEach((data, id) => {
+      inlineResults.push({
+        id,
+        line: data.line,
+        value: data.value,
+        type: 'value',
+      });
     });
     
-    return { success: true, result: formatValue(result), logs, inlineResults };
+    // Add captured errors as inline results
+    capturedErrors.forEach((data, id) => {
+      inlineResults.push({
+        id,
+        line: data.line,
+        value: `⚠ ${data.error}`,
+        type: 'error',
+      });
+    });
+    
+    // Sort by line number
+    inlineResults.sort((a, b) => a.line - b.line);
+    
+    return { 
+      success: true, 
+      logs, 
+      inlineResults,
+      errors,
+      executionTime: Date.now() - startTime,
+    };
+    
   } catch (err) {
-    return { success: false, error: err.message, logs: [], inlineResults: [] };
+    return { 
+      success: false, 
+      error: err.message, 
+      logs: [], 
+      inlineResults: [],
+      errors: [{ line: 1, message: err.message, type: 'Error' }],
+      executionTime: Date.now() - startTime,
+    };
   }
 });
 

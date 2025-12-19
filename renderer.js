@@ -230,21 +230,45 @@ let projectWizardData = {
 };
 let createdProjectData = null;
 
-// Playground state
+// =====================================================
+// Playground State & Engine v2.0 (RunJS-style)
+// =====================================================
 let monacoEditor = null;
-let isAutoRunEnabled = true; // RunJS-like: auto-run enabled by default
+let monacoInstance = null;
+let isAutoRunEnabled = true;
 let autoRunTimeout = null;
+let autoSaveTimeout = null;
 let lastRunTime = 0;
-let inlineDecorations = []; // Track Monaco inline decorations
-let monacoInstance = null; // Store Monaco instance for decorations
-let inlineWidgets = []; // Quokka-style inline widgets (content widgets)
+let inlineWidgets = [];
+let inlineDecorations = [];
+let isExecuting = false;
+let executionVersion = 0; // Track execution version to discard stale results
+let currentSnippetId = null; // Currently active snippet
 
-// Snippets
-const PLAYGROUND_SNIPPETS_KEY = 'playgroundSnippets';
+// Playground configuration
+const PLAYGROUND_CONFIG = {
+  autoRunDebounce: 50,      // 50ms debounce for instant feel
+  autoSaveInterval: 5000,   // Auto-save every 5 seconds
+  maxSnippets: 100,
+  maxHistoryPerSnippet: 20,
+};
+
+// Storage keys
+const STORAGE_KEYS = {
+  snippets: 'playgroundSnippets',
+  drafts: 'playgroundDrafts',
+  currentDraft: 'playgroundCurrentDraft',
+  settings: 'playgroundSettings',
+  lastSession: 'playgroundLastSession',
+};
+
+// =====================================================
+// Snippet & Draft Management
+// =====================================================
 
 function getSavedSnippets() {
   try {
-    const raw = localStorage.getItem(PLAYGROUND_SNIPPETS_KEY);
+    const raw = localStorage.getItem(STORAGE_KEYS.snippets);
     const arr = raw ? JSON.parse(raw) : [];
     return Array.isArray(arr) ? arr : [];
   } catch {
@@ -252,82 +276,251 @@ function getSavedSnippets() {
   }
 }
 
-function saveSnippet(name, code) {
-  const snippets = getSavedSnippets();
-  snippets.unshift({
-    id: Date.now(),
-    name: name || 'Untitled',
-    code: code || '',
-    savedAt: new Date().toISOString(),
-  });
-  localStorage.setItem(PLAYGROUND_SNIPPETS_KEY, JSON.stringify(snippets.slice(0, 50)));
+function saveSnippetToStorage(snippets) {
+  try {
+    localStorage.setItem(STORAGE_KEYS.snippets, JSON.stringify(snippets.slice(0, PLAYGROUND_CONFIG.maxSnippets)));
+  } catch (e) {
+    console.error('Failed to save snippets:', e);
+  }
 }
+
+function saveSnippet(name, code, tags = []) {
+  const snippets = getSavedSnippets();
+  const id = Date.now();
+  const snippet = {
+    id,
+    name: name || `Snippet ${new Date().toLocaleString()}`,
+    code: code || '',
+    tags: tags,
+    language: 'javascript',
+    createdAt: new Date().toISOString(),
+    lastRunAt: new Date().toISOString(),
+    runCount: 1,
+  };
+  
+  snippets.unshift(snippet);
+  saveSnippetToStorage(snippets);
+  currentSnippetId = id;
+  
+  return snippet;
+}
+
+function updateSnippet(id, updates) {
+  const snippets = getSavedSnippets();
+  const idx = snippets.findIndex(s => s.id === id);
+  if (idx !== -1) {
+    snippets[idx] = { ...snippets[idx], ...updates, updatedAt: new Date().toISOString() };
+    saveSnippetToStorage(snippets);
+    return snippets[idx];
+  }
+  return null;
+}
+
+function deleteSnippet(id) {
+  const snippets = getSavedSnippets();
+  const filtered = snippets.filter(s => s.id !== id);
+  saveSnippetToStorage(filtered);
+  if (currentSnippetId === id) {
+    currentSnippetId = null;
+  }
+}
+
+function loadSnippet(id) {
+  const snippets = getSavedSnippets();
+  const snippet = snippets.find(s => s.id === id);
+  if (snippet && monacoEditor) {
+    monacoEditor.setValue(snippet.code || '');
+    currentSnippetId = id;
+    
+    // Update last run time
+    updateSnippet(id, { lastRunAt: new Date().toISOString(), runCount: (snippet.runCount || 0) + 1 });
+    
+    clearInlineWidgets();
+    return snippet;
+  }
+  return null;
+}
+
+// Draft management
+function saveDraft() {
+  if (!monacoEditor) return;
+  
+  const draft = {
+    code: monacoEditor.getValue(),
+    snippetId: currentSnippetId,
+    cursorPosition: monacoEditor.getPosition(),
+    savedAt: new Date().toISOString(),
+  };
+  
+  try {
+    localStorage.setItem(STORAGE_KEYS.currentDraft, JSON.stringify(draft));
+  } catch (e) {
+    console.error('Failed to save draft:', e);
+  }
+}
+
+function loadDraft() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.currentDraft);
+    if (raw) {
+      return JSON.parse(raw);
+    }
+  } catch (e) {
+    console.error('Failed to load draft:', e);
+  }
+  return null;
+}
+
+function restoreLastSession() {
+  const draft = loadDraft();
+  if (draft && monacoEditor) {
+    monacoEditor.setValue(draft.code || '');
+    currentSnippetId = draft.snippetId;
+    
+    if (draft.cursorPosition) {
+      monacoEditor.setPosition(draft.cursorPosition);
+      monacoEditor.focus();
+    }
+    
+    return true;
+  }
+  return false;
+}
+
+// =====================================================
+// Snippet History Panel
+// =====================================================
 
 function renderSnippetHistory() {
   if (!codeOutput) return;
   const snippets = getSavedSnippets();
+  
   if (snippets.length === 0) {
-    codeOutput.innerHTML = '<p class="text-xs" style="color: #52525b;">No saved snippets yet.</p>';
+    codeOutput.innerHTML = `
+      <div style="text-align: center; padding: 40px 20px;">
+        <div style="font-size: 32px; margin-bottom: 12px; opacity: 0.5;">📝</div>
+        <div style="font-size: 13px; color: #71717a; margin-bottom: 8px;">No saved snippets yet</div>
+        <div style="font-size: 11px; color: #52525b;">Click "Save" to save your current code</div>
+      </div>
+    `;
     return;
   }
 
   codeOutput.innerHTML = `
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
-      <div style="font-size:12px;color:#a1a1aa;">Saved Snippets</div>
-      <div style="font-size:11px;color:#52525b;">Click Load</div>
-    </div>
-    <div style="display:flex;flex-direction:column;gap:6px;">
-      ${snippets.map(s => `
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px;border:1px solid rgba(255,255,255,0.06);border-radius:8px;background:rgba(255,255,255,0.03);">
-          <div style="min-width:0;">
-            <div style="font-size:12px;color:#e4e4e7;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(s.name)}</div>
-            <div style="font-size:10px;color:#71717a;">${new Date(s.savedAt).toLocaleString()}</div>
-          </div>
-          <div style="display:flex;gap:6px;flex-shrink:0;">
-            <button data-snippet-action="load" data-snippet-id="${s.id}" class="action-btn" title="Load Snippet">Load</button>
-            <button data-snippet-action="delete" data-snippet-id="${s.id}" class="action-btn" title="Delete Snippet">Delete</button>
-          </div>
-        </div>
-      `).join('')}
+    <div style="padding: 4px 0;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,0.06);">
+        <div style="font-size:13px;font-weight:600;color:#fafafa;">Saved Snippets</div>
+        <div style="font-size:11px;color:#52525b;">${snippets.length} saved</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px;max-height:300px;overflow-y:auto;">
+        ${snippets.map(s => {
+          const isActive = s.id === currentSnippetId;
+          const timeAgo = formatRelativeTime(s.lastRunAt || s.createdAt);
+          return `
+            <div class="snippet-item ${isActive ? 'active' : ''}" 
+                 style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid ${isActive ? 'rgba(139, 92, 246, 0.3)' : 'rgba(255,255,255,0.06)'};border-radius:10px;background:${isActive ? 'rgba(139, 92, 246, 0.1)' : 'rgba(255,255,255,0.02)'};cursor:pointer;transition:all 0.15s ease;">
+              <div style="width:32px;height:32px;border-radius:8px;background:rgba(139, 92, 246, 0.15);display:flex;align-items:center;justify-content:center;font-size:14px;">
+                📄
+              </div>
+              <div style="flex:1;min-width:0;">
+                <div style="font-size:13px;color:#fafafa;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(s.name)}</div>
+                <div style="font-size:11px;color:#71717a;">${timeAgo} • ${s.runCount || 1} runs</div>
+              </div>
+              <div style="display:flex;gap:4px;flex-shrink:0;">
+                <button data-snippet-action="load" data-snippet-id="${s.id}" 
+                        style="padding:6px 12px;background:rgba(139, 92, 246, 0.15);border:none;border-radius:6px;color:#a78bfa;font-size:11px;font-weight:500;cursor:pointer;">
+                  Load
+                </button>
+                <button data-snippet-action="delete" data-snippet-id="${s.id}" 
+                        style="padding:6px 8px;background:rgba(244, 63, 94, 0.1);border:none;border-radius:6px;color:#f43f5e;font-size:11px;cursor:pointer;"
+                        title="Delete">
+                  ✕
+                </button>
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
     </div>
   `;
 }
 
+// =====================================================
+// Inline Results (Quokka-style)
+// =====================================================
+
 function clearInlineWidgets() {
   if (!monacoEditor) return;
-  try {
-    inlineWidgets.forEach(w => {
-      try { monacoEditor.removeContentWidget(w); } catch {}
-    });
-  } finally {
-    inlineWidgets = [];
+  
+  // Remove all content widgets
+  inlineWidgets.forEach(w => {
+    try { 
+      monacoEditor.removeContentWidget(w); 
+    } catch (e) {}
+  });
+  inlineWidgets = [];
+  
+  // Clear decorations
+  if (inlineDecorations.length > 0) {
+    inlineDecorations = monacoEditor.deltaDecorations(inlineDecorations, []);
   }
 }
 
-function applyInlineResults(inlineResults) {
+function applyInlineResults(inlineResults, version) {
+  // Discard stale results from old executions
+  if (version !== undefined && version !== executionVersion) return 0;
+  
   if (!monacoEditor || !monacoInstance) return 0;
   const model = monacoEditor.getModel();
   if (!model) return 0;
 
+  // Clear previous widgets first - MUST happen before new widgets
   clearInlineWidgets();
 
-  const sorted = [...inlineResults].sort((a, b) => (Number(a.line) || 0) - (Number(b.line) || 0));
+  // Sort by line and deduplicate (keep last result per line)
+  const byLine = new Map();
+  for (const item of inlineResults) {
+    const line = Number(item.line);
+    if (Number.isFinite(line) && line >= 1 && line <= model.getLineCount()) {
+      byLine.set(line, item);
+    }
+  }
+
+  const sorted = Array.from(byLine.values()).sort((a, b) => a.line - b.line);
 
   for (let idx = 0; idx < sorted.length; idx++) {
     const item = sorted[idx];
-    const line = Number(item.line);
-    if (!Number.isFinite(line) || line < 1 || line > model.getLineCount()) continue;
-
+    const line = item.line;
     const col = model.getLineMaxColumn(line);
     const raw = String(item.value ?? '');
-    const value = raw.length > 120 ? raw.slice(0, 117) + '…' : raw;
+    const value = raw.length > 100 ? raw.slice(0, 97) + '…' : raw;
+    const isError = item.type === 'error' || raw.startsWith('⚠');
 
+    // Create styled widget node
     const node = document.createElement('span');
-    node.className = 'inline-result-widget';
-    node.textContent = `⇒ ${value}`;
+    node.className = `inline-result-widget ${isError ? 'error' : 'value'}`;
+    node.textContent = isError ? value : `⇒ ${value}`;
+    node.style.cssText = `
+      display: inline-block;
+      margin-left: 16px;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      font-weight: 500;
+      white-space: nowrap;
+      pointer-events: none;
+      opacity: 0.95;
+      animation: fadeInResult 0.15s ease;
+      ${isError 
+        ? 'color: #f59e0b; background: rgba(245, 158, 11, 0.12); border: 1px solid rgba(245, 158, 11, 0.2);'
+        : 'color: #10b981; background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.2);'
+      }
+    `;
 
+    const widgetId = `inline-${item.id || line}-${idx}`;
     const widget = {
-      getId: () => `inline-result-${line}-${idx}`,
+      getId: () => widgetId,
       getDomNode: () => node,
       getPosition: () => ({
         position: { lineNumber: line, column: col },
@@ -3335,6 +3528,30 @@ function escapeHtml(text) {
   div.textContent = text;
   return div.innerHTML;
 }
+
+// Format relative time (e.g., "2 hours ago", "just now")
+function formatRelativeTime(dateStr) {
+  if (!dateStr) return 'Unknown';
+  try {
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffSec = Math.floor(diffMs / 1000);
+    const diffMin = Math.floor(diffSec / 60);
+    const diffHour = Math.floor(diffMin / 60);
+    const diffDay = Math.floor(diffHour / 24);
+    
+    if (diffSec < 10) return 'just now';
+    if (diffSec < 60) return `${diffSec}s ago`;
+    if (diffMin < 60) return `${diffMin}m ago`;
+    if (diffHour < 24) return `${diffHour}h ago`;
+    if (diffDay < 7) return `${diffDay}d ago`;
+    return date.toLocaleDateString();
+  } catch {
+    return 'Unknown';
+  }
+}
+
 // =====================================================
 // MODULE SWITCHING
 // =====================================================
@@ -3473,28 +3690,36 @@ async function initPlayground() {
   }
 
   try {
-    // Load saved code
-    const savedCode = localStorage.getItem('playgroundCode') || `// ✨ QUOKKA-STYLE INLINE EVALUATION! ✨
-// Values appear right next to your code!
+    // Load saved code - prioritize draft, then localStorage, then default
+    const draft = loadDraft();
+    let savedCode;
+    
+    if (draft && draft.code) {
+      savedCode = draft.code;
+      currentSnippetId = draft.snippetId;
+      console.log('📝 Restored last session draft');
+    } else {
+      savedCode = localStorage.getItem('playgroundCode') || `// ⚡ INSTANT PLAYGROUND
+// Type and see results immediately!
 
-const name = 'Tafil'
-const version = '1.0'
+const greeting = 'Hello, Tafil!'
+const version = 2.0
 
-// Math operations
-const x = 5
-const y = 10
+// Math evaluates inline
+const x = 10
+const y = 20
 const sum = x + y
 
-// Arrays & Objects
-const numbers = [1, 2, 3, 4, 5]
-const user = { name: 'John', age: 30 }
+// Arrays and objects
+const items = [1, 2, 3]
+const user = { name: 'Dev', level: 42 }
 
-// Functions
-const multiply = (a, b) => a * b
-const result = multiply(7, 6)
+// Use //?  to force-show any expression
+user.name //?
 
-console.log('✅ See values inline!')
+console.log('Ready to code!')
 `;
+    }
 
     // Define custom theme
     monaco.editor.defineTheme('tafil-dark', {
@@ -3640,28 +3865,27 @@ console.log('✅ See values inline!')
       const code = monacoEditor.getValue();
       localStorage.setItem('playgroundCode', code);
 
-      // Auto-run with debounce
+      // INSTANT Auto-run with minimal debounce (50ms)
+      clearTimeout(autoRunTimeout);
+      clearTimeout(autoSaveTimeout);
+      
       if (isAutoRunEnabled && code.trim()) {
-        if (autoRunStatus) {
-          autoRunStatus.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-yellow-400 animate-pulse"></span> Running...';
-          autoRunStatus.style.color = '#f59e0b';
-          autoRunStatus.style.background = 'rgba(245, 158, 11, 0.15)';
-        }
-
-        // Clear any pending execution
-        clearTimeout(autoRunTimeout);
+        // Clear previous inline results immediately on keystroke
+        clearInlineWidgets();
+        
         autoRunTimeout = setTimeout(() => {
-          // Double-check auto-run is still enabled before running
           if (isAutoRunEnabled) {
-            runCode().then(() => {
-              if (isAutoRunEnabled) updateAutoRunStatus();
-            }).catch(err => {
+            runCode().catch(err => {
               console.error('Auto-run error:', err);
-              updateAutoRunStatus();
             });
           }
-        }, 800); // Increased debounce from 500ms to 800ms
+        }, PLAYGROUND_CONFIG.autoRunDebounce); // 50ms for instant feel
       }
+      
+      // Auto-save draft (separate from execution)
+      autoSaveTimeout = setTimeout(() => {
+        saveDraft();
+      }, PLAYGROUND_CONFIG.autoSaveInterval);
     });
 
     // Run button
@@ -3688,13 +3912,25 @@ console.log('✅ See values inline!')
         });
       }
 
-      // Save snippet
+      // Save snippet with better UX
       if (saveSnippetBtn) {
         saveSnippetBtn.addEventListener('click', () => {
           const code = monacoEditor ? monacoEditor.getValue() : '';
-          const name = window.prompt('Snippet name?', `Snippet ${new Date().toLocaleString()}`) || '';
-          saveSnippet(name.trim(), code);
-          showNotification('Snippet saved', 'success');
+          if (!code.trim()) {
+            showNotification('Nothing to save', 'warning');
+            return;
+          }
+          
+          // Generate smart default name from code
+          const firstLine = code.split('\n')[0].slice(0, 30).replace(/[^a-zA-Z0-9 ]/g, '').trim();
+          const defaultName = firstLine || `Snippet ${new Date().toLocaleTimeString()}`;
+          
+          const name = window.prompt('Snippet name:', defaultName);
+          if (name === null) return; // Cancelled
+          
+          const snippet = saveSnippet(name.trim() || defaultName, code);
+          showNotification(`✓ Saved "${snippet.name}"`, 'success');
+          renderSnippetHistory();
         });
       }
 
@@ -3704,10 +3940,23 @@ console.log('✅ See values inline!')
 
       if (navNewSnippet) {
         navNewSnippet.addEventListener('click', () => {
-          if (monacoEditor) monacoEditor.setValue('');
-          if (codeOutput) codeOutput.innerHTML = '<p class="text-xs" style="color: #52525b;">New snippet</p>';
+          // Auto-save current work as draft before clearing
+          const currentCode = monacoEditor ? monacoEditor.getValue() : '';
+          if (currentCode.trim()) {
+            saveDraft();
+          }
+          
+          if (monacoEditor) {
+            monacoEditor.setValue('// New snippet\n');
+            monacoEditor.setPosition({ lineNumber: 2, column: 1 });
+            monacoEditor.focus();
+          }
+          if (codeOutput) {
+            codeOutput.innerHTML = '<p class="text-xs" style="color: #52525b;">Ready to code...</p>';
+          }
           clearInlineWidgets();
-          showNotification('New snippet', 'info');
+          currentSnippetId = null;
+          showNotification('New snippet created', 'info');
         });
       }
       if (navSnippetHistory) {
@@ -3852,75 +4101,122 @@ function updateAutoRunStatus() {
 
 async function runCode() {
   if (!monacoEditor || !codeOutput) return Promise.resolve();
+  
+  // Prevent concurrent executions
+  if (isExecuting) {
+    return Promise.resolve();
+  }
 
-  // Rate limiting: prevent execution more than once every 100ms
+  // Rate limiting: prevent execution more than once every 30ms
   const now = Date.now();
-  if (now - lastRunTime < 100) {
-    console.log('⚠️ Rate limited: execution too frequent');
+  if (now - lastRunTime < 30) {
     return Promise.resolve();
   }
   lastRunTime = now;
+  
+  // Increment execution version to track this run
+  const thisVersion = ++executionVersion;
 
   const code = monacoEditor.getValue();
   if (!code.trim()) {
-    codeOutput.innerHTML = '<p class="text-xs" style="color: #52525b;">No code to run</p>';
+    clearInlineWidgets();
+    codeOutput.innerHTML = '<p class="text-xs" style="color: #52525b;">Type code to see results...</p>';
     return Promise.resolve();
   }
 
+  isExecuting = true;
   const startTime = performance.now();
 
-  codeOutput.innerHTML = '<p class="log" style="color: #a78bfa;">⚡ Running...</p>';
+  // Update status without blocking
+  if (autoRunStatus) {
+    autoRunStatus.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-yellow-400 animate-pulse"></span> ⚡';
+    autoRunStatus.style.color = '#f59e0b';
+  }
 
   try {
     const result = await window.electronAPI.executeJS(code);
-    const duration = (performance.now() - startTime).toFixed(1);
-
+    
+    // Discard if this is a stale execution
+    if (thisVersion !== executionVersion) {
+      isExecuting = false;
+      return Promise.resolve();
+    }
+    
+    const duration = (performance.now() - startTime).toFixed(0);
     if (executionTimeEl) executionTimeEl.textContent = `${duration}ms`;
 
     if (result.success) {
-      // Display inline results like Quokka (content widgets - reliable for Monaco 0.45)
+      // Apply inline results with version check
       let inlineCount = 0;
       if (Array.isArray(result.inlineResults) && result.inlineResults.length > 0) {
-        inlineCount = applyInlineResults(result.inlineResults);
+        inlineCount = applyInlineResults(result.inlineResults, thisVersion);
       } else {
         clearInlineWidgets();
       }
       
-      // Display console output
+      // Build console output
       let outputHtml = '';
+      
+      // Show execution time in a subtle way
+      outputHtml += `<div style="font-size:10px;color:#52525b;margin-bottom:8px;">Executed in ${duration}ms</div>`;
 
       if (result.logs && result.logs.length > 0) {
         result.logs.forEach(log => {
           const typeClass = log.type === 'error' ? 'error' : log.type === 'warn' ? 'warn' : log.type === 'info' ? 'info' : 'log';
-          const icon = log.type === 'error' ? '❌' : log.type === 'warn' ? '⚠️' : log.type === 'info' ? 'ℹ️' : '✓';
-          outputHtml += `<p class="${typeClass}">${icon} ${escapeHtml(log.message)}</p>`;
+          const icon = log.type === 'error' ? '❌' : log.type === 'warn' ? '⚠️' : log.type === 'info' ? 'ℹ️' : '';
+          outputHtml += `<p class="${typeClass}" style="margin:4px 0;">${icon} ${escapeHtml(log.message)}</p>`;
         });
       }
 
-      if (inlineCount > 0) {
-        outputHtml += `<p class="info" style="opacity: 0.7; font-size: 11px; margin-top: 8px;">💡 Inline values shown in editor (${inlineCount})</p>`;
+      if (inlineCount > 0 && result.logs.length === 0) {
+        outputHtml += `<p style="color:#10b981;font-size:11px;">✓ ${inlineCount} inline values</p>`;
       }
 
-      if (result.result !== undefined && result.result !== 'undefined') {
-        outputHtml += `<p class="info" style="margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.06);"><strong>→</strong> ${escapeHtml(String(result.result))}</p>`;
-      }
-
-      if (!outputHtml) {
-        outputHtml = '<p class="log" style="color: #52525b;">No output</p>';
+      if (!result.logs.length && !inlineCount) {
+        outputHtml += '<p style="color:#52525b;font-size:11px;">No output</p>';
       }
 
       codeOutput.innerHTML = outputHtml;
-    } else {
-      // Clear inline decorations on error
-      if (monacoEditor && inlineDecorations.length > 0) {
-        inlineDecorations = monacoEditor.deltaDecorations(inlineDecorations, []);
+      
+      // Update status
+      if (autoRunStatus && isAutoRunEnabled) {
+        autoRunStatus.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-green-400"></span> ✓';
+        autoRunStatus.style.color = '#10b981';
       }
+      
+    } else {
+      // Handle execution error
       clearInlineWidgets();
-      codeOutput.innerHTML = `<p class="error">❌ ${escapeHtml(result.error || 'Execution failed')}</p>`;
+      
+      // Show error inline if we have line info
+      if (result.errorLine && result.errorLine > 0) {
+        applyInlineResults([{
+          id: 'error',
+          line: result.errorLine,
+          value: `⚠ ${result.error}`,
+          type: 'error',
+        }], thisVersion);
+      }
+      
+      codeOutput.innerHTML = `
+        <div style="color:#f43f5e;">
+          <div style="font-weight:600;margin-bottom:4px;">❌ Error</div>
+          <div style="font-size:12px;opacity:0.9;">${escapeHtml(result.error || 'Execution failed')}</div>
+          ${result.errorLine ? `<div style="font-size:11px;margin-top:4px;opacity:0.7;">Line ${result.errorLine}</div>` : ''}
+        </div>
+      `;
+      
+      if (autoRunStatus) {
+        autoRunStatus.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-red-400"></span> ✗';
+        autoRunStatus.style.color = '#f43f5e';
+      }
     }
   } catch (err) {
     console.error('Error running code:', err);
+    clearInlineWidgets();
     codeOutput.innerHTML = `<p class="error">❌ ${escapeHtml(err.message || 'Failed to execute')}</p>`;
+  } finally {
+    isExecuting = false;
   }
 }
 
