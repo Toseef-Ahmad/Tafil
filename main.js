@@ -925,6 +925,36 @@ function checkFullDiskAccess() {
 // ensureAdminPrivileges();
 // Once app is ready, create the tray
 app.whenReady().then(() => {
+  // ⚠️ ROOT USER WARNING
+  // Running as root causes permission issues with created projects
+  const isRunningAsRoot = process.getuid && process.getuid() === 0;
+  if (isRunningAsRoot) {
+    console.warn('⚠️ WARNING: Tafil is running as root (sudo)!');
+    console.warn('   Projects created will be owned by root and may cause permission issues.');
+    console.warn('   Please restart Tafil without sudo: npm start');
+    
+    // Show warning dialog
+    dialog.showMessageBox({
+      type: 'warning',
+      title: 'Running as Root',
+      message: 'Tafil is running with root privileges (sudo)',
+      detail: 'This can cause permission problems:\n\n' +
+              '• Projects will be owned by root\n' +
+              '• VS Code may not be able to edit files\n' +
+              '• Files may be created in /var/root instead of your home folder\n\n' +
+              'Recommendation: Close Tafil and restart without sudo:\n\n' +
+              '  npm start\n\n' +
+              'Do you want to continue anyway?',
+      buttons: ['Continue Anyway', 'Quit'],
+      defaultId: 1,
+      cancelId: 1,
+    }).then(result => {
+      if (result.response === 1) {
+        app.quit();
+      }
+    });
+  }
+  
   // Now we can safely check if dev
   isDev = !app.isPackaged;
   console.log(`Is Development: ${isDev}`);
@@ -1315,6 +1345,12 @@ ipcMain.handle('select-project-directory', async () => {
 ipcMain.handle('create-project', async (_event, options) => {
   try {
     console.log('Creating project with options:', options);
+    
+    // Warn if running as root
+    const isRunningAsRoot = process.getuid && process.getuid() === 0;
+    if (isRunningAsRoot) {
+      console.warn('⚠️ Creating project as root - files will be owned by root!');
+    }
     
     const result = await createProject({
       ...options,
