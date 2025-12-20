@@ -1,383 +1,284 @@
-# 🚀 Tafil — Modern Project Manager for Node.js Developers
+<div align="center">
 
-![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)
-![License](https://img.shields.io/badge/license-GPL-green.svg)
-![Electron](https://img.shields.io/badge/Electron-33.0+-purple.svg)
-![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey.svg)
+<img src="./logo.svg" alt="TAFIL" width="120" height="120" />
 
-**Tafil** is a beautiful, modern desktop application inspired by Linear, Raycast, and Vercel. Manage all your Node.js projects in one place with a premium developer experience. Scan directories, organize with collections, run scripts, manage dependencies, and launch projects in your favorite IDE — all with a sleek, minimalist interface.
+# TAFIL
 
----
+**The project command center for developers**
 
-## ✨ Features
+Manage projects, write documentation, plan features, and experiment with code — all in one desktop app that works alongside your IDE.
 
-### 🎨 **Modern UI Design**
-- **Premium Dark Theme** inspired by Linear, Raycast, Arc Browser, and Warp Terminal
-- **Notion-like Sidebar** with collections and quick navigation
-- **Command Palette** (⌘K) for lightning-fast actions
-- **Smooth Animations** and polished micro-interactions
-- **Compact Cards** with intelligent spacing and typography
+[![Download](https://img.shields.io/badge/Download-Free-FCD34D?style=for-the-badge&logo=download)](https://github.com/Toseef-Ahmad/Tafil/releases)
+[![License](https://img.shields.io/badge/License-MIT-zinc?style=for-the-badge)](./LICENSE)
+[![Version](https://img.shields.io/badge/Version-1.0.0-zinc?style=for-the-badge)](https://github.com/Toseef-Ahmad/Tafil/releases)
 
-### 📁 **Collections System**
-- **Create Custom Collections** to organize projects by client, framework, or priority
-- **Add Projects to Multiple Collections** with one click
-- **Smart Filtering** - instantly view projects by collection
-- **Visual Badges** show which collections a project belongs to
-- **Built-in Collections:** All Projects, Running, Uncategorized
+[Website](https://tafil.app) • [Download](https://github.com/Toseef-Ahmad/Tafil/releases) • [Documentation](https://tafil.app) • [Support](mailto:ahmadtouseef946@gmail.com)
 
-### 🔍 **Smart Project Scanning**
-- **Auto-Scan:** Find all Node.js projects in your Home directory instantly
-- **Custom Folders:** Scan any specific directory
-- **Framework Detection:** Automatically identifies React, Vite, Next.js, Vue, Angular, Express, Gatsby, Remix, and more
-- **Git Integration:** Shows current branch, last commit message, and timestamp
-- **Cached Results** for lightning-fast refresh
-
-### 🛠 **Intelligent Project Management**
-- **One-Click Run:** Start dev servers instantly with automatic port detection
-- **Smart Port Management:** 
-  - Auto-detects and resolves port conflicts
-  - Handles CRA port prompts automatically
-  - Shows real-time port status
-- **Dependency Control:** 
-  - One-click `npm install`
-  - Remove `node_modules` to free space
-  - Visual indicators for missing dependencies
-- **Live Status Indicators:** Running badge with pulse animation
-
-### 📊 **Project Insights**
-- **Insights Panel** with project health overview
-- **Per-Project Details:**
-  - Dependencies status
-  - Running status and port
-  - Git information
-  - Last commit details
-- **Project Memory (Project Brain):**
-  - Remembers last run outcome, detected port, and last crash summary
-  - Stored locally (offline-first) and visible in Project Insights
-- **System-wide Metrics:** Track all running projects and dependencies
-
-### 🛠 **Fix It (Recovery Actions)**
-- When a project fails, Tafil can show a **Fix It** modal with actionable recovery steps:
-  - **Port conflict**: stop the conflicting Tafil project, inspect/kill the process on the port, or rerun on a custom port
-  - **Missing env vars**: surfaces detected keys and lets you copy/open project quickly
-  - **Node mismatch**: suggests and copies `nvm` commands
-
-### 🖥 **Developer Experience**
-- **IDE Integration:** Auto-detects VS Code, Cursor, WebStorm, Sublime Text, IntelliJ, Atom, and more
-- **Terminal Support:** Launch in iTerm, Hyper, Warp, Kitty, Alacritty, Terminal.app, PowerShell, Windows Terminal
-- **Default Preferences:** Set your preferred IDE and terminal to skip selection prompts
-- **Quick Open in Browser:** One click to open running projects
-- **Live Notifications:** Toast notifications for all important events
-
-### ⌨️ **Command Palette**
-- Press **⌘K** (macOS) or **Ctrl+K** (Windows/Linux) to access:
-  - Search all projects by name or path
-  - Quick actions (Scan, Refresh, View switching)
-  - Jump to collections
-  - Open settings
-  - Keyboard navigation (↑↓ + Enter)
-
-### 🎯 **Running Projects Panel**
-- Dedicated view for all active dev servers
-- Shows port, framework, and status
-- Quick stop/open actions
-- Live count badge with pulse animation
-
-### ⚙️ **Customizable Settings**
-- Set **Default IDE** to skip selection prompts
-- Set **Default Terminal** for seamless workflow
-- **Dark/Light Mode** toggle (coming soon)
-- All preferences persist across sessions
+</div>
 
 ---
 
-## 📸 Screenshots
+## 📸 Preview
+
+<div align="center">
+
+![TAFIL App Screenshot](./screenshots/dashboard.png)
+
+*Manage all your projects from one beautiful interface*
+
+</div>
+
+---
+
+## ✨ Why TAFIL?
+
+TAFIL is your second brain for development. It's not an IDE — it works **alongside** your favorite code editor. Think of it as mission control for all your projects.
+
+- **📁 Project Management** — Scan folders, auto-detect frameworks, launch servers with one click
+- **⚡ Code Playground** — Test JavaScript snippets without creating new projects
+- **📐 Visual Blueprints** — Plan architecture with Kanban boards and module diagrams
+- **📝 Markdown Notes** — Write documentation with full Markdown support and wiki-style linking
+- **🖥️ SSH Integration** — Connect to remote servers and manage multiple connections
+- **🔒 100% Offline** — All data stored locally. Works without internet. Your privacy matters.
+
+---
+
+## 🚀 Quick Start
+
+### Download
+
+Get TAFIL for your platform:
+
+- **macOS** (Intel & Apple Silicon) — [Download .dmg](https://github.com/Toseef-Ahmad/Tafil/releases/download/v1.0.0/Tafil-1.0.0-darwin-universal.dmg)
+- **Windows** 10/11 — [Download .exe](https://github.com/Toseef-Ahmad/Tafil/releases/download/v1.0.0/Tafil-1.0.0-portable.exe)
+- **Linux** (x64 / ARM64) — [Download x64](https://github.com/Toseef-Ahmad/Tafil/releases/download/v1.0.0/Tafil-1.0.0-x86_64.AppImage) | [Download ARM64](https://github.com/Toseef-Ahmad/Tafil/releases/download/v1.0.0/Tafil-1.0.0-arm64.AppImage)
+
+### Installation
+
+**macOS:**
+```bash
+# Download the .dmg file
+# Drag TAFIL to Applications folder
+# If you see "unidentified developer", right-click → Open
+```
+
+**Windows:**
+```bash
+# Download the .exe installer
+# Run the installer
+# Launch TAFIL from Start Menu
+```
+
+**Linux:**
+```bash
+# Download the .AppImage file
+chmod +x Tafil-1.0.0-x86_64.AppImage
+./Tafil-1.0.0-x86_64.AppImage
+```
+
+---
+
+## 🎯 Key Features
+
+<table>
+<tr>
+<td width="50%">
+
+### 📁 Project Management
+Scan your machine for projects, organize them into collections, and launch dev servers with one click.
+
+**Auto-detects:**
+- Next.js, React, Vue, Angular
+- Express, Nest.js, Fastify
+- Python, Django, Flask
+- And many more...
+
+</td>
+<td width="50%">
+
+### ⚡ Code Playground
+Test JavaScript/TypeScript snippets instantly. No need to create throwaway projects.
+
+**Perfect for:**
+- Testing APIs
+- Experimenting with libraries
+- Prototyping ideas
+- Learning new concepts
+
+</td>
+</tr>
+<tr>
+<td width="50%">
+
+### 📐 Visual Blueprints
+Plan your architecture before you code.
+
+**Features:**
+- Create modules and features
+- Track progress with Kanban boards
+- Document decisions
+- Link notes together
+
+</td>
+<td width="50%">
+
+### 📝 Markdown Notes
+Full-featured note-taking system.
+
+**Includes:**
+- Live preview
+- Syntax highlighting
+- Wiki-style linking
+- Export to PDF
+
+</td>
+</tr>
+<tr>
+<td width="50%">
+
+### 🖥️ SSH Integration (Pro)
+Connect to remote servers seamlessly.
+
+**Capabilities:**
+- Save multiple connections
+- Quick access to servers
+- Terminal integration
+- Secure credentials
+
+</td>
+<td width="50%">
+
+### 🔒 100% Offline
+Your data, your machine.
+
+**Privacy-first:**
+- All data stored locally
+- Works without internet
+- No tracking or telemetry
+- Full control over your data
+
+</td>
+</tr>
+</table>
+
+---
+
+## 🖼️ More Screenshots
+
+<details>
+<summary><b>Click to view more screenshots</b></summary>
+
+<br/>
+
+### Collections View
+![Collections](./screenshots/collections.png)
+
+### Project Insights
+![Insights](./screenshots/insights.png)
 
 ### Empty State
-![Tafil Empty State](screenshots/empty-state.png)
+![Empty State](./screenshots/empty-state.png)
 
-*Clean, inviting interface guides you to scan your projects*
-
-### Project Dashboard
-![Tafil Dashboard](screenshots/dashboard.png)
-
-*Manage all your Node.js projects in one beautiful interface with modern card design*
-
-### Collections
-![Tafil Collections](screenshots/collections.png)
-
-*Organize projects into custom collections with visual badges*
-
-### Project Insights
-![Tafil Insights](screenshots/insights.png)
-
-*Deep dive into project details with dependency status, git info, and health metrics*
+</details>
 
 ---
 
-## 📥 Download & Install
+## 💎 Free vs Pro
 
-### Pre-built Releases
+### Free (Forever)
+- ✅ Unlimited projects
+- ✅ Basic playground
+- ✅ Markdown notes
+- ✅ Kanban boards
+- ✅ Offline mode
 
-Download the latest version for your platform from [**GitHub Releases**](https://github.com/Toseef-Ahmad/Tafil/releases):
+### Pro ($49 one-time)
+- ✅ Everything in Free
+- ✅ Advanced playground with npm packages
+- ✅ SSH integration
+- ✅ Excalidraw canvas
+- ✅ Wiki-style note linking
+- ✅ Unlimited modules
+- ✅ 3 device activations
+- ✅ Priority support
 
-| Platform | Download | Notes |
-|----------|----------|-------|
-| **macOS** | `Tafil-x.x.x-mac-arm64.dmg` (Apple Silicon) <br> `Tafil-x.x.x-mac-x64.dmg` (Intel) | Universal build supports both architectures |
-| **Windows** | `Tafil-x.x.x-win-x64.exe` (Installer) <br> `Tafil-x.x.x-portable.exe` (Portable) | NSIS installer or standalone |
-| **Linux** | `Tafil-x.x.x.AppImage` <br> `Tafil-x.x.x-amd64.deb` <br> `Tafil-x.x.x-x86_64.rpm` | Choose your preferred format |
-
----
-
-### 🍎 macOS Installation
-
-1. Download the `.dmg` file for your Mac (arm64 for M1/M2/M3/M4, x64 for Intel)
-2. Open the `.dmg` and drag **Tafil** to Applications
-3. **First launch:** Right-click the app → Click **Open** → Click **Open** again
-
-> ⚠️ **Note:** Since the app is not signed with an Apple Developer certificate ($99/year), macOS will show a warning. This is normal for open-source apps distributed via GitHub. You only need to do this once.
-
-**Alternative:** Run in Terminal:
-```bash
-xattr -cr /Applications/Tafil.app
-```
+[Get Pro License →](https://tafil.gumroad.com/l/tafil-license)
 
 ---
 
-### 🪟 Windows Installation
+## 🛠️ Tech Stack
 
-1. Download the `.exe` installer or portable version
-2. Run the installer (or just run the portable `.exe`)
-3. **First launch:** If SmartScreen appears:
-   - Click "**More info**"
-   - Click "**Run anyway**"
+<div align="center">
 
-> ⚠️ **Note:** Windows SmartScreen shows a warning because the app isn't signed with an EV certificate ($300-500/year). This is normal for open-source apps and is completely safe to bypass.
+![Electron](https://img.shields.io/badge/Electron-191970?style=for-the-badge&logo=Electron&logoColor=white)
+![React](https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)
+![Vite](https://img.shields.io/badge/Vite-646CFF?style=for-the-badge&logo=vite&logoColor=white)
+![TailwindCSS](https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)
+![JavaScript](https://img.shields.io/badge/JavaScript-F7DF1E?style=for-the-badge&logo=javascript&logoColor=black)
+![Node.js](https://img.shields.io/badge/Node.js-43853D?style=for-the-badge&logo=node.js&logoColor=white)
 
----
+</div>
 
-### 🐧 Linux Installation
-
-**AppImage (Universal):**
-```bash
-chmod +x Tafil-*.AppImage
-./Tafil-*.AppImage
-```
-
-**Debian/Ubuntu (.deb):**
-```bash
-sudo dpkg -i Tafil-*-amd64.deb
-```
-
-**Fedora/RHEL (.rpm):**
-```bash
-sudo rpm -i Tafil-*-x86_64.rpm
-```
+**Core Technologies:**
+- **Electron** — Cross-platform desktop framework
+- **React** — UI framework with hooks
+- **Vite** — Lightning-fast build tool
+- **Monaco Editor** — VSCode's powerful editor
+- **Excalidraw** — Beautiful drawing canvas
+- **Tailwind CSS** — Utility-first styling
 
 ---
 
-## 🛠 Build from Source
+## 📖 Documentation
 
-### Prerequisites
-- Node.js (v18 or higher)
-- npm or yarn
-
-### Development Setup
-
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/Toseef-Ahmad/Tafil.git
-   cd Tafil
-   ```
-
-2. **Install dependencies**
-   ```bash
-   npm install
-   ```
-
-3. **Run in Development Mode**
-   ```bash
-   npm run dev
-   ```
-   
-   This will start both the Electron app and Tailwind CSS watcher.
-
-### Build for Production
-
-```bash
-# For macOS (DMG + ZIP)
-npm run build:mac
-
-# For Windows (NSIS Installer + Portable)
-npm run build:win
-
-# For Linux (AppImage, DEB, RPM)
-npm run build:linux
-
-# For all platforms
-npm run build:all
-```
-
-Build outputs are saved to the `release/` folder.
-
-### Code Signing (Optional)
-
-For production distribution, you can sign your builds:
-
-- **macOS:** Requires Apple Developer account ($99/year)
-- **Windows:** Requires EV Code Signing Certificate ($300-500/year)
-- **Linux:** No signing required
-
-See `build/signing.md` for detailed instructions.
-
----
-
-## ⌨️ Keyboard Shortcuts
-
-| Shortcut | Action |
-|----------|--------|
-| `⌘K` / `Ctrl+K` | Open Command Palette |
-| `⌘R` / `Ctrl+R` | Refresh Projects |
-| `Esc` | Close modals/palette |
-| `↑` `↓` | Navigate command results |
-| `Enter` | Execute selected command |
-
----
-
-## 🎯 Usage Guide
-
-### Getting Started
-
-1. **Launch Tafil** and click **"Scan Home"** to find all Node.js projects
-2. **Create Collections** using the + button in the sidebar to organize projects
-3. **Add projects to collections** by clicking the folder icon on any project card
-4. **Run a project** by clicking the green play button
-5. **Open in IDE** by clicking the code icon (set your default in Settings)
-6. **View insights** by clicking the chart icon on any project
-
-### Using the Command Palette
-
-Press `⌘K` (or `Ctrl+K`) to:
-- **Search projects** by name or path
-- **Quick actions** like Scan, Refresh, Settings
-- **Switch views** (All Projects, Running, Insights)
-- **Navigate collections** instantly
-
-### Managing Running Projects
-
-- Click **"Running"** in the sidebar to see all active dev servers
-- Each running project shows:
-  - Framework badge (React, Vite, Next.js, etc.)
-  - Port number
-  - Quick actions to open in browser or stop
-- Tafil handles port conflicts automatically
-
-### Project Insights
-
-Click the **chart icon** on any project to see:
-- Dependencies status (installed/missing)
-- Git information (branch, last commit)
-- Running status and port
-- Project location
-
----
-
-## 🛠 Tech Stack
-
-- **Electron 33.x:** Cross-platform desktop runtime
-- **Node.js:** Backend logic and file system operations
-- **Tailwind CSS 3.x:** Modern utility-first styling
-- **Lucide Icons:** Beautiful, consistent SVG icons
-- **Inter Font:** Premium typography
-- **IPC Communication:** Secure main-renderer bridge
-- **Child Process Management:** Advanced process handling
-
----
-
-## 🎨 Design Inspiration
-
-Tafil's design is inspired by the best modern developer tools:
-
-- **Linear** - Clean layout and perfect spacing
-- **Raycast** - Command palette and keyboard-first approach
-- **Vercel Dashboard** - Typography and card design
-- **Warp Terminal** - Speed-focused interface
-- **Arc Browser** - Premium polish and animations
-- **Notion** - Sidebar organization
-
----
-
-## 🚀 Roadmap
-
-- [ ] Multi-language support (Python, Ruby, Go, Rust projects)
-- [ ] Remote project management via SSH
-- [ ] Docker container integration
-- [ ] Project templates and scaffolding
-- [ ] Advanced git operations (branch switching, commit, push)
-- [ ] Package update notifications
-- [ ] Script favorites and custom commands
-- [ ] Team collaboration features
-- [ ] Light mode theme
-- [ ] Plugin system for extensibility
+Visit [tafil.app](https://tafil.app) for full documentation including:
+- Getting started guide
+- Feature tutorials
+- Keyboard shortcuts
+- FAQs
+- Troubleshooting
 
 ---
 
 ## 🤝 Contributing
 
-Contributions are what make the open-source community such an amazing place to learn, inspire, and create. Any contributions you make are **greatly appreciated**.
+We welcome contributions! Here's how you can help:
 
-### How to Contribute
-
-1. Fork the Project
-2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the Branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
-
-### Development Guidelines
-
-- Follow the existing code style
-- Test on multiple platforms when possible
-- Update documentation for new features
-- Add screenshots for UI changes
-
----
-
-## 🐛 Known Issues
-
-- **macOS:** First launch requires right-click → Open due to unsigned app
-- **Windows:** SmartScreen warning appears due to unsigned executable
-- **Linux:** Some distros may require additional permissions for file access
-
-These are expected behaviors for unsigned open-source applications.
+1. **Report bugs** — [Open an issue](https://github.com/Toseef-Ahmad/Tafil/issues)
+2. **Suggest features** — [Start a discussion](https://github.com/Toseef-Ahmad/Tafil/discussions)
+3. **Improve docs** — Submit a PR with documentation improvements
+4. **Spread the word** — Star the repo, share with friends
 
 ---
 
 ## 📝 License
 
-Distributed under the MIT License. See `LICENSE` for more information.
+TAFIL is licensed under the **MIT License**. See [LICENSE](./LICENSE) for details.
+
+The free version includes all core features. The Pro version unlocks advanced features and supports continued development.
 
 ---
 
-## 📬 Contact
+## 💬 Support
 
-**Touseef Ahmad** - [ahmadtouseef946@gmail.com](mailto:ahmadtouseef946@gmail.com)
-
-Project Link: [https://github.com/Toseef-Ahmad/Tafil](https://github.com/Toseef-Ahmad/Tafil)
-
----
-
-## 💖 Acknowledgments
-
-- Electron.js team for the amazing framework
-- Tailwind CSS for the styling system
-- All open-source contributors
-- The developer community for feedback and support
+- **Email:** [ahmadtouseef946@gmail.com](mailto:ahmadtouseef946@gmail.com)
+- **Issues:** [GitHub Issues](https://github.com/Toseef-Ahmad/Tafil/issues)
+- **Website:** [tafil.app](https://tafil.app)
 
 ---
 
-## ⭐ Star History
+## 🌟 Acknowledgments
 
-If you find Tafil useful, please consider giving it a star on GitHub! It helps others discover the project.
+Built with ❤️ by [Touseef Ahmad](https://github.com/Toseef-Ahmad)
 
-[![Star History Chart](https://api.star-history.com/svg?repos=Toseef-Ahmad/Tafil&type=Date)](https://star-history.com/#Toseef-Ahmad/Tafil&Date)
+Special thanks to all the open-source projects that made TAFIL possible.
+
+---
+
+<div align="center">
+
+**[⬇️ Download TAFIL](https://github.com/Toseef-Ahmad/Tafil/releases)** • **[🌐 Visit Website](https://tafil.app)** • **[⭐ Star on GitHub](https://github.com/Toseef-Ahmad/Tafil)**
+
+Made with passion for developers who love to build.
+
+</div>

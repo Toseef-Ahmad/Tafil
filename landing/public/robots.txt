@@ -1,0 +1,17 @@
+# TAFIL - robots.txt
+# https://tafil.app
+
+User-agent: *
+Allow: /
+
+# Sitemap
+Sitemap: https://tafil.app/sitemap.xml
+
+# Crawl-delay (optional, be nice to bots)
+Crawl-delay: 1
+
+# Disallow admin/internal paths
+Disallow: /api/
+Disallow: /_next/
+Disallow: /admin/
+

@@ -1,354 +1,284 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 
-// =====================================================
-// Interactive App Demo Component
-// =====================================================
-function InteractiveAppDemo() {
-  const [activeScreen, setActiveScreen] = useState('projects');
-  const [isTyping, setIsTyping] = useState(false);
-  const [typedCode, setTypedCode] = useState('');
-  const [playgroundOutput, setPlaygroundOutput] = useState('');
-  const [runningProject, setRunningProject] = useState(null);
-  const [autoPlay, setAutoPlay] = useState(true);
-  
-  // Sample code for playground demo
-  const sampleCode = `// Calculate Fibonacci sequence
-function fibonacci(n) {
-  if (n <= 1) return n;
-  return fibonacci(n - 1) + fibonacci(n - 2);
+// ============================================================================
+// TAFIL - Professional Landing Page
+// A high-end, developer-focused landing page inspired by Linear, Raycast, Vercel
+// ============================================================================
+
+// Configuration
+const CONFIG = {
+  GITHUB_USERNAME: "Toseef-Ahmad",
+  REPO_NAME: "Tafil",
+  VERSION: "v1.0.0",
+  CONTACT_EMAIL: "ahmadtouseef946@gmail.com",
+  GUMROAD_URL: "https://tafil.gumroad.com/l/tafil-license",
+};
+
+const RELEASE_BASE = `https://github.com/${CONFIG.GITHUB_USERNAME}/${CONFIG.REPO_NAME}/releases/download/${CONFIG.VERSION}`;
+const DOWNLOADS = {
+  mac: `${RELEASE_BASE}/Tafil-1.0.0-darwin-universal.dmg`,
+  windows: `${RELEASE_BASE}/Tafil-1.0.0-portable.exe`,
+  linux_x64: `${RELEASE_BASE}/Tafil-1.0.0-x86_64.AppImage`,
+  linux_arm64: `${RELEASE_BASE}/Tafil-1.0.0-arm64.AppImage`,
+};
+
+// ============================================================================
+// COMPONENTS
+// ============================================================================
+
+// Logo Component
+function Logo({ size = 32, className = "" }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 32 32" fill="none" className={className}>
+      <rect width="32" height="32" rx="8" fill="url(#logo-grad)" />
+      <path d="M10 12L14 16L10 20" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M17 20H22" stroke="white" strokeWidth="2.5" strokeLinecap="round" />
+      <defs>
+        <linearGradient id="logo-grad" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
+          <stop stopColor="#9333ea" />
+          <stop offset="1" stopColor="#0891b2" />
+        </linearGradient>
+      </defs>
+    </svg>
+  );
 }
 
-const result = fibonacci(10);
-console.log("Fibonacci(10) =", result);`;
+// Feature Card
+function FeatureCard({ icon, title, description }) {
+  return (
+    <div className="group bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] hover:border-purple-500/20 rounded-xl p-7 transition-all duration-300">
+      <div className="text-3xl mb-4">{icon}</div>
+      <h3 className="text-lg font-semibold text-white mb-2">{title}</h3>
+      <p className="text-sm text-zinc-400 leading-relaxed">{description}</p>
+    </div>
+  );
+}
 
-  const sampleOutput = `→ Fibonacci(10) = 55
-✓ Executed in 2ms`;
+// Platform Download Card
+function PlatformCard({ icon, name, subtitle, downloadUrl, secondaryUrl, secondaryLabel }) {
+  return (
+    <div className="bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] hover:border-purple-500/20 rounded-xl p-8 text-center transition-all duration-300">
+      <div className="text-5xl mb-5">{icon}</div>
+      <h3 className="font-bold text-xl text-white mb-2">{name}</h3>
+      <p className="text-sm text-zinc-500 mb-6">{subtitle}</p>
+      <a href={downloadUrl} className="block w-full py-3.5 bg-gradient-to-r from-purple-600 to-cyan-600 hover:from-purple-500 hover:to-cyan-500 text-white rounded-xl text-sm font-semibold transition-all">
+        Download
+      </a>
+      {secondaryUrl && (
+        <a href={secondaryUrl} className="block w-full py-2.5 mt-3 border-2 border-white/10 hover:border-purple-500/30 text-white rounded-xl text-sm font-semibold transition-all">
+          {secondaryLabel}
+        </a>
+      )}
+    </div>
+  );
+}
 
-  // Sample projects
+// FAQ Item
+function FAQItem({ question, answer }) {
+  const [isOpen, setIsOpen] = useState(false);
+  return (
+    <div className="border border-white/[0.06] rounded-xl overflow-hidden">
+      <button onClick={() => setIsOpen(!isOpen)} className="w-full flex items-center justify-between p-6 text-left hover:bg-white/[0.02] transition-colors">
+        <span className="font-semibold text-white pr-4">{question}</span>
+        <span className={`text-zinc-400 transform transition-transform ${isOpen ? 'rotate-180' : ''}`}>▼</span>
+      </button>
+      {isOpen && (
+        <div className="px-6 pb-6 pt-0 text-zinc-400 leading-relaxed">
+          {answer}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Interactive Demo
+function InteractiveDemo() {
+  const [activeTab, setActiveTab] = useState('projects');
+  const [runningProjects, setRunningProjects] = useState(['api-server']);
+
   const projects = [
-    { name: 'tafil-landing', framework: 'React + Vite', status: 'stopped', port: null },
-    { name: 'api-server', framework: 'Express.js', status: 'running', port: 3001 },
-    { name: 'mobile-app', framework: 'React Native', status: 'stopped', port: null },
-    { name: 'dashboard', framework: 'Next.js', status: 'stopped', port: null },
+    { id: 'api-server', name: 'api-server', framework: 'Express.js', port: 3001 },
+    { id: 'dashboard', name: 'dashboard', framework: 'Next.js', port: 3000 },
+    { id: 'mobile-app', name: 'mobile-app', framework: 'React Native', port: 8081 },
+    { id: 'landing', name: 'landing-page', framework: 'Vite + React', port: 5173 },
   ];
 
-  // Auto-cycle through screens
-  useEffect(() => {
-    if (!autoPlay) return;
-    
-    const screens = ['projects', 'playground', 'blueprints', 'ssh'];
-    let currentIndex = screens.indexOf(activeScreen);
-    
-    const interval = setInterval(() => {
-      currentIndex = (currentIndex + 1) % screens.length;
-      setActiveScreen(screens[currentIndex]);
-    }, 4000);
-    
-    return () => clearInterval(interval);
-  }, [autoPlay, activeScreen]);
-
-  // Typing animation for playground
-  useEffect(() => {
-    if (activeScreen === 'playground' && typedCode.length < sampleCode.length) {
-      setIsTyping(true);
-      const timeout = setTimeout(() => {
-        setTypedCode(sampleCode.slice(0, typedCode.length + 1));
-      }, 30);
-      return () => clearTimeout(timeout);
-    } else if (activeScreen === 'playground' && typedCode.length === sampleCode.length) {
-      setIsTyping(false);
-      setTimeout(() => setPlaygroundOutput(sampleOutput), 500);
-    }
-  }, [activeScreen, typedCode]);
-
-  // Reset playground when switching away
-  useEffect(() => {
-    if (activeScreen !== 'playground') {
-      setTypedCode('');
-      setPlaygroundOutput('');
-    }
-  }, [activeScreen]);
-
-  const handleScreenChange = (screen) => {
-    setAutoPlay(false); // Stop auto-play when user interacts
-    setActiveScreen(screen);
-  };
-
-  const toggleProject = (projectName) => {
-    setAutoPlay(false);
-    setRunningProject(runningProject === projectName ? null : projectName);
+  const toggleProject = (id) => {
+    setRunningProjects(prev => 
+      prev.includes(id) ? prev.filter(p => p !== id) : [...prev, id]
+    );
   };
 
   return (
-    <div 
-      className="relative mx-auto max-w-5xl"
-      onMouseEnter={() => setAutoPlay(false)}
-    >
-      {/* macOS Window Frame */}
-      <div className="rounded-xl overflow-hidden shadow-2xl shadow-purple-500/20 border border-zinc-700/50">
-        {/* Title Bar */}
-        <div className="bg-[#1a1a1f] px-4 py-3 flex items-center gap-3 border-b border-zinc-800">
-          <div className="flex gap-2">
-            <div className="w-3 h-3 rounded-full bg-red-500 hover:bg-red-400 cursor-pointer transition-colors"></div>
-            <div className="w-3 h-3 rounded-full bg-yellow-500 hover:bg-yellow-400 cursor-pointer transition-colors"></div>
-            <div className="w-3 h-3 rounded-full bg-green-500 hover:bg-green-400 cursor-pointer transition-colors"></div>
+    <figure className="max-w-5xl mx-auto" aria-label="TAFIL application demo">
+      <div className="rounded-xl overflow-hidden border border-white/10 bg-zinc-900/50 backdrop-blur-md shadow-2xl shadow-black/50">
+        {/* Window Chrome */}
+        <div className="bg-zinc-900 px-4 py-3 flex items-center gap-2 border-b border-zinc-800">
+          <div className="flex gap-1.5">
+            <div className="w-3 h-3 rounded-full bg-[#ff5f57]"></div>
+            <div className="w-3 h-3 rounded-full bg-[#febc2e]"></div>
+            <div className="w-3 h-3 rounded-full bg-[#28c840]"></div>
           </div>
-          <div className="flex-1 text-center">
-            <span className="text-xs text-zinc-500 font-medium">TAFIL — Project Command Center</span>
-          </div>
-          <div className="w-16"></div>
+          <span className="flex-1 text-center text-xs text-zinc-500 font-medium">TAFIL — Project Command Center</span>
+          <div className="w-12"></div>
         </div>
 
         {/* App Content */}
-        <div className="flex bg-[#0f0f12] min-h-[480px]">
+        <div className="flex min-h-[400px]">
           {/* Sidebar */}
-          <div className="w-56 bg-[#141418] border-r border-zinc-800/50 flex flex-col">
-            {/* Logo */}
-            <div className="p-4 border-b border-zinc-800/50">
+          <nav className="w-52 bg-[#111113] border-r border-zinc-800 flex flex-col">
+            <div className="p-4 border-b border-zinc-800">
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-blue-500 rounded-lg flex items-center justify-center text-lg">⚡</div>
-                <span className="font-bold text-white">TAFIL</span>
+                <Logo size={24} />
+                <span className="font-semibold text-white text-sm">TAFIL</span>
                 <span className="ml-auto text-[10px] px-1.5 py-0.5 bg-purple-500/20 text-purple-400 rounded font-medium">PRO</span>
               </div>
             </div>
 
-            {/* Navigation */}
-            <div className="flex-1 p-2 space-y-1">
-              <button
-                onClick={() => handleScreenChange('projects')}
-                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                  activeScreen === 'projects' 
-                    ? 'bg-purple-500/20 text-purple-400' 
-                    : 'text-zinc-400 hover:bg-zinc-800/50 hover:text-white'
-                }`}
-              >
-                <span className="text-lg">📁</span>
-                <span>Projects</span>
-                <span className="ml-auto text-xs bg-zinc-800 px-1.5 py-0.5 rounded">4</span>
-              </button>
-
-              <button
-                onClick={() => handleScreenChange('playground')}
-                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                  activeScreen === 'playground' 
-                    ? 'bg-blue-500/20 text-blue-400' 
-                    : 'text-zinc-400 hover:bg-zinc-800/50 hover:text-white'
-                }`}
-              >
-                <span className="text-lg">⚡</span>
-                <span>Playground</span>
-              </button>
-
-              <button
-                onClick={() => handleScreenChange('blueprints')}
-                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                  activeScreen === 'blueprints' 
-                    ? 'bg-emerald-500/20 text-emerald-400' 
-                    : 'text-zinc-400 hover:bg-zinc-800/50 hover:text-white'
-                }`}
-              >
-                <span className="text-lg">📐</span>
-                <span>Blueprints</span>
-              </button>
-
-              <button
-                onClick={() => handleScreenChange('ssh')}
-                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                  activeScreen === 'ssh' 
-                    ? 'bg-orange-500/20 text-orange-400' 
-                    : 'text-zinc-400 hover:bg-zinc-800/50 hover:text-white'
-                }`}
-              >
-                <span className="text-lg">🖥️</span>
-                <span>SSH</span>
-              </button>
+            <div className="flex-1 p-2 space-y-0.5">
+              {[
+                { id: 'projects', icon: '📁', label: 'Projects', count: 4 },
+                { id: 'playground', icon: '⚡', label: 'Playground' },
+                { id: 'blueprints', icon: '📐', label: 'Blueprints' },
+                { id: 'notes', icon: '📝', label: 'Notes' },
+                { id: 'ssh', icon: '🖥️', label: 'SSH' },
+              ].map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => setActiveTab(item.id)}
+                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${
+                    activeTab === item.id 
+                      ? 'bg-purple-500/15 text-purple-400' 
+                      : 'text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200'
+                  }`}
+                >
+                  <span>{item.icon}</span>
+                  <span>{item.label}</span>
+                  {item.count && (
+                    <span className="ml-auto text-xs bg-zinc-800 text-zinc-500 px-1.5 py-0.5 rounded">{item.count}</span>
+                  )}
+                </button>
+              ))}
             </div>
 
-            {/* Running indicator */}
-            <div className="p-3 border-t border-zinc-800/50">
+            <div className="p-3 border-t border-zinc-800">
               <div className="flex items-center gap-2 text-xs text-zinc-500">
-                <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-                <span>1 project running</span>
+                <span className="w-2 h-2 rounded-full bg-green-500"></span>
+                <span>{runningProjects.length} running</span>
               </div>
             </div>
-          </div>
+          </nav>
 
           {/* Main Content */}
-          <div className="flex-1 overflow-hidden">
-            {/* Projects Screen */}
-            {activeScreen === 'projects' && (
-              <div className="p-6 animate-fadeIn">
+          <div className="flex-1 bg-[#0c0c0e] overflow-hidden">
+            {activeTab === 'projects' && (
+              <div className="p-6">
                 <div className="flex items-center justify-between mb-6">
                   <div>
-                    <h2 className="text-xl font-bold text-white">All Projects</h2>
-                    <p className="text-sm text-zinc-500">4 projects found</p>
+                    <h2 className="text-lg font-semibold text-white">All Projects</h2>
+                    <p className="text-xs text-zinc-500 mt-0.5">Click to start/stop servers</p>
                   </div>
-                  <button className="px-4 py-2 bg-purple-500 hover:bg-purple-400 rounded-lg text-sm font-medium transition-colors">
-                    + New Project
+                  <button className="px-3 py-1.5 bg-gradient-to-r from-purple-600 to-cyan-600 text-white rounded-lg text-xs font-semibold">
+                    + Add Project
                   </button>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  {projects.map((project) => (
-                    <div 
-                      key={project.name}
-                      className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-4 hover:border-zinc-700 transition-all cursor-pointer group"
-                      onClick={() => toggleProject(project.name)}
-                    >
-                      <div className="flex items-start justify-between mb-3">
-                        <div>
-                          <h3 className="font-semibold text-white group-hover:text-purple-400 transition-colors">{project.name}</h3>
-                          <p className="text-xs text-zinc-500">{project.framework}</p>
+                <div className="grid grid-cols-2 gap-3">
+                  {projects.map((project) => {
+                    const isRunning = runningProjects.includes(project.id);
+                    return (
+                      <button 
+                        key={project.id}
+                        onClick={() => toggleProject(project.id)}
+                        className={`bg-zinc-900/80 border rounded-lg p-4 text-left transition-all ${
+                          isRunning ? 'border-green-500/30' : 'border-zinc-800 hover:border-zinc-700'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="font-medium text-white text-sm">{project.name}</span>
+                          <div className={`w-2 h-2 rounded-full ${isRunning ? 'bg-green-500' : 'bg-zinc-600'}`}></div>
                         </div>
-                        <div className={`w-2 h-2 rounded-full ${
-                          project.status === 'running' || runningProject === project.name
-                            ? 'bg-green-500 animate-pulse' 
-                            : 'bg-zinc-600'
-                        }`}></div>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className={`text-xs px-2 py-1 rounded ${
-                          project.status === 'running' || runningProject === project.name
-                            ? 'bg-green-500/20 text-green-400'
-                            : 'bg-zinc-800 text-zinc-500'
-                        }`}>
-                          {project.status === 'running' || runningProject === project.name ? `Running :${project.port || '3000'}` : 'Stopped'}
-                        </span>
-                        <button className={`p-1.5 rounded-lg transition-all ${
-                          project.status === 'running' || runningProject === project.name
-                            ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
-                            : 'bg-green-500/20 text-green-400 hover:bg-green-500/30'
-                        }`}>
-                          {project.status === 'running' || runningProject === project.name ? '⏹' : '▶'}
-                        </button>
-                      </div>
-                    </div>
-                  ))}
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-zinc-500">{project.framework}</span>
+                          <span className={`text-xs px-2 py-0.5 rounded ${isRunning ? 'bg-green-500/15 text-green-400' : 'bg-zinc-800 text-zinc-500'}`}>
+                            {isRunning ? `:${project.port}` : 'stopped'}
+                          </span>
+                        </div>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             )}
 
-            {/* Playground Screen */}
-            {activeScreen === 'playground' && (
-              <div className="h-full flex flex-col animate-fadeIn">
+            {activeTab === 'playground' && (
+              <div className="h-full flex flex-col">
                 <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800">
-                  <div className="flex items-center gap-2">
-                    <span className="text-lg">⚡</span>
-                    <span className="font-medium text-white">JavaScript Playground</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-zinc-500">Auto-run</span>
-                    <div className="w-8 h-4 bg-purple-500 rounded-full relative">
-                      <div className="absolute right-0.5 top-0.5 w-3 h-3 bg-white rounded-full"></div>
-                    </div>
-                  </div>
+                  <span className="text-sm font-medium text-white">JavaScript Playground</span>
+                  <button className="px-3 py-1 bg-green-600 rounded text-xs font-medium">▶ Run</button>
                 </div>
-
                 <div className="flex-1 flex">
-                  {/* Code Editor */}
-                  <div className="flex-1 bg-[#1e1e24] p-4 font-mono text-sm border-r border-zinc-800">
-                    <pre className="text-zinc-300 whitespace-pre-wrap">
-                      {typedCode}
-                      {isTyping && <span className="inline-block w-2 h-4 bg-purple-500 animate-pulse ml-0.5"></span>}
-                    </pre>
-                  </div>
+                  <div className="flex-1 p-4 font-mono text-sm bg-[#0a0a0c]">
+                    <pre className="text-zinc-300">{`// Test your code here
+const fibonacci = (n) => {
+  if (n <= 1) return n;
+  return fibonacci(n - 1) + fibonacci(n - 2);
+};
 
-                  {/* Output */}
-                  <div className="w-64 bg-[#0a0a0d] p-4">
+console.log(fibonacci(10));`}</pre>
+                  </div>
+                  <div className="w-48 p-4 bg-[#080809] border-l border-zinc-800">
                     <div className="text-xs text-zinc-500 mb-2">Output</div>
-                    {playgroundOutput ? (
-                      <pre className="text-sm text-green-400 font-mono animate-fadeIn">{playgroundOutput}</pre>
-                    ) : (
-                      <div className="text-zinc-600 text-xs">Waiting for execution...</div>
-                    )}
+                    <pre className="text-sm text-green-400 font-mono">55</pre>
                   </div>
                 </div>
               </div>
             )}
 
-            {/* Blueprints Screen */}
-            {activeScreen === 'blueprints' && (
-              <div className="p-6 animate-fadeIn">
-                <div className="flex items-center justify-between mb-6">
-                  <div>
-                    <h2 className="text-xl font-bold text-white">Project Blueprints</h2>
-                    <p className="text-sm text-zinc-500">tafil-landing</p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-3 gap-4 mb-6">
-                  {['Authentication', 'API Routes', 'Database'].map((module, i) => (
-                    <div key={module} className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-4 hover:border-emerald-500/50 transition-all cursor-pointer">
-                      <div className="flex items-center gap-2 mb-2">
-                        <span className="text-lg">{['🔐', '🔌', '🗄️'][i]}</span>
-                        <h3 className="font-medium text-white">{module}</h3>
-                      </div>
-                      <div className="flex items-center gap-2 text-xs text-zinc-500">
-                        <span className="bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded">3 tasks</span>
-                        <span>5 notes</span>
-                      </div>
+            {activeTab === 'blueprints' && (
+              <div className="p-6">
+                <h2 className="text-lg font-semibold text-white mb-4">Project Blueprint</h2>
+                <div className="grid grid-cols-3 gap-3">
+                  {['Authentication', 'API Layer', 'Database'].map((module) => (
+                    <div key={module} className="bg-zinc-900/80 border border-zinc-800 rounded-lg p-4">
+                      <h3 className="font-medium text-white text-sm mb-2">{module}</h3>
+                      <span className="text-xs bg-purple-500/15 text-purple-400 px-1.5 py-0.5 rounded">3 tasks</span>
                     </div>
                   ))}
                 </div>
+              </div>
+            )}
 
-                {/* Kanban Preview */}
-                <div className="bg-zinc-900/30 rounded-xl p-4 border border-zinc-800">
-                  <div className="flex gap-4">
-                    {['To Do', 'In Progress', 'Done'].map((col, i) => (
-                      <div key={col} className="flex-1">
-                        <div className="text-xs font-medium text-zinc-400 mb-2">{col}</div>
-                        <div className="space-y-2">
-                          {[1, 2].map(j => (
-                            <div key={j} className="bg-zinc-800/50 rounded-lg p-2 text-xs text-zinc-400">
-                              Task item {j}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+            {activeTab === 'notes' && (
+              <div className="p-6">
+                <h2 className="text-lg font-semibold text-white mb-4">Notes</h2>
+                <div className="space-y-2">
+                  {['Architecture decisions', 'API documentation', 'Meeting notes'].map((note) => (
+                    <div key={note} className="bg-zinc-900/80 border border-zinc-800 rounded-lg p-4 hover:border-zinc-700 cursor-pointer">
+                      <h3 className="font-medium text-white text-sm">{note}</h3>
+                      <p className="text-xs text-zinc-500 mt-1">Last edited 2 days ago</p>
+                    </div>
+                  ))}
                 </div>
               </div>
             )}
 
-            {/* SSH Screen */}
-            {activeScreen === 'ssh' && (
-              <div className="p-6 animate-fadeIn">
-                <div className="flex items-center justify-between mb-6">
-                  <div>
-                    <h2 className="text-xl font-bold text-white">SSH Connections</h2>
-                    <p className="text-sm text-zinc-500">Manage remote servers</p>
-                  </div>
-                  <button className="px-4 py-2 bg-orange-500 hover:bg-orange-400 rounded-lg text-sm font-medium transition-colors">
-                    + Add Host
-                  </button>
-                </div>
-
-                <div className="space-y-3">
+            {activeTab === 'ssh' && (
+              <div className="p-6">
+                <h2 className="text-lg font-semibold text-white mb-4">SSH Connections</h2>
+                <div className="space-y-2">
                   {[
-                    { name: 'Production Server', host: 'prod.example.com', status: 'connected' },
-                    { name: 'Staging', host: 'staging.example.com', status: 'disconnected' },
-                    { name: 'Database Server', host: 'db.example.com', status: 'disconnected' },
+                    { name: 'Production', host: 'prod.example.com', connected: true },
+                    { name: 'Staging', host: 'staging.example.com', connected: false },
                   ].map((server) => (
-                    <div key={server.name} className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-4 hover:border-orange-500/50 transition-all cursor-pointer flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                          server.status === 'connected' ? 'bg-green-500/20' : 'bg-zinc-800'
-                        }`}>
-                          🖥️
-                        </div>
-                        <div>
-                          <h3 className="font-medium text-white">{server.name}</h3>
-                          <p className="text-xs text-zinc-500">{server.host}</p>
-                        </div>
+                    <div key={server.name} className="bg-zinc-900/80 border border-zinc-800 rounded-lg p-4 flex items-center justify-between">
+                      <div>
+                        <h3 className="font-medium text-white text-sm">{server.name}</h3>
+                        <p className="text-xs text-zinc-500">{server.host}</p>
                       </div>
-                      <div className={`text-xs px-2 py-1 rounded ${
-                        server.status === 'connected' 
-                          ? 'bg-green-500/20 text-green-400' 
-                          : 'bg-zinc-800 text-zinc-500'
-                      }`}>
-                        {server.status}
-                      </div>
+                      <span className={`text-xs px-2 py-0.5 rounded ${server.connected ? 'bg-green-500/15 text-green-400' : 'bg-zinc-800 text-zinc-500'}`}>
+                        {server.connected ? 'connected' : 'disconnected'}
+                      </span>
                     </div>
                   ))}
                 </div>
@@ -357,760 +287,468 @@ console.log("Fibonacci(10) =", result);`;
           </div>
         </div>
       </div>
-
-      {/* Interactive hint */}
-      <div className="text-center mt-4">
-        <span className="text-xs text-zinc-500 inline-flex items-center gap-2">
-          <span className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-pulse"></span>
-          Click the sidebar tabs to explore • Auto-cycles every 4 seconds
-        </span>
-      </div>
-
-      {/* Animation styles */}
-      <style>{`
-        @keyframes fadeIn {
-          from { opacity: 0; transform: translateY(10px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        .animate-fadeIn {
-          animation: fadeIn 0.3s ease-out;
-        }
-      `}</style>
-    </div>
+      <figcaption className="text-center text-xs text-zinc-500 mt-4">
+        ↑ Interactive preview — click tabs and projects to explore
+      </figcaption>
+    </figure>
   );
 }
 
-export default function App() {
-  // Download URLs (Cloudflare R2 - direct downloads)
-  const DOWNLOAD_MAC_URL = `https://download.tafil.app/TAFIL-1.0.0-mac-universal.dmg`;
-  const DOWNLOAD_WINDOWS_URL = `https://download.tafil.app/TAFIL-1.0.0-windows.exe`;
-  const DOWNLOAD_LINUX_X64_URL = `https://download.tafil.app/TAFIL-1.0.0-linux-x64.AppImage`;
-  const DOWNLOAD_LINUX_ARM64_URL = `https://download.tafil.app/TAFIL-1.0.0-linux-arm64.AppImage`;
-  
-  // Other URLs
-  const GUMROAD_URL = `https://tafil.gumroad.com/l/tafil-license`;
-  const GITHUB_URL = `https://github.com/Toseef-Ahmad/Tafil`;
-  const CONTACT_EMAIL = `ahmadtouseef946@gmail.com`;
+// ============================================================================
+// MAIN APP
+// ============================================================================
 
-  const [activeTab, setActiveTab] = useState('free');
-  const [showDownloadModal, setShowDownloadModal] = useState(false);
-  
-  // Detect OS
-  const getOS = () => {
-    const userAgent = window.navigator.userAgent;
-    if (userAgent.indexOf('Mac') !== -1) return 'mac';
-    if (userAgent.indexOf('Win') !== -1) return 'windows';
-    if (userAgent.indexOf('Linux') !== -1) return 'linux';
-    return 'mac';
-  };
-  
+export default function App() {
   const [detectedOS, setDetectedOS] = useState('mac');
   
   useEffect(() => {
-    setDetectedOS(getOS());
+    const ua = window.navigator.userAgent;
+    if (ua.includes('Win')) setDetectedOS('windows');
+    else if (ua.includes('Linux')) setDetectedOS('linux');
+    else setDetectedOS('mac');
   }, []);
   
   const getDownloadURL = () => {
-    switch (detectedOS) {
-      case 'windows': return DOWNLOAD_WINDOWS_URL;
-      case 'linux': return DOWNLOAD_LINUX_X64_URL; // Default to x64, ARM users can choose below
-      default: return DOWNLOAD_MAC_URL;
-    }
+    if (detectedOS === 'windows') return DOWNLOADS.windows;
+    if (detectedOS === 'linux') return DOWNLOADS.linux_x64;
+    return DOWNLOADS.mac;
   };
   
   const getOSLabel = () => {
-    switch (detectedOS) {
-      case 'windows': return 'Windows';
-      case 'linux': return 'Linux';
-      default: return 'macOS';
-    }
+    if (detectedOS === 'windows') return 'Windows';
+    if (detectedOS === 'linux') return 'Linux';
+    return 'macOS';
   };
 
   return (
-    <div className="min-h-screen bg-[#0a0a0f] text-white font-sans overflow-x-hidden">
-      {/* Background */}
-      <div className="fixed inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute top-0 left-1/3 w-[520px] h-[520px] bg-purple-500/10 rounded-full blur-[140px]"></div>
-        <div className="absolute bottom-0 right-1/4 w-[420px] h-[420px] bg-blue-500/10 rounded-full blur-[140px]"></div>
-        <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:64px_64px]"></div>
+    <div className="min-h-screen bg-[#0a0a0f] text-white antialiased">
+      {/* Background Effects */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-0 left-1/4 w-[600px] h-[600px] bg-purple-600/[0.08] rounded-full blur-[120px]"></div>
+        <div className="absolute bottom-0 right-1/4 w-[600px] h-[600px] bg-cyan-600/[0.06] rounded-full blur-[120px]"></div>
       </div>
-
-      {/* Header */}
-      <header className="relative z-10 border-b border-white/10 backdrop-blur-sm">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <a href="/" className="flex items-center gap-3 font-bold text-xl group">
-            <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-blue-500 rounded-xl flex items-center justify-center shadow-lg">
-              <span className="text-2xl">⚡</span>
-            </div>
-            <span className="bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
-              TAFIL
-            </span>
-          </a>
-          
-          <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-zinc-400">
-            <a href="#features" className="hover:text-white transition-colors">Features</a>
-            <a href="#how-it-works" className="hover:text-white transition-colors">How it Works</a>
-            <a href="#download" className="hover:text-white transition-colors">Download</a>
-            <a href="#faq" className="hover:text-white transition-colors">FAQ</a>
-          </nav>
-          
-          <a 
-            href="#download"
-            className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white font-semibold px-6 py-2.5 rounded-full text-sm shadow-lg transition-all"
-          >
-            Download Free
-          </a>
-        </div>
-      </header>
-
-      {/* Hero */}
-      <section className="relative z-10 py-24 md:py-32 px-6">
-        <div className="max-w-6xl mx-auto text-center">
-          <div className="inline-flex items-center gap-3 bg-zinc-900/60 border border-zinc-800 text-zinc-300 px-5 py-2.5 rounded-full text-sm font-medium mb-8 backdrop-blur-sm">
-            <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse"></span>
-            <span>Free Download · No Account Required · Works Offline</span>
-          </div>
-          
-          <h1 className="text-5xl md:text-7xl font-bold mb-8 leading-tight">
-            The Second Brain for
-            <br />
-            <span className="bg-gradient-to-r from-purple-400 via-blue-400 to-cyan-400 bg-clip-text text-transparent">
-              Developer Projects
-            </span>
-          </h1>
-          
-          <p className="text-xl md:text-2xl text-zinc-400 mb-12 max-w-3xl mx-auto leading-relaxed">
-            Plan, brainstorm, code, document, and experiment — all in one powerful desktop app.
-            <br className="hidden md:block" />
-            <span className="text-zinc-500">Works with your IDE. Not instead of it.</span>
-          </p>
-
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-6 mb-8">
-            <a
-              href={getDownloadURL()}
-              className="group flex items-center gap-3 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white px-10 py-5 rounded-2xl font-bold text-lg shadow-2xl shadow-purple-500/30 hover:shadow-purple-500/50 hover:scale-105 transition-all"
-            >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-              </svg>
-              Download for {getOSLabel()}
-              <span className="opacity-60 group-hover:translate-x-1 transition-transform">→</span>
+      
+      <div className="relative z-10">
+        {/* ================================================================ */}
+        {/* HEADER */}
+        {/* ================================================================ */}
+        <header className="border-b border-white/5 backdrop-blur-xl bg-black/30 sticky top-0 z-50">
+          <nav className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between" aria-label="Main navigation">
+            <a href="/" className="flex items-center gap-2.5 font-bold text-lg" aria-label="TAFIL home">
+              <Logo size={32} />
+              <span className="text-white">TAFIL</span>
             </a>
-
-            <a
-              href={GUMROAD_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-3 border-2 border-zinc-700 hover:border-purple-500 bg-zinc-900/50 backdrop-blur px-10 py-5 rounded-2xl font-semibold text-lg hover:bg-zinc-800/50 transition-all"
-            >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-              </svg>
-              Buy Pro License - $49
-            </a>
-          </div>
-
-          <div className="flex items-center justify-center gap-8 text-sm text-zinc-500">
-            <span className="flex items-center gap-2">
-              <svg className="w-4 h-4 text-green-400" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" />
-              </svg>
-              macOS, Windows, Linux
-            </span>
-            <span className="flex items-center gap-2">
-              <svg className="w-4 h-4 text-green-400" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" />
-              </svg>
-              100% Offline
-            </span>
-            <span className="flex items-center gap-2">
-              <svg className="w-4 h-4 text-green-400" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" />
-              </svg>
-              No Account Needed
-            </span>
-          </div>
-        </div>
-      </section>
-
-      {/* Interactive App Demo */}
-      <section className="relative z-10 py-16 px-6">
-        <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-10">
-            <h2 className="text-2xl md:text-3xl font-bold mb-3">
-              See TAFIL in Action
-            </h2>
-            <p className="text-zinc-400">
-              Interactive preview — click the tabs to explore
-            </p>
-          </div>
-          
-          <InteractiveAppDemo />
-        </div>
-      </section>
-
-      {/* How It Works - Simple Flow */}
-      <section id="how-it-works" className="relative z-10 py-20 px-6 bg-zinc-900/20">
-        <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-5xl font-bold mb-4">How TAFIL Works</h2>
-            <p className="text-xl text-zinc-400">Download free. Try it. Upgrade when ready.</p>
-          </div>
-
-          <div className="grid md:grid-cols-4 gap-8">
-            <div className="bg-zinc-900/50 backdrop-blur-sm rounded-2xl border border-zinc-800 p-8 text-center">
-              <div className="w-16 h-16 bg-gradient-to-br from-purple-500 to-blue-500 rounded-2xl flex items-center justify-center mx-auto mb-4 text-3xl">
-                1️⃣
-              </div>
-              <h3 className="text-xl font-bold mb-3">Download Free</h3>
-              <p className="text-zinc-400 text-sm">
-                Get TAFIL for macOS, Windows, or Linux. No payment, no sign-up, no strings attached.
-              </p>
-            </div>
-
-            <div className="bg-zinc-900/50 backdrop-blur-sm rounded-2xl border border-zinc-800 p-8 text-center">
-              <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-2xl flex items-center justify-center mx-auto mb-4 text-3xl">
-                2️⃣
-              </div>
-              <h3 className="text-xl font-bold mb-3">Install & Try</h3>
-              <p className="text-zinc-400 text-sm">
-                Use all basic features FREE. Manage projects, take notes, organize your work.
-              </p>
-            </div>
-
-            <div className="bg-zinc-900/50 backdrop-blur-sm rounded-2xl border border-zinc-800 p-8 text-center">
-              <div className="w-16 h-16 bg-gradient-to-br from-cyan-500 to-emerald-500 rounded-2xl flex items-center justify-center mx-auto mb-4 text-3xl">
-                3️⃣
-              </div>
-              <h3 className="text-xl font-bold mb-3">Upgrade (Optional)</h3>
-              <p className="text-zinc-400 text-sm">
-                Need advanced features? Buy a Pro license ($49) — one-time payment, lifetime access.
-              </p>
-            </div>
-
-            <div className="bg-zinc-900/50 backdrop-blur-sm rounded-2xl border border-zinc-800 p-8 text-center">
-              <div className="w-16 h-16 bg-gradient-to-br from-emerald-500 to-green-500 rounded-2xl flex items-center justify-center mx-auto mb-4 text-3xl">
-                4️⃣
-              </div>
-              <h3 className="text-xl font-bold mb-3">Paste & Unlock</h3>
-              <p className="text-zinc-400 text-sm">
-                Receive license key via email. Paste it in TAFIL. All Pro features unlock forever.
-              </p>
-            </div>
-          </div>
-
-          <div className="mt-12 text-center">
-            <div className="inline-block bg-zinc-800/50 border border-zinc-700 rounded-xl px-8 py-4">
-              <p className="text-zinc-300">
-                <strong className="text-purple-400">No tricks.</strong> Download is always free.
-                Pay only if you want Pro features. Cancel anytime (it's not a subscription anyway).
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Features Comparison - Free vs Pro */}
-      <section id="features" className="relative z-10 py-20 px-6">
-        <div className="max-w-5xl mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-5xl font-bold mb-4">Free vs Pro</h2>
-            <p className="text-xl text-zinc-400">Try TAFIL free. Upgrade when you're ready.</p>
-          </div>
-
-          <div className="grid md:grid-cols-2 gap-8">
-            {/* Free Column */}
-            <div className="bg-zinc-900/50 backdrop-blur-sm rounded-3xl border-2 border-zinc-800 p-8 hover:border-zinc-700 transition-colors">
-              <div className="text-center mb-8">
-                <h3 className="text-2xl font-bold mb-2">TAFIL Free</h3>
-                <div className="text-4xl font-bold text-zinc-400 mb-2">$0</div>
-                <p className="text-zinc-500">Forever free</p>
-              </div>
-
-              <ul className="space-y-4">
-                <li className="flex items-start gap-3">
-                  <svg className="w-6 h-6 text-green-400 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" />
-                  </svg>
-                  <div>
-                    <div className="font-semibold text-white">Unlimited Projects</div>
-                    <div className="text-sm text-zinc-400">Manage as many as you need</div>
-                  </div>
-                </li>
-                <li className="flex items-start gap-3">
-                  <svg className="w-6 h-6 text-green-400 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" />
-                  </svg>
-                  <div>
-                    <div className="font-semibold text-white">Blueprint & Modules</div>
-                    <div className="text-sm text-zinc-400">Basic project documentation</div>
-                  </div>
-                </li>
-                <li className="flex items-start gap-3">
-                  <svg className="w-6 h-6 text-green-400 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" />
-                  </svg>
-                  <div>
-                    <div className="font-semibold text-white">Markdown Notes</div>
-                    <div className="text-sm text-zinc-400">Write and organize notes</div>
-                  </div>
-                </li>
-                <li className="flex items-start gap-3">
-                  <svg className="w-6 h-6 text-green-400 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" />
-                  </svg>
-                  <div>
-                    <div className="font-semibold text-white">Todo & Kanban</div>
-                    <div className="text-sm text-zinc-400">Track tasks and progress</div>
-                  </div>
-                </li>
-                <li className="flex items-start gap-3">
-                  <svg className="w-6 h-6 text-green-400 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" />
-                  </svg>
-                  <div>
-                    <div className="font-semibold text-white">Basic Playground</div>
-                    <div className="text-sm text-zinc-400">Test JavaScript snippets</div>
-                  </div>
-                </li>
-                <li className="flex items-start gap-3">
-                  <svg className="w-6 h-6 text-green-400 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" />
-                  </svg>
-                  <div>
-                    <div className="font-semibold text-white">Fully Offline</div>
-                    <div className="text-sm text-zinc-400">No internet required</div>
-                  </div>
-                </li>
-              </ul>
-
-              <button className="w-full mt-8 py-4 border-2 border-zinc-700 rounded-xl font-semibold hover:border-zinc-600 transition-colors">
-                Forever Free
-              </button>
-            </div>
-
-            {/* Pro Column */}
-            <div className="bg-gradient-to-br from-purple-900/30 to-blue-900/30 backdrop-blur-sm rounded-3xl border-2 border-purple-500/30 p-8 hover:border-purple-500/50 transition-colors relative overflow-hidden">
-              <div className="absolute top-4 right-4 bg-purple-500 text-white text-xs px-3 py-1 rounded-full font-bold">
-                MOST POPULAR
-              </div>
-
-              <div className="text-center mb-8">
-                <h3 className="text-2xl font-bold mb-2">TAFIL Pro</h3>
-                <div className="flex items-baseline justify-center gap-2 mb-2">
-                  <span className="text-5xl font-bold bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">$49</span>
-                  <span className="text-zinc-500 line-through text-xl">$79</span>
-                </div>
-                <p className="text-zinc-400">One-time payment · Lifetime license</p>
-              </div>
-
-              <div className="text-sm text-purple-300 mb-4 font-semibold">Everything in Free, plus:</div>
-
-              <ul className="space-y-4">
-                <li className="flex items-start gap-3">
-                  <svg className="w-6 h-6 text-purple-400 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" />
-                  </svg>
-                  <div>
-                    <div className="font-semibold text-white">Advanced Playground</div>
-                    <div className="text-sm text-zinc-400">Full REPL with history & snippets</div>
-                  </div>
-                </li>
-                <li className="flex items-start gap-3">
-                  <svg className="w-6 h-6 text-purple-400 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" />
-                  </svg>
-                  <div>
-                    <div className="font-semibold text-white">Unlimited Modules</div>
-                    <div className="text-sm text-zinc-400">No limits on blueprints</div>
-                  </div>
-                </li>
-                <li className="flex items-start gap-3">
-                  <svg className="w-6 h-6 text-purple-400 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" />
-                  </svg>
-                  <div>
-                    <div className="font-semibold text-white">Excalidraw Canvas</div>
-                    <div className="text-sm text-zinc-400">Draw architecture diagrams</div>
-                  </div>
-                </li>
-                <li className="flex items-start gap-3">
-                  <svg className="w-6 h-6 text-purple-400 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" />
-                  </svg>
-                  <div>
-                    <div className="font-semibold text-white">Cross-Linking [[Wiki-Style]]</div>
-                    <div className="text-sm text-zinc-400">Like Obsidian, for code projects</div>
-                  </div>
-                </li>
-                <li className="flex items-start gap-3">
-                  <svg className="w-6 h-6 text-purple-400 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" />
-                  </svg>
-                  <div>
-                    <div className="font-semibold text-white">SSH Integration</div>
-                    <div className="text-sm text-zinc-400">Connect to remote servers</div>
-                  </div>
-                </li>
-                <li className="flex items-start gap-3">
-                  <svg className="w-6 h-6 text-purple-400 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" />
-                  </svg>
-                  <div>
-                    <div className="font-semibold text-white">Priority Support</div>
-                    <div className="text-sm text-zinc-400">Email support within 24h</div>
-                  </div>
-                </li>
-                <li className="flex items-start gap-3">
-                  <svg className="w-6 h-6 text-purple-400 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" />
-                  </svg>
-                  <div>
-                    <div className="font-semibold text-white">Commercial Usage</div>
-                    <div className="text-sm text-zinc-400">Use in your business</div>
-                  </div>
-                </li>
-                <li className="flex items-start gap-3">
-                  <svg className="w-6 h-6 text-purple-400 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" />
-                  </svg>
-                  <div>
-                    <div className="font-semibold text-white">3 Device Activations</div>
-                    <div className="text-sm text-zinc-400">Mac, Windows, Linux</div>
-                  </div>
-                </li>
-              </ul>
-
-              <a
-                href={GUMROAD_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="block w-full mt-8 py-4 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 rounded-xl font-bold text-center shadow-lg shadow-purple-500/30 hover:shadow-purple-500/50 transition-all"
-              >
-                Buy Pro License - $49
-              </a>
-
-              <p className="text-center text-xs text-zinc-500 mt-4">
-                ✓ 30-day money-back guarantee
-              </p>
-            </div>
-          </div>
-
-          <div className="mt-12 text-center">
-            <p className="text-zinc-400 text-lg">
-              <strong className="text-white">Not sure?</strong> Download free and try it first.
-              Upgrade to Pro later if you need advanced features.
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* What TAFIL IS / IS NOT */}
-      <section className="relative z-10 py-20 px-6 bg-zinc-900/20">
-        <div className="max-w-5xl mx-auto">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-5xl font-bold mb-4">
-              TAFIL is NOT an IDE
-            </h2>
-            <p className="text-xl text-zinc-400">
-              It works <span className="text-purple-400 font-semibold">WITH</span> your IDE, not instead of it
-            </p>
-          </div>
-
-          <div className="grid md:grid-cols-2 gap-8">
-            <div className="bg-emerald-500/5 border-2 border-emerald-500/20 rounded-2xl p-8">
-              <div className="text-emerald-400 text-xl font-bold mb-6 flex items-center gap-2">
-                <span className="text-3xl">✅</span> TAFIL IS:
-              </div>
-              <ul className="space-y-3 text-zinc-300">
-                <li className="flex items-start gap-3">
-                  <span className="text-emerald-400 mt-1">→</span>
-                  <span>A <strong>second brain</strong> for your development projects</span>
-                </li>
-                <li className="flex items-start gap-3">
-                  <span className="text-emerald-400 mt-1">→</span>
-                  <span>A <strong>project orchestrator</strong> that manages your workflow</span>
-                </li>
-                <li className="flex items-start gap-3">
-                  <span className="text-emerald-400 mt-1">→</span>
-                  <span>A <strong>planning & documentation</strong> tool with context</span>
-                </li>
-                <li className="flex items-start gap-3">
-                  <span className="text-emerald-400 mt-1">→</span>
-                  <span><strong>Works WITH</strong> VS Code, Cursor, WebStorm, etc.</span>
-                </li>
-                <li className="flex items-start gap-3">
-                  <span className="text-emerald-400 mt-1">→</span>
-                  <span><strong>100% offline</strong> - no cloud dependency</span>
-                </li>
-              </ul>
-            </div>
-
-            <div className="bg-red-500/5 border-2 border-red-500/20 rounded-2xl p-8">
-              <div className="text-red-400 text-xl font-bold mb-6 flex items-center gap-2">
-                <span className="text-3xl">❌</span> TAFIL IS NOT:
-              </div>
-              <ul className="space-y-3 text-zinc-300">
-                <li className="flex items-start gap-3">
-                  <span className="text-red-400 mt-1">×</span>
-                  <span>Not an IDE (keep using your favorite editor)</span>
-                </li>
-                <li className="flex items-start gap-3">
-                  <span className="text-red-400 mt-1">×</span>
-                  <span>Not a code editor (write code elsewhere)</span>
-                </li>
-                <li className="flex items-start gap-3">
-                  <span className="text-red-400 mt-1">×</span>
-                  <span>Not cloud-based (your data stays local)</span>
-                </li>
-                <li className="flex items-start gap-3">
-                  <span className="text-red-400 mt-1">×</span>
-                  <span>Not a subscription (one-time $49 for Pro)</span>
-                </li>
-                <li className="flex items-start gap-3">
-                  <span className="text-red-400 mt-1">×</span>
-                  <span>Not trying to replace your workflow</span>
-                </li>
-              </ul>
-            </div>
-          </div>
-
-          <div className="mt-12 text-center">
-            <div className="inline-block bg-zinc-800/50 border border-zinc-700 rounded-xl px-8 py-4">
-              <p className="text-lg text-zinc-300">
-                <strong className="text-purple-400">Think:</strong> Obsidian for code projects.
-                A layer <em>above</em> your IDE that connects everything.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* FAQ */}
-      <section id="faq" className="relative z-10 py-20 px-6">
-        <div className="max-w-4xl mx-auto">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-5xl font-bold mb-4">Frequently Asked Questions</h2>
-          </div>
-
-          <div className="space-y-6">
-            <div className="bg-zinc-900/50 backdrop-blur-sm rounded-2xl border border-zinc-800 p-6 hover:border-zinc-700 transition-colors">
-              <h3 className="text-xl font-bold text-white mb-3">Do I need to pay to download TAFIL?</h3>
-              <p className="text-zinc-400">
-                <strong className="text-white">No!</strong> Download is completely free. You can use TAFIL Free forever.
-                Pay only if you want Pro features ($49 one-time).
-              </p>
-            </div>
-
-            <div className="bg-zinc-900/50 backdrop-blur-sm rounded-2xl border border-zinc-800 p-6 hover:border-zinc-700 transition-colors">
-              <h3 className="text-xl font-bold text-white mb-3">How does the Pro license work?</h3>
-              <p className="text-zinc-400">
-                After buying Pro on Gumroad, you'll receive a license key via email. Paste it in TAFIL → all Pro features unlock.
-                Works on 3 devices, lifetime access, no subscription.
-              </p>
-            </div>
-
-            <div className="bg-zinc-900/50 backdrop-blur-sm rounded-2xl border border-zinc-800 p-6 hover:border-zinc-700 transition-colors">
-              <h3 className="text-xl font-bold text-white mb-3">Can I try Pro features before buying?</h3>
-              <p className="text-zinc-400">
-                Free version gives you a feel for TAFIL. Pro features are clearly marked in the app.
-                We offer a <strong className="text-emerald-400">30-day money-back guarantee</strong> if Pro doesn't meet your needs.
-              </p>
-            </div>
-
-            <div className="bg-zinc-900/50 backdrop-blur-sm rounded-2xl border border-zinc-800 p-6 hover:border-zinc-700 transition-colors">
-              <h3 className="text-xl font-bold text-white mb-3">Do I need internet to use TAFIL?</h3>
-              <p className="text-zinc-400">
-                <strong className="text-white">No.</strong> TAFIL works 100% offline after installation.
-                License activation needs internet once, then works offline for 30+ days.
-              </p>
-            </div>
-
-            <div className="bg-zinc-900/50 backdrop-blur-sm rounded-2xl border border-zinc-800 p-6 hover:border-zinc-700 transition-colors">
-              <h3 className="text-xl font-bold text-white mb-3">Is TAFIL an IDE or code editor?</h3>
-              <p className="text-zinc-400">
-                No. TAFIL is a <strong className="text-white">second brain</strong> for your projects.
-                Think Obsidian + Notion, but for developers. You still code in VS Code/Cursor/WebStorm.
-              </p>
-            </div>
-
-            <div className="bg-zinc-900/50 backdrop-blur-sm rounded-2xl border border-zinc-800 p-6 hover:border-zinc-700 transition-colors">
-              <h3 className="text-xl font-bold text-white mb-3">What platforms are supported?</h3>
-              <p className="text-zinc-400">
-                macOS (10.13+, Intel & Apple Silicon), Windows (10/11), and Linux (Ubuntu, Fedora, etc.).
-                One license works on all platforms.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Download Section */}
-      <section id="download" className="relative z-10 py-20 px-6 bg-gradient-to-b from-purple-900/10 to-transparent">
-        <div className="max-w-5xl mx-auto">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-5xl font-bold mb-4">Download TAFIL</h2>
-            <p className="text-xl text-zinc-400">Free download. No account required. Works offline.</p>
-          </div>
-
-          <div className="grid md:grid-cols-3 gap-6 mb-12">
-            {/* macOS */}
-            <div className="bg-zinc-900/60 backdrop-blur-sm rounded-2xl border border-zinc-800 p-8 text-center hover:border-purple-500/50 transition-all group">
-              <div className="text-5xl mb-4">🍎</div>
-              <h3 className="text-xl font-bold mb-2">macOS</h3>
-              <p className="text-sm text-zinc-400 mb-6">Intel & Apple Silicon</p>
-              <a
-                href={DOWNLOAD_MAC_URL}
-                className="block w-full py-3 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 rounded-xl font-semibold text-sm transition-all group-hover:shadow-lg group-hover:shadow-purple-500/20"
-              >
-                Download DMG
-              </a>
-              <p className="text-xs text-zinc-500 mt-3">macOS 10.13+</p>
-            </div>
-
-            {/* Windows */}
-            <div className="bg-zinc-900/60 backdrop-blur-sm rounded-2xl border border-zinc-800 p-8 text-center hover:border-blue-500/50 transition-all group">
-              <div className="text-5xl mb-4">🪟</div>
-              <h3 className="text-xl font-bold mb-2">Windows</h3>
-              <p className="text-sm text-zinc-400 mb-6">Windows 10/11</p>
-              <a
-                href={DOWNLOAD_WINDOWS_URL}
-                className="block w-full py-3 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 rounded-xl font-semibold text-sm transition-all group-hover:shadow-lg group-hover:shadow-blue-500/20"
-              >
-                Download EXE
-              </a>
-              <p className="text-xs text-zinc-500 mt-3">Windows 10+</p>
-            </div>
-
-            {/* Linux */}
-            <div className="bg-zinc-900/60 backdrop-blur-sm rounded-2xl border border-zinc-800 p-8 text-center hover:border-emerald-500/50 transition-all group">
-              <div className="text-5xl mb-4">🐧</div>
-              <h3 className="text-xl font-bold mb-2">Linux</h3>
-              <p className="text-sm text-zinc-400 mb-4">Ubuntu, Fedora, Debian</p>
-              <div className="space-y-2">
-                <a
-                  href={DOWNLOAD_LINUX_X64_URL}
-                  className="block w-full py-3 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-500 rounded-xl font-semibold text-sm transition-all group-hover:shadow-lg group-hover:shadow-emerald-500/20"
-                >
-                  Download x64
-                </a>
-                <a
-                  href={DOWNLOAD_LINUX_ARM64_URL}
-                  className="block w-full py-2.5 border border-emerald-500/30 hover:bg-emerald-500/10 rounded-xl font-medium text-sm text-emerald-400 transition-all"
-                >
-                  Download ARM64
-                </a>
-              </div>
-              <p className="text-xs text-zinc-500 mt-3">Ubuntu 18.04+ • AppImage</p>
-            </div>
-          </div>
-
-          {/* Quick Install Instructions */}
-          <div className="bg-zinc-900/40 backdrop-blur-sm rounded-2xl border border-zinc-800 p-6">
-            <h4 className="font-bold text-lg mb-4 text-center">Quick Installation</h4>
-            <div className="grid md:grid-cols-3 gap-6 text-sm text-zinc-400">
-              <div>
-                <div className="font-semibold text-white mb-2">🍎 macOS</div>
-                <ol className="space-y-1">
-                  <li>1. Open the DMG file</li>
-                  <li>2. Drag TAFIL to Applications</li>
-                  <li>3. Launch from Applications</li>
-                </ol>
-              </div>
-              <div>
-                <div className="font-semibold text-white mb-2">🪟 Windows</div>
-                <ol className="space-y-1">
-                  <li>1. Run the installer</li>
-                  <li>2. Follow the wizard</li>
-                  <li>3. Launch from Start Menu</li>
-                </ol>
-              </div>
-              <div>
-                <div className="font-semibold text-white mb-2">🐧 Linux</div>
-                <ol className="space-y-1">
-                  <li>1. Make executable: <code className="bg-zinc-800 px-1 rounded">chmod +x *.AppImage</code></li>
-                  <li>2. Double-click to run</li>
-                </ol>
-              </div>
-            </div>
-          </div>
-
-          {/* Pro License CTA */}
-          <div className="mt-12 text-center">
-            <div className="inline-block bg-gradient-to-r from-purple-900/30 to-blue-900/30 border border-purple-500/30 rounded-2xl px-8 py-6">
-              <p className="text-lg text-zinc-300 mb-4">
-                <strong className="text-purple-400">Want Pro features?</strong> Get unlimited everything for a one-time payment.
-              </p>
-              <a
-                href={GUMROAD_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 px-8 py-3 rounded-xl font-bold transition-all hover:scale-105"
-              >
-                Buy Pro License - $49
-                <span className="text-xs opacity-70">(one-time)</span>
-              </a>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Final CTA */}
-      <section className="relative z-10 py-20 px-6">
-        <div className="max-w-4xl mx-auto text-center">
-          <h2 className="text-4xl md:text-5xl font-bold mb-6">
-            Try TAFIL Today — Free
-          </h2>
-          <p className="text-xl text-zinc-400 mb-12">
-            No payment. No account. No tricks. Just download and use.
-          </p>
-
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-6">
-            <a
-              href={getDownloadURL()}
-              className="inline-flex items-center gap-3 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white font-bold text-xl px-12 py-5 rounded-2xl shadow-2xl shadow-purple-500/30 hover:shadow-purple-500/50 hover:scale-105 transition-all"
-            >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-              </svg>
-              Download for {getOSLabel()}
-            </a>
-
-            <a
-              href={GUMROAD_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-3 border-2 border-zinc-700 hover:border-purple-500 bg-zinc-900/50 backdrop-blur text-white font-semibold text-lg px-10 py-5 rounded-2xl hover:bg-zinc-800/50 transition-all"
-            >
-              Buy Pro License - $49
-            </a>
-          </div>
-
-          <p className="text-sm text-zinc-500 mt-8">
-            macOS • Windows • Linux • One-time payment • 30-day guarantee
-          </p>
-        </div>
-      </section>
-
-      {/* Footer */}
-      <footer className="relative z-10 border-t border-zinc-800 py-10 px-6">
-        <div className="max-w-6xl mx-auto">
-          <div className="flex flex-col md:flex-row justify-between items-center gap-6 text-sm text-zinc-500">
-            <div className="flex items-center gap-3">
-              <span className="font-bold text-white">TAFIL</span>
-              <span>·</span>
-              <span>© 2025 Touseef Ahmad</span>
+            
+            <div className="hidden md:flex items-center gap-8 text-sm">
+              <a href="#what-is-tafil" className="text-zinc-400 hover:text-white transition-colors">What is TAFIL?</a>
+              <a href="#features" className="text-zinc-400 hover:text-white transition-colors">Features</a>
+              <a href="#pricing" className="text-zinc-400 hover:text-white transition-colors">Pricing</a>
+              <a href="#download" className="text-zinc-400 hover:text-white transition-colors">Download</a>
+              <a href="/blog" className="text-zinc-400 hover:text-white transition-colors">Blog</a>
+              <a href={`https://github.com/${CONFIG.GITHUB_USERNAME}/${CONFIG.REPO_NAME}`} target="_blank" rel="noopener noreferrer" className="text-zinc-400 hover:text-white transition-colors">GitHub</a>
             </div>
             
-            <div className="flex items-center gap-6">
-              <a href={GITHUB_URL} className="hover:text-white transition-colors">GitHub</a>
-              <a href={`mailto:${CONTACT_EMAIL}`} className="hover:text-white transition-colors">Support</a>
-              <a href="/privacy" className="hover:text-white transition-colors">Privacy</a>
+            <a href="#download" className="bg-gradient-to-r from-purple-600 to-cyan-600 hover:from-purple-500 hover:to-cyan-500 text-white text-sm font-semibold px-5 py-2.5 rounded-lg transition-all">
+              Download Free
+            </a>
+          </nav>
+        </header>
+
+        <main id="main-content">
+          {/* ================================================================ */}
+          {/* HERO SECTION */}
+          {/* ================================================================ */}
+          <section className="py-24 md:py-32 px-6" aria-labelledby="hero-heading">
+            <div className="max-w-5xl mx-auto text-center">
+              <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/10 rounded-full text-sm text-zinc-300 mb-8">
+                <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+                Free Download · Works Offline · No Account Required
+              </div>
+              
+              <h1 id="hero-heading" className="text-5xl md:text-6xl lg:text-7xl font-bold mb-8 leading-[1.1] tracking-tight">
+                <span className="bg-gradient-to-r from-purple-400 via-cyan-400 to-purple-400 bg-clip-text text-transparent">
+                  Your second brain
+                </span>
+                <br />
+                <span className="text-zinc-500">for development</span>
+              </h1>
+              
+              <p className="text-xl md:text-2xl text-zinc-400 mb-12 max-w-3xl mx-auto leading-relaxed">
+                Manage projects, write documentation, plan features, and experiment with code — 
+                all in one desktop app that works alongside your IDE.
+              </p>
+
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-8">
+                <a href={getDownloadURL()} className="flex items-center gap-3 bg-gradient-to-r from-purple-600 to-cyan-600 hover:from-purple-500 hover:to-cyan-500 text-white px-8 py-4 rounded-xl font-semibold transition-all shadow-lg shadow-purple-500/25">
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  </svg>
+                  Download for {getOSLabel()}
+                </a>
+
+                <a href={CONFIG.GUMROAD_URL} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 border-2 border-white/20 hover:border-purple-500/50 hover:bg-white/5 text-white px-8 py-4 rounded-xl font-semibold transition-all">
+                  Get Pro — $49
+                </a>
+              </div>
+
+              <p className="text-sm text-zinc-500">
+                macOS (Intel & Apple Silicon) · Windows 10/11 · Linux
+              </p>
+            </div>
+          </section>
+
+          {/* ================================================================ */}
+          {/* INTERACTIVE DEMO */}
+          {/* ================================================================ */}
+          <section className="px-6 pb-24" aria-label="Application demo">
+            <InteractiveDemo />
+          </section>
+
+          {/* ================================================================ */}
+          {/* WHAT IS TAFIL */}
+          {/* ================================================================ */}
+          <section id="what-is-tafil" className="py-24 px-6 border-t border-white/5" aria-labelledby="what-heading">
+            <div className="max-w-5xl mx-auto">
+              <div className="text-center mb-16">
+                <h2 id="what-heading" className="text-4xl md:text-5xl font-bold mb-6 text-white">
+                  What is TAFIL?
+                </h2>
+                <p className="text-xl text-zinc-400 max-w-3xl mx-auto leading-relaxed">
+                  TAFIL is a desktop application that helps developers organize their work. 
+                  It's not an IDE — it works <em>alongside</em> your favorite editor as a 
+                  command center for all your projects.
+                </p>
+              </div>
+              
+              <div className="grid md:grid-cols-3 gap-8">
+                <div className="text-center">
+                  <div className="text-5xl mb-4">🧠</div>
+                  <h3 className="text-lg font-semibold text-white mb-2">Your Dev Brain</h3>
+                  <p className="text-zinc-400 text-sm">
+                    Keep project notes, architecture decisions, and documentation in one searchable place.
+                  </p>
+                </div>
+                <div className="text-center">
+                  <div className="text-5xl mb-4">🚀</div>
+                  <h3 className="text-lg font-semibold text-white mb-2">Project Launcher</h3>
+                  <p className="text-zinc-400 text-sm">
+                    Scan your machine, detect frameworks, and start dev servers with one click.
+                  </p>
+                </div>
+                <div className="text-center">
+                  <div className="text-5xl mb-4">🔒</div>
+                  <h3 className="text-lg font-semibold text-white mb-2">100% Offline</h3>
+                  <p className="text-zinc-400 text-sm">
+                    All data stays on your machine. No cloud sync, no tracking, no subscriptions.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* ================================================================ */}
+          {/* WHO IT'S FOR */}
+          {/* ================================================================ */}
+          <section className="py-24 px-6 border-t border-white/5" aria-labelledby="audience-heading">
+            <div className="max-w-5xl mx-auto">
+              <div className="text-center mb-16">
+                <h2 id="audience-heading" className="text-4xl md:text-5xl font-bold mb-6 text-white">
+                  Who is TAFIL for?
+                </h2>
+              </div>
+              
+              <div className="grid md:grid-cols-3 gap-8">
+                <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-8">
+                  <div className="text-4xl mb-4">👨‍💻</div>
+                  <h3 className="text-xl font-semibold text-white mb-3">Professional Developers</h3>
+                  <p className="text-zinc-400 text-sm leading-relaxed">
+                    Juggling multiple client projects? TAFIL helps you switch context instantly 
+                    and keep track of where you left off.
+                  </p>
+                </div>
+                <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-8">
+                  <div className="text-4xl mb-4">🎓</div>
+                  <h3 className="text-xl font-semibold text-white mb-3">Students & Learners</h3>
+                  <p className="text-zinc-400 text-sm leading-relaxed">
+                    Keep all your course projects organized. Take notes while coding. 
+                    The free version has everything you need.
+                  </p>
+                </div>
+                <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-8">
+                  <div className="text-4xl mb-4">🏴‍☠️</div>
+                  <h3 className="text-xl font-semibold text-white mb-3">Indie Hackers</h3>
+                  <p className="text-zinc-400 text-sm leading-relaxed">
+                    Building your own products? Use blueprints to plan features, 
+                    track progress with Kanban, and document everything.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* ================================================================ */}
+          {/* FEATURES */}
+          {/* ================================================================ */}
+          <section id="features" className="py-24 px-6 border-t border-white/5" aria-labelledby="features-heading">
+            <div className="max-w-6xl mx-auto">
+              <div className="text-center mb-16">
+                <h2 id="features-heading" className="text-4xl md:text-5xl font-bold mb-6 text-white">
+                  Everything you need
+                </h2>
+                <p className="text-zinc-400 text-lg">A focused toolkit for your development workflow</p>
+              </div>
+
+              <div className="grid md:grid-cols-3 gap-6">
+                <FeatureCard icon="📁" title="Project Management" description="Scan folders, organize into collections, launch with one click. Auto-detects Next.js, Express, React, Vue, and more." />
+                <FeatureCard icon="⚡" title="Code Playground" description="Test JavaScript snippets, experiment with APIs, prototype ideas. No need to create throwaway projects." />
+                <FeatureCard icon="📐" title="Blueprint Planning" description="Plan architecture with visual modules. Document decisions. Track progress from idea to implementation." />
+                <FeatureCard icon="📝" title="Markdown Notes" description="Write docs with full Markdown. Link notes together like Obsidian. Full-text search across everything." />
+                <FeatureCard icon="📊" title="Kanban Boards" description="Track tasks per project. Move cards between columns. See progress at a glance without leaving TAFIL." />
+                <FeatureCard icon="🖥️" title="SSH Integration" description="Connect to remote servers. Save multiple connections. Quick access to your infrastructure. (Pro)" />
+              </div>
+            </div>
+          </section>
+
+          {/* ================================================================ */}
+          {/* PRICING */}
+          {/* ================================================================ */}
+          <section id="pricing" className="py-24 px-6 border-t border-white/5" aria-labelledby="pricing-heading">
+            <div className="max-w-5xl mx-auto">
+              <div className="text-center mb-16">
+                <h2 id="pricing-heading" className="text-4xl md:text-5xl font-bold mb-6 text-white">
+                  Simple, honest pricing
+                </h2>
+                <p className="text-zinc-400 text-lg">Free forever, or unlock Pro with a one-time purchase</p>
+              </div>
+
+              <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+                {/* Free Tier */}
+                <div className="border border-white/10 bg-white/[0.02] rounded-xl p-10">
+                  <div className="mb-8">
+                    <h3 className="text-2xl font-bold mb-2 text-white">Free</h3>
+                    <div className="text-5xl font-bold text-white">$0</div>
+                    <p className="text-sm text-zinc-500 mt-1">Forever</p>
+                  </div>
+
+                  <ul className="space-y-4 mb-10 text-sm">
+                    {['Unlimited projects', 'Basic code playground', 'Markdown notes', 'Kanban boards', 'Offline mode', 'No account required'].map((item) => (
+                      <li key={item} className="flex items-center gap-3 text-zinc-300">
+                        <svg className="w-5 h-5 text-green-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                        </svg>
+                        {item}
+                      </li>
+                    ))}
+                  </ul>
+
+                  <a href="#download" className="block w-full text-center py-4 border-2 border-white/20 hover:border-purple-500/50 hover:bg-white/5 text-white rounded-xl font-semibold transition-all">
+                    Download Free
+                  </a>
+                </div>
+
+                {/* Pro Tier */}
+                <div className="border-2 border-purple-500/30 bg-gradient-to-br from-purple-500/10 to-cyan-500/5 rounded-xl p-10 relative">
+                  <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-gradient-to-r from-purple-600 to-cyan-600 text-white text-xs font-bold px-5 py-2 rounded-full uppercase tracking-wide">
+                    Recommended
+                  </div>
+
+                  <div className="mb-8">
+                    <h3 className="text-2xl font-bold mb-2 text-white">Pro</h3>
+                    <div className="flex items-baseline gap-3">
+                      <span className="text-5xl font-bold text-white">$49</span>
+                      <span className="text-lg text-zinc-500 line-through">$79</span>
+                    </div>
+                    <p className="text-sm text-zinc-500 mt-1">One-time payment</p>
+                  </div>
+
+                  <ul className="space-y-4 mb-10 text-sm">
+                    {[
+                      'Everything in Free',
+                      'Advanced playground with npm',
+                      'SSH integration',
+                      'Excalidraw canvas',
+                      'Wiki-style note linking',
+                      'Unlimited blueprint modules',
+                      '3 device activations',
+                      'Priority email support',
+                    ].map((item) => (
+                      <li key={item} className="flex items-center gap-3 text-zinc-300">
+                        <svg className="w-5 h-5 text-purple-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                        </svg>
+                        {item}
+                      </li>
+                    ))}
+                  </ul>
+
+                  <a href={CONFIG.GUMROAD_URL} target="_blank" rel="noopener noreferrer" className="block w-full text-center py-4 bg-gradient-to-r from-purple-600 to-cyan-600 hover:from-purple-500 hover:to-cyan-500 text-white rounded-xl font-semibold transition-all">
+                    Get Pro License
+                  </a>
+                  
+                  <p className="text-center text-xs text-zinc-500 mt-4">30-day money-back guarantee</p>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* ================================================================ */}
+          {/* HOW LICENSING WORKS */}
+          {/* ================================================================ */}
+          <section className="py-24 px-6 border-t border-white/5" aria-labelledby="licensing-heading">
+            <div className="max-w-4xl mx-auto">
+              <div className="text-center mb-16">
+                <h2 id="licensing-heading" className="text-4xl md:text-5xl font-bold mb-6 text-white">
+                  How licensing works
+                </h2>
+                <p className="text-zinc-400 text-lg">Simple steps, no hassle</p>
+              </div>
+              
+              <div className="grid md:grid-cols-4 gap-8">
+                {[
+                  { step: '1', title: 'Purchase', desc: 'Buy a Pro license through Gumroad' },
+                  { step: '2', title: 'Receive Key', desc: 'Get your license key via email' },
+                  { step: '3', title: 'Activate', desc: 'Enter the key in TAFIL (once)' },
+                  { step: '4', title: 'Done!', desc: 'All Pro features unlocked forever' },
+                ].map((item) => (
+                  <div key={item.step} className="text-center">
+                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-600 to-cyan-600 flex items-center justify-center text-xl font-bold mx-auto mb-4">
+                      {item.step}
+                    </div>
+                    <h3 className="font-semibold text-white mb-2">{item.title}</h3>
+                    <p className="text-sm text-zinc-400">{item.desc}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+
+          {/* ================================================================ */}
+          {/* DOWNLOAD */}
+          {/* ================================================================ */}
+          <section id="download" className="py-24 px-6 border-t border-white/5" aria-labelledby="download-heading">
+            <div className="max-w-5xl mx-auto">
+              <div className="text-center mb-16">
+                <h2 id="download-heading" className="text-4xl md:text-5xl font-bold mb-6 text-white">
+                  Download TAFIL
+                </h2>
+                <p className="text-zinc-400 text-lg">Free download. No account required.</p>
+              </div>
+
+              <div className="grid md:grid-cols-3 gap-6">
+                <PlatformCard icon="🍎" name="macOS" subtitle="Intel & Apple Silicon" downloadUrl={DOWNLOADS.mac} />
+                <PlatformCard icon="🪟" name="Windows" subtitle="Windows 10/11" downloadUrl={DOWNLOADS.windows} />
+                <PlatformCard icon="🐧" name="Linux" subtitle="Ubuntu, Fedora, Debian" downloadUrl={DOWNLOADS.linux_x64} secondaryUrl={DOWNLOADS.linux_arm64} secondaryLabel="ARM64" />
+              </div>
+
+              <div className="mt-10 p-5 bg-white/[0.03] border border-white/[0.06] rounded-xl">
+                <p className="text-sm text-zinc-400 text-center">
+                  <strong className="text-white">macOS tip:</strong> If you see "unidentified developer", right-click the app and select "Open"
+                </p>
+              </div>
+            </div>
+          </section>
+
+          {/* ================================================================ */}
+          {/* FAQ */}
+          {/* ================================================================ */}
+          <section id="faq" className="py-24 px-6 border-t border-white/5" aria-labelledby="faq-heading">
+            <div className="max-w-4xl mx-auto">
+              <h2 id="faq-heading" className="text-4xl md:text-5xl font-bold mb-16 text-center text-white">
+                Frequently asked questions
+              </h2>
+              
+              <div className="space-y-4">
+                <FAQItem question="Is TAFIL really free?" answer="Yes. The free version includes unlimited projects, markdown notes, Kanban boards, and works 100% offline. Pro is optional and unlocks advanced features like SSH integration, advanced playground, and wiki-style linking." />
+                <FAQItem question="Does TAFIL require internet?" answer="No. TAFIL works completely offline. All your data stays on your machine. License activation needs internet once, then works forever offline with a 30-day grace period for re-verification." />
+                <FAQItem question="What platforms are supported?" answer="TAFIL runs on macOS (Intel & Apple Silicon), Windows 10/11, and Linux (via AppImage). We provide native builds for all major platforms." />
+                <FAQItem question="Is this an IDE?" answer="No. TAFIL works alongside your favorite IDE (VS Code, Cursor, WebStorm, etc.) as a project command center. It helps you manage, organize, and document projects — not edit code." />
+                <FAQItem question="What's the difference between Free and Pro?" answer="Free includes unlimited projects, notes, Kanban boards, and basic playground. Pro ($49 one-time) adds SSH integration, advanced code playground with npm packages, Excalidraw canvas, wiki-style note linking, and priority support." />
+                <FAQItem question="Can I use Pro on multiple devices?" answer="Yes! The Pro license includes 3 device activations. You can use it on your work laptop, home desktop, and another machine. Need more? Contact us." />
+                <FAQItem question="What if I change my device?" answer="If your device fingerprint changes (new hardware, reinstall), you can re-enter your license key. If you've hit the device limit, you can deactivate an old device from the app or contact support." />
+              </div>
+            </div>
+          </section>
+
+          {/* ================================================================ */}
+          {/* FINAL CTA */}
+          {/* ================================================================ */}
+          <section className="py-24 px-6 border-t border-white/5">
+            <div className="max-w-4xl mx-auto text-center">
+              <div className="bg-gradient-to-br from-purple-500/10 to-cyan-500/5 border border-purple-500/20 rounded-2xl p-12 md:p-16">
+                <h2 className="text-4xl md:text-5xl font-bold mb-6 text-white">
+                  Ready to get organized?
+                </h2>
+                <p className="text-lg text-zinc-400 mb-8 max-w-2xl mx-auto">
+                  Download TAFIL for free and take control of your development workflow. 
+                  Your projects, notes, and plans — all in one place.
+                </p>
+                <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                  <a href={getDownloadURL()} className="inline-flex items-center justify-center gap-2 px-10 py-4 text-lg rounded-xl bg-gradient-to-r from-purple-600 to-cyan-600 hover:from-purple-500 hover:to-cyan-500 shadow-lg shadow-purple-500/25 font-semibold transition-all">
+                    Download for {getOSLabel()}
+                  </a>
+                  <a href={`https://github.com/${CONFIG.GITHUB_USERNAME}/${CONFIG.REPO_NAME}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center gap-2 px-10 py-4 text-lg rounded-xl border-2 border-white/20 hover:border-white/30 hover:bg-white/5 transition-all">
+                    View on GitHub
+                  </a>
+                </div>
+              </div>
+            </div>
+          </section>
+        </main>
+
+        {/* ================================================================ */}
+        {/* FOOTER */}
+        {/* ================================================================ */}
+        <footer className="border-t border-white/5 py-16 px-6" role="contentinfo">
+          <div className="max-w-6xl mx-auto">
+            <div className="grid md:grid-cols-4 gap-10 mb-12">
+              <div>
+                <div className="flex items-center gap-2 mb-4">
+                  <Logo size={24} />
+                  <span className="font-bold text-lg text-white">TAFIL</span>
+                </div>
+                <p className="text-sm text-zinc-500 leading-relaxed">
+                  The project command center for developers. Manage, document, and ship faster.
+                </p>
+                <p className="text-xs text-zinc-600 mt-4">Version {CONFIG.VERSION}</p>
+              </div>
+              
+              <div>
+                <h3 className="font-semibold text-white mb-4 text-sm">Product</h3>
+                <ul className="space-y-2 text-sm">
+                  <li><a href="#features" className="text-zinc-400 hover:text-white transition-colors">Features</a></li>
+                  <li><a href="#pricing" className="text-zinc-400 hover:text-white transition-colors">Pricing</a></li>
+                  <li><a href="#download" className="text-zinc-400 hover:text-white transition-colors">Download</a></li>
+                  <li><a href="#faq" className="text-zinc-400 hover:text-white transition-colors">FAQ</a></li>
+                </ul>
+              </div>
+              
+              <div>
+                <h3 className="font-semibold text-white mb-4 text-sm">Resources</h3>
+                <ul className="space-y-2 text-sm">
+                  <li><a href="/blog" className="text-zinc-400 hover:text-white transition-colors">Blog</a></li>
+                  <li><a href={`https://github.com/${CONFIG.GITHUB_USERNAME}/${CONFIG.REPO_NAME}`} target="_blank" rel="noopener noreferrer" className="text-zinc-400 hover:text-white transition-colors">GitHub</a></li>
+                  <li><a href={`https://github.com/${CONFIG.GITHUB_USERNAME}/${CONFIG.REPO_NAME}/issues`} target="_blank" rel="noopener noreferrer" className="text-zinc-400 hover:text-white transition-colors">Report Issues</a></li>
+                  <li><a href={`https://github.com/${CONFIG.GITHUB_USERNAME}/${CONFIG.REPO_NAME}/releases`} target="_blank" rel="noopener noreferrer" className="text-zinc-400 hover:text-white transition-colors">Changelog</a></li>
+                </ul>
+              </div>
+              
+              <div>
+                <h3 className="font-semibold text-white mb-4 text-sm">Legal</h3>
+                <ul className="space-y-2 text-sm">
+                  <li><a href="/privacy" className="text-zinc-400 hover:text-white transition-colors">Privacy Policy</a></li>
+                  <li><a href="/terms" className="text-zinc-400 hover:text-white transition-colors">Terms of Service</a></li>
+                  <li><a href={`mailto:${CONFIG.CONTACT_EMAIL}`} className="text-zinc-400 hover:text-white transition-colors">Contact</a></li>
+                </ul>
+              </div>
+            </div>
+            
+            <div className="pt-8 border-t border-white/5 flex flex-col md:flex-row justify-between items-center gap-4 text-sm text-zinc-500">
+              <p>© 2024 TAFIL. Built by <a href={`https://github.com/${CONFIG.GITHUB_USERNAME}`} target="_blank" rel="noopener noreferrer" className="text-purple-400 hover:text-purple-300">Touseef Ahmad</a></p>
+              <p>MIT License · Made with ❤️ for developers</p>
             </div>
           </div>
-        </div>
-      </footer>
+        </footer>
+      </div>
     </div>
   );
 }
-

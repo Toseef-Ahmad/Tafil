@@ -8,6 +8,7 @@
     "**/*.node",
     "**/node_modules/ps-tree/**/*"
   ],
+  "icon": "logo.svg",
   "directories": {
     "output": "release",
     "buildResources": "build"
@@ -48,7 +49,7 @@
   ],
   "mac": {
     "category": "public.app-category.developer-tools",
-    "icon": "build/icon.icns",
+    "icon": "logo.svg",
     "darkModeSupport": true,
     "hardenedRuntime": true,
     "gatekeeperAssess": false,
@@ -86,11 +87,11 @@
       "height": 400
     },
     "title": "${productName} ${version}",
-    "icon": "build/icon.icns",
+    "icon": "logo.svg",
     "backgroundColor": "#1a1a1a"
   },
   "win": {
-    "icon": "build/icon.ico",
+    "icon": "logo.svg",
     "target": [
       {
         "target": "nsis",
@@ -113,9 +114,9 @@
     "createDesktopShortcut": true,
     "createStartMenuShortcut": true,
     "shortcutName": "Tafil",
-    "installerIcon": "build/icon.ico",
-    "uninstallerIcon": "build/icon.ico",
-    "installerHeaderIcon": "build/icon.ico",
+    "installerIcon": "logo.svg",
+    "uninstallerIcon": "logo.svg",
+    "installerHeaderIcon": "logo.svg",
     "deleteAppDataOnUninstall": false,
     "runAfterFinish": true,
     "artifactName": "${productName}-Setup-${version}.${ext}",
@@ -128,7 +129,7 @@
     "artifactName": "${productName}-${version}-portable.${ext}"
   },
   "linux": {
-    "icon": "build/icons",
+    "icon": "logo.svg",
     "category": "Development",
     "maintainer": "Touseef Ahmad <ahmadtouseef946@gmail.com>",
     "target": [

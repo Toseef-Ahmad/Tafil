@@ -33,6 +33,7 @@
       "**/*.node",
       "**/node_modules/ps-tree/**/*"
     ],
+    "icon": "logo.svg",
     "directories": {
       "output": "release",
       "buildResources": "build"
@@ -75,7 +76,7 @@
     ],
     "mac": {
       "category": "public.app-category.developer-tools",
-      "icon": "build/icon.icns",
+      "icon": "logo.svg",
       "darkModeSupport": true,
       "hardenedRuntime": true,
       "gatekeeperAssess": false,
@@ -114,7 +115,7 @@
       }
     },
     "win": {
-      "icon": "build/icon.ico",
+      "icon": "logo.svg",
       "target": [
         {
           "target": "nsis",
@@ -150,7 +151,7 @@
       "artifactName": "${productName}-${version}-portable.${ext}"
     },
     "linux": {
-      "icon": "build/icons",
+      "icon": "logo.svg",
       "category": "Development",
       "maintainer": "Touseef Ahmad <ahmadtouseef946@gmail.com>",
       "target": [
