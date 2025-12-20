@@ -1,12 +1,429 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
+
+// =====================================================
+// Interactive App Demo Component
+// =====================================================
+function InteractiveAppDemo() {
+  const [activeScreen, setActiveScreen] = useState('projects');
+  const [isTyping, setIsTyping] = useState(false);
+  const [typedCode, setTypedCode] = useState('');
+  const [playgroundOutput, setPlaygroundOutput] = useState('');
+  const [runningProject, setRunningProject] = useState(null);
+  const [autoPlay, setAutoPlay] = useState(true);
+  
+  // Sample code for playground demo
+  const sampleCode = `// Calculate Fibonacci sequence
+function fibonacci(n) {
+  if (n <= 1) return n;
+  return fibonacci(n - 1) + fibonacci(n - 2);
+}
+
+const result = fibonacci(10);
+console.log("Fibonacci(10) =", result);`;
+
+  const sampleOutput = `→ Fibonacci(10) = 55
+✓ Executed in 2ms`;
+
+  // Sample projects
+  const projects = [
+    { name: 'tafil-landing', framework: 'React + Vite', status: 'stopped', port: null },
+    { name: 'api-server', framework: 'Express.js', status: 'running', port: 3001 },
+    { name: 'mobile-app', framework: 'React Native', status: 'stopped', port: null },
+    { name: 'dashboard', framework: 'Next.js', status: 'stopped', port: null },
+  ];
+
+  // Auto-cycle through screens
+  useEffect(() => {
+    if (!autoPlay) return;
+    
+    const screens = ['projects', 'playground', 'blueprints', 'ssh'];
+    let currentIndex = screens.indexOf(activeScreen);
+    
+    const interval = setInterval(() => {
+      currentIndex = (currentIndex + 1) % screens.length;
+      setActiveScreen(screens[currentIndex]);
+    }, 4000);
+    
+    return () => clearInterval(interval);
+  }, [autoPlay, activeScreen]);
+
+  // Typing animation for playground
+  useEffect(() => {
+    if (activeScreen === 'playground' && typedCode.length < sampleCode.length) {
+      setIsTyping(true);
+      const timeout = setTimeout(() => {
+        setTypedCode(sampleCode.slice(0, typedCode.length + 1));
+      }, 30);
+      return () => clearTimeout(timeout);
+    } else if (activeScreen === 'playground' && typedCode.length === sampleCode.length) {
+      setIsTyping(false);
+      setTimeout(() => setPlaygroundOutput(sampleOutput), 500);
+    }
+  }, [activeScreen, typedCode]);
+
+  // Reset playground when switching away
+  useEffect(() => {
+    if (activeScreen !== 'playground') {
+      setTypedCode('');
+      setPlaygroundOutput('');
+    }
+  }, [activeScreen]);
+
+  const handleScreenChange = (screen) => {
+    setAutoPlay(false); // Stop auto-play when user interacts
+    setActiveScreen(screen);
+  };
+
+  const toggleProject = (projectName) => {
+    setAutoPlay(false);
+    setRunningProject(runningProject === projectName ? null : projectName);
+  };
+
+  return (
+    <div 
+      className="relative mx-auto max-w-5xl"
+      onMouseEnter={() => setAutoPlay(false)}
+    >
+      {/* macOS Window Frame */}
+      <div className="rounded-xl overflow-hidden shadow-2xl shadow-purple-500/20 border border-zinc-700/50">
+        {/* Title Bar */}
+        <div className="bg-[#1a1a1f] px-4 py-3 flex items-center gap-3 border-b border-zinc-800">
+          <div className="flex gap-2">
+            <div className="w-3 h-3 rounded-full bg-red-500 hover:bg-red-400 cursor-pointer transition-colors"></div>
+            <div className="w-3 h-3 rounded-full bg-yellow-500 hover:bg-yellow-400 cursor-pointer transition-colors"></div>
+            <div className="w-3 h-3 rounded-full bg-green-500 hover:bg-green-400 cursor-pointer transition-colors"></div>
+          </div>
+          <div className="flex-1 text-center">
+            <span className="text-xs text-zinc-500 font-medium">TAFIL — Project Command Center</span>
+          </div>
+          <div className="w-16"></div>
+        </div>
+
+        {/* App Content */}
+        <div className="flex bg-[#0f0f12] min-h-[480px]">
+          {/* Sidebar */}
+          <div className="w-56 bg-[#141418] border-r border-zinc-800/50 flex flex-col">
+            {/* Logo */}
+            <div className="p-4 border-b border-zinc-800/50">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-blue-500 rounded-lg flex items-center justify-center text-lg">⚡</div>
+                <span className="font-bold text-white">TAFIL</span>
+                <span className="ml-auto text-[10px] px-1.5 py-0.5 bg-purple-500/20 text-purple-400 rounded font-medium">PRO</span>
+              </div>
+            </div>
+
+            {/* Navigation */}
+            <div className="flex-1 p-2 space-y-1">
+              <button
+                onClick={() => handleScreenChange('projects')}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                  activeScreen === 'projects' 
+                    ? 'bg-purple-500/20 text-purple-400' 
+                    : 'text-zinc-400 hover:bg-zinc-800/50 hover:text-white'
+                }`}
+              >
+                <span className="text-lg">📁</span>
+                <span>Projects</span>
+                <span className="ml-auto text-xs bg-zinc-800 px-1.5 py-0.5 rounded">4</span>
+              </button>
+
+              <button
+                onClick={() => handleScreenChange('playground')}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                  activeScreen === 'playground' 
+                    ? 'bg-blue-500/20 text-blue-400' 
+                    : 'text-zinc-400 hover:bg-zinc-800/50 hover:text-white'
+                }`}
+              >
+                <span className="text-lg">⚡</span>
+                <span>Playground</span>
+              </button>
+
+              <button
+                onClick={() => handleScreenChange('blueprints')}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                  activeScreen === 'blueprints' 
+                    ? 'bg-emerald-500/20 text-emerald-400' 
+                    : 'text-zinc-400 hover:bg-zinc-800/50 hover:text-white'
+                }`}
+              >
+                <span className="text-lg">📐</span>
+                <span>Blueprints</span>
+              </button>
+
+              <button
+                onClick={() => handleScreenChange('ssh')}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                  activeScreen === 'ssh' 
+                    ? 'bg-orange-500/20 text-orange-400' 
+                    : 'text-zinc-400 hover:bg-zinc-800/50 hover:text-white'
+                }`}
+              >
+                <span className="text-lg">🖥️</span>
+                <span>SSH</span>
+              </button>
+            </div>
+
+            {/* Running indicator */}
+            <div className="p-3 border-t border-zinc-800/50">
+              <div className="flex items-center gap-2 text-xs text-zinc-500">
+                <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+                <span>1 project running</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Main Content */}
+          <div className="flex-1 overflow-hidden">
+            {/* Projects Screen */}
+            {activeScreen === 'projects' && (
+              <div className="p-6 animate-fadeIn">
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <h2 className="text-xl font-bold text-white">All Projects</h2>
+                    <p className="text-sm text-zinc-500">4 projects found</p>
+                  </div>
+                  <button className="px-4 py-2 bg-purple-500 hover:bg-purple-400 rounded-lg text-sm font-medium transition-colors">
+                    + New Project
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  {projects.map((project) => (
+                    <div 
+                      key={project.name}
+                      className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-4 hover:border-zinc-700 transition-all cursor-pointer group"
+                      onClick={() => toggleProject(project.name)}
+                    >
+                      <div className="flex items-start justify-between mb-3">
+                        <div>
+                          <h3 className="font-semibold text-white group-hover:text-purple-400 transition-colors">{project.name}</h3>
+                          <p className="text-xs text-zinc-500">{project.framework}</p>
+                        </div>
+                        <div className={`w-2 h-2 rounded-full ${
+                          project.status === 'running' || runningProject === project.name
+                            ? 'bg-green-500 animate-pulse' 
+                            : 'bg-zinc-600'
+                        }`}></div>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className={`text-xs px-2 py-1 rounded ${
+                          project.status === 'running' || runningProject === project.name
+                            ? 'bg-green-500/20 text-green-400'
+                            : 'bg-zinc-800 text-zinc-500'
+                        }`}>
+                          {project.status === 'running' || runningProject === project.name ? `Running :${project.port || '3000'}` : 'Stopped'}
+                        </span>
+                        <button className={`p-1.5 rounded-lg transition-all ${
+                          project.status === 'running' || runningProject === project.name
+                            ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
+                            : 'bg-green-500/20 text-green-400 hover:bg-green-500/30'
+                        }`}>
+                          {project.status === 'running' || runningProject === project.name ? '⏹' : '▶'}
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Playground Screen */}
+            {activeScreen === 'playground' && (
+              <div className="h-full flex flex-col animate-fadeIn">
+                <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800">
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">⚡</span>
+                    <span className="font-medium text-white">JavaScript Playground</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-zinc-500">Auto-run</span>
+                    <div className="w-8 h-4 bg-purple-500 rounded-full relative">
+                      <div className="absolute right-0.5 top-0.5 w-3 h-3 bg-white rounded-full"></div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex-1 flex">
+                  {/* Code Editor */}
+                  <div className="flex-1 bg-[#1e1e24] p-4 font-mono text-sm border-r border-zinc-800">
+                    <pre className="text-zinc-300 whitespace-pre-wrap">
+                      {typedCode}
+                      {isTyping && <span className="inline-block w-2 h-4 bg-purple-500 animate-pulse ml-0.5"></span>}
+                    </pre>
+                  </div>
+
+                  {/* Output */}
+                  <div className="w-64 bg-[#0a0a0d] p-4">
+                    <div className="text-xs text-zinc-500 mb-2">Output</div>
+                    {playgroundOutput ? (
+                      <pre className="text-sm text-green-400 font-mono animate-fadeIn">{playgroundOutput}</pre>
+                    ) : (
+                      <div className="text-zinc-600 text-xs">Waiting for execution...</div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Blueprints Screen */}
+            {activeScreen === 'blueprints' && (
+              <div className="p-6 animate-fadeIn">
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <h2 className="text-xl font-bold text-white">Project Blueprints</h2>
+                    <p className="text-sm text-zinc-500">tafil-landing</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-4 mb-6">
+                  {['Authentication', 'API Routes', 'Database'].map((module, i) => (
+                    <div key={module} className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-4 hover:border-emerald-500/50 transition-all cursor-pointer">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-lg">{['🔐', '🔌', '🗄️'][i]}</span>
+                        <h3 className="font-medium text-white">{module}</h3>
+                      </div>
+                      <div className="flex items-center gap-2 text-xs text-zinc-500">
+                        <span className="bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded">3 tasks</span>
+                        <span>5 notes</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Kanban Preview */}
+                <div className="bg-zinc-900/30 rounded-xl p-4 border border-zinc-800">
+                  <div className="flex gap-4">
+                    {['To Do', 'In Progress', 'Done'].map((col, i) => (
+                      <div key={col} className="flex-1">
+                        <div className="text-xs font-medium text-zinc-400 mb-2">{col}</div>
+                        <div className="space-y-2">
+                          {[1, 2].map(j => (
+                            <div key={j} className="bg-zinc-800/50 rounded-lg p-2 text-xs text-zinc-400">
+                              Task item {j}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* SSH Screen */}
+            {activeScreen === 'ssh' && (
+              <div className="p-6 animate-fadeIn">
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <h2 className="text-xl font-bold text-white">SSH Connections</h2>
+                    <p className="text-sm text-zinc-500">Manage remote servers</p>
+                  </div>
+                  <button className="px-4 py-2 bg-orange-500 hover:bg-orange-400 rounded-lg text-sm font-medium transition-colors">
+                    + Add Host
+                  </button>
+                </div>
+
+                <div className="space-y-3">
+                  {[
+                    { name: 'Production Server', host: 'prod.example.com', status: 'connected' },
+                    { name: 'Staging', host: 'staging.example.com', status: 'disconnected' },
+                    { name: 'Database Server', host: 'db.example.com', status: 'disconnected' },
+                  ].map((server) => (
+                    <div key={server.name} className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-4 hover:border-orange-500/50 transition-all cursor-pointer flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                          server.status === 'connected' ? 'bg-green-500/20' : 'bg-zinc-800'
+                        }`}>
+                          🖥️
+                        </div>
+                        <div>
+                          <h3 className="font-medium text-white">{server.name}</h3>
+                          <p className="text-xs text-zinc-500">{server.host}</p>
+                        </div>
+                      </div>
+                      <div className={`text-xs px-2 py-1 rounded ${
+                        server.status === 'connected' 
+                          ? 'bg-green-500/20 text-green-400' 
+                          : 'bg-zinc-800 text-zinc-500'
+                      }`}>
+                        {server.status}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Interactive hint */}
+      <div className="text-center mt-4">
+        <span className="text-xs text-zinc-500 inline-flex items-center gap-2">
+          <span className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-pulse"></span>
+          Click the sidebar tabs to explore • Auto-cycles every 4 seconds
+        </span>
+      </div>
+
+      {/* Animation styles */}
+      <style>{`
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fadeIn {
+          animation: fadeIn 0.3s ease-out;
+        }
+      `}</style>
+    </div>
+  );
+}
 
 export default function App() {
-  const DOWNLOAD_URL = `https://download.tafil.app`;
-  const GUMROAD_URL = `https://toseefahmad.gumroad.com/l/tafil`;
+  // Download URLs (Cloudflare R2 - direct downloads)
+  const DOWNLOAD_MAC_URL = `https://download.tafil.app/TAFIL-1.0.0-mac-universal.dmg`;
+  const DOWNLOAD_WINDOWS_URL = `https://download.tafil.app/TAFIL-1.0.0-windows.exe`;
+  const DOWNLOAD_LINUX_URL = `https://download.tafil.app/TAFIL-1.0.0-linux.AppImage`;
+  
+  // Other URLs
+  const GUMROAD_URL = `https://tafil.gumroad.com/l/tafil-license`;
   const GITHUB_URL = `https://github.com/Toseef-Ahmad/Tafil`;
   const CONTACT_EMAIL = `ahmadtouseef946@gmail.com`;
 
   const [activeTab, setActiveTab] = useState('free');
+  const [showDownloadModal, setShowDownloadModal] = useState(false);
+  
+  // Detect OS
+  const getOS = () => {
+    const userAgent = window.navigator.userAgent;
+    if (userAgent.indexOf('Mac') !== -1) return 'mac';
+    if (userAgent.indexOf('Win') !== -1) return 'windows';
+    if (userAgent.indexOf('Linux') !== -1) return 'linux';
+    return 'mac';
+  };
+  
+  const [detectedOS, setDetectedOS] = useState('mac');
+  
+  useEffect(() => {
+    setDetectedOS(getOS());
+  }, []);
+  
+  const getDownloadURL = () => {
+    switch (detectedOS) {
+      case 'windows': return DOWNLOAD_WINDOWS_URL;
+      case 'linux': return DOWNLOAD_LINUX_URL;
+      default: return DOWNLOAD_MAC_URL;
+    }
+  };
+  
+  const getOSLabel = () => {
+    switch (detectedOS) {
+      case 'windows': return 'Windows';
+      case 'linux': return 'Linux';
+      default: return 'macOS';
+    }
+  };
 
   return (
     <div className="min-h-screen bg-[#0a0a0f] text-white font-sans overflow-x-hidden">
@@ -32,12 +449,12 @@ export default function App() {
           <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-zinc-400">
             <a href="#features" className="hover:text-white transition-colors">Features</a>
             <a href="#how-it-works" className="hover:text-white transition-colors">How it Works</a>
-            <a href="#pricing" className="hover:text-white transition-colors">Pricing</a>
+            <a href="#download" className="hover:text-white transition-colors">Download</a>
             <a href="#faq" className="hover:text-white transition-colors">FAQ</a>
           </nav>
           
           <a 
-            href={DOWNLOAD_URL}
+            href="#download"
             className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white font-semibold px-6 py-2.5 rounded-full text-sm shadow-lg transition-all"
           >
             Download Free
@@ -69,13 +486,13 @@ export default function App() {
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-6 mb-8">
             <a
-              href={DOWNLOAD_URL}
+              href={getDownloadURL()}
               className="group flex items-center gap-3 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white px-10 py-5 rounded-2xl font-bold text-lg shadow-2xl shadow-purple-500/30 hover:shadow-purple-500/50 hover:scale-105 transition-all"
             >
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
               </svg>
-              Download Free
+              Download for {getOSLabel()}
               <span className="opacity-60 group-hover:translate-x-1 transition-transform">→</span>
             </a>
 
@@ -88,7 +505,7 @@ export default function App() {
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
               </svg>
-              Buy Pro License - $49
+              Buy Pro License - $29
             </a>
           </div>
 
@@ -112,6 +529,22 @@ export default function App() {
               No Account Needed
             </span>
           </div>
+        </div>
+      </section>
+
+      {/* Interactive App Demo */}
+      <section className="relative z-10 py-16 px-6">
+        <div className="max-w-6xl mx-auto">
+          <div className="text-center mb-10">
+            <h2 className="text-2xl md:text-3xl font-bold mb-3">
+              See TAFIL in Action
+            </h2>
+            <p className="text-zinc-400">
+              Interactive preview — click the tabs to explore
+            </p>
+          </div>
+          
+          <InteractiveAppDemo />
         </div>
       </section>
 
@@ -150,7 +583,7 @@ export default function App() {
               </div>
               <h3 className="text-xl font-bold mb-3">Upgrade (Optional)</h3>
               <p className="text-zinc-400 text-sm">
-                Need advanced features? Buy a Pro license ($49) — one-time payment, lifetime access.
+                Need advanced features? Buy a Pro license ($29) — one-time payment, lifetime access.
               </p>
             </div>
 
@@ -264,8 +697,8 @@ export default function App() {
               <div className="text-center mb-8">
                 <h3 className="text-2xl font-bold mb-2">TAFIL Pro</h3>
                 <div className="flex items-baseline justify-center gap-2 mb-2">
-                  <span className="text-5xl font-bold bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">$49</span>
-                  <span className="text-zinc-500 line-through text-xl">$99</span>
+                  <span className="text-5xl font-bold bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">$29</span>
+                  <span className="text-zinc-500 line-through text-xl">$49</span>
                 </div>
                 <p className="text-zinc-400">One-time payment · Lifetime license</p>
               </div>
@@ -353,7 +786,7 @@ export default function App() {
                 rel="noopener noreferrer"
                 className="block w-full mt-8 py-4 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 rounded-xl font-bold text-center shadow-lg shadow-purple-500/30 hover:shadow-purple-500/50 transition-all"
               >
-                Buy Pro License - $49
+                Buy Pro License - $29
               </a>
 
               <p className="text-center text-xs text-zinc-500 mt-4">
@@ -431,7 +864,7 @@ export default function App() {
                 </li>
                 <li className="flex items-start gap-3">
                   <span className="text-red-400 mt-1">×</span>
-                  <span>Not a subscription (one-time $49 for Pro)</span>
+                  <span>Not a subscription (one-time $29 for Pro)</span>
                 </li>
                 <li className="flex items-start gap-3">
                   <span className="text-red-400 mt-1">×</span>
@@ -464,7 +897,7 @@ export default function App() {
               <h3 className="text-xl font-bold text-white mb-3">Do I need to pay to download TAFIL?</h3>
               <p className="text-zinc-400">
                 <strong className="text-white">No!</strong> Download is completely free. You can use TAFIL Free forever.
-                Pay only if you want Pro features ($49 one-time).
+                Pay only if you want Pro features ($29 one-time).
               </p>
             </div>
 
@@ -511,6 +944,108 @@ export default function App() {
         </div>
       </section>
 
+      {/* Download Section */}
+      <section id="download" className="relative z-10 py-20 px-6 bg-gradient-to-b from-purple-900/10 to-transparent">
+        <div className="max-w-5xl mx-auto">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl md:text-5xl font-bold mb-4">Download TAFIL</h2>
+            <p className="text-xl text-zinc-400">Free download. No account required. Works offline.</p>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-6 mb-12">
+            {/* macOS */}
+            <div className="bg-zinc-900/60 backdrop-blur-sm rounded-2xl border border-zinc-800 p-8 text-center hover:border-purple-500/50 transition-all group">
+              <div className="text-5xl mb-4">🍎</div>
+              <h3 className="text-xl font-bold mb-2">macOS</h3>
+              <p className="text-sm text-zinc-400 mb-6">Intel & Apple Silicon</p>
+              <a
+                href={DOWNLOAD_MAC_URL}
+                className="block w-full py-3 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 rounded-xl font-semibold text-sm transition-all group-hover:shadow-lg group-hover:shadow-purple-500/20"
+              >
+                Download DMG
+              </a>
+              <p className="text-xs text-zinc-500 mt-3">macOS 10.13+</p>
+            </div>
+
+            {/* Windows */}
+            <div className="bg-zinc-900/60 backdrop-blur-sm rounded-2xl border border-zinc-800 p-8 text-center hover:border-blue-500/50 transition-all group">
+              <div className="text-5xl mb-4">🪟</div>
+              <h3 className="text-xl font-bold mb-2">Windows</h3>
+              <p className="text-sm text-zinc-400 mb-6">Windows 10/11</p>
+              <a
+                href={DOWNLOAD_WINDOWS_URL}
+                className="block w-full py-3 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 rounded-xl font-semibold text-sm transition-all group-hover:shadow-lg group-hover:shadow-blue-500/20"
+              >
+                Download EXE
+              </a>
+              <p className="text-xs text-zinc-500 mt-3">Windows 10+</p>
+            </div>
+
+            {/* Linux */}
+            <div className="bg-zinc-900/60 backdrop-blur-sm rounded-2xl border border-zinc-800 p-8 text-center hover:border-emerald-500/50 transition-all group">
+              <div className="text-5xl mb-4">🐧</div>
+              <h3 className="text-xl font-bold mb-2">Linux</h3>
+              <p className="text-sm text-zinc-400 mb-6">Ubuntu, Fedora, Debian</p>
+              <a
+                href={DOWNLOAD_LINUX_URL}
+                className="block w-full py-3 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-500 rounded-xl font-semibold text-sm transition-all group-hover:shadow-lg group-hover:shadow-emerald-500/20"
+              >
+                Download AppImage
+              </a>
+              <p className="text-xs text-zinc-500 mt-3">Ubuntu 18.04+</p>
+            </div>
+          </div>
+
+          {/* Quick Install Instructions */}
+          <div className="bg-zinc-900/40 backdrop-blur-sm rounded-2xl border border-zinc-800 p-6">
+            <h4 className="font-bold text-lg mb-4 text-center">Quick Installation</h4>
+            <div className="grid md:grid-cols-3 gap-6 text-sm text-zinc-400">
+              <div>
+                <div className="font-semibold text-white mb-2">🍎 macOS</div>
+                <ol className="space-y-1">
+                  <li>1. Open the DMG file</li>
+                  <li>2. Drag TAFIL to Applications</li>
+                  <li>3. Launch from Applications</li>
+                </ol>
+              </div>
+              <div>
+                <div className="font-semibold text-white mb-2">🪟 Windows</div>
+                <ol className="space-y-1">
+                  <li>1. Run the installer</li>
+                  <li>2. Follow the wizard</li>
+                  <li>3. Launch from Start Menu</li>
+                </ol>
+              </div>
+              <div>
+                <div className="font-semibold text-white mb-2">🐧 Linux</div>
+                <ol className="space-y-1">
+                  <li>1. Make executable: <code className="bg-zinc-800 px-1 rounded">chmod +x *.AppImage</code></li>
+                  <li>2. Double-click to run</li>
+                </ol>
+              </div>
+            </div>
+          </div>
+
+          {/* Pro License CTA */}
+          <div className="mt-12 text-center">
+            <div className="inline-block bg-gradient-to-r from-purple-900/30 to-blue-900/30 border border-purple-500/30 rounded-2xl px-8 py-6">
+              <p className="text-lg text-zinc-300 mb-4">
+                <strong className="text-purple-400">Want Pro features?</strong> Get unlimited everything for a one-time payment.
+              </p>
+              <a
+                href={GUMROAD_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 px-8 py-3 rounded-xl font-bold transition-all hover:scale-105"
+              >
+                Buy Pro License - $29
+                <span className="text-xs opacity-70">(one-time)</span>
+              </a>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Final CTA */}
       <section className="relative z-10 py-20 px-6">
         <div className="max-w-4xl mx-auto text-center">
@@ -523,13 +1058,13 @@ export default function App() {
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-6">
             <a
-              href={DOWNLOAD_URL}
+              href={getDownloadURL()}
               className="inline-flex items-center gap-3 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white font-bold text-xl px-12 py-5 rounded-2xl shadow-2xl shadow-purple-500/30 hover:shadow-purple-500/50 hover:scale-105 transition-all"
             >
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
               </svg>
-              Download Free
+              Download for {getOSLabel()}
             </a>
 
             <a
@@ -538,7 +1073,7 @@ export default function App() {
               rel="noopener noreferrer"
               className="inline-flex items-center gap-3 border-2 border-zinc-700 hover:border-purple-500 bg-zinc-900/50 backdrop-blur text-white font-semibold text-lg px-10 py-5 rounded-2xl hover:bg-zinc-800/50 transition-all"
             >
-              Buy Pro License - $49
+              Buy Pro License - $29
             </a>
           </div>
 

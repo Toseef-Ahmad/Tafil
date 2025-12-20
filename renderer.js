@@ -9056,7 +9056,7 @@ const tierBadge = document.getElementById('tierBadge');
 
 // Track if upgrade nudge shown this session
 let upgradeNudgeShown = false;
-const GUMROAD_URL = 'https://toseefahmad.gumroad.com/l/tafil-pro';
+const GUMROAD_URL = 'https://tafil.gumroad.com/l/tafil-license';
 
 /**
  * Show the upgrade modal with custom content
