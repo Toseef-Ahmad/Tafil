@@ -51,13 +51,18 @@
       "node_modules/xterm-addon-web-links/**/*",
       "node_modules/monaco-editor/**/*",
       "utils/**/*",
+      "licensing/**/*",
       "assets/**/*",
       "!**/*.map",
       "!**/*.md",
       "!.git",
       "!.vscode",
       "!.cursor",
-      "!node_modules/.cache"
+      "!node_modules/.cache",
+      "!**/*.log",
+      "!**/.DS_Store",
+      "!**/test/**",
+      "!**/__tests__/**"
     ],
     "extraResources": [
       {
@@ -72,25 +77,15 @@
       "category": "public.app-category.developer-tools",
       "icon": "build/icon.icns",
       "darkModeSupport": true,
-      "hardenedRuntime": false,
-      "gatekeeperAssess": false,
+    "hardenedRuntime": true,
+    "gatekeeperAssess": false,
       "entitlements": "build/entitlements.mac.plist",
       "entitlementsInherit": "build/entitlements.mac.plist",
       "minimumSystemVersion": "10.13.0",
       "target": [
         {
           "target": "dmg",
-          "arch": [
-            "x64",
-            "arm64"
-          ]
-        },
-        {
-          "target": "zip",
-          "arch": [
-            "x64",
-            "arm64"
-          ]
+          "arch": ["universal"]
         }
       ],
       "extendInfo": {
