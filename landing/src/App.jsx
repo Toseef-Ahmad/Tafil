@@ -4,12 +4,14 @@ export default function App() {
   const GITHUB_USERNAME = "Toseef-Ahmad";
   const REPO_NAME = "Tafil";
 
-  const RELEASES_URL = `https://github.com/${GITHUB_USERNAME}/${REPO_NAME}/releases`;
+  // Download page - hosted on Vercel
+  const DOWNLOAD_URL = `https://download.tafil.app`; // Will be tafil-downloads.vercel.app initially
+  
   const GITHUB_URL = `https://github.com/${GITHUB_USERNAME}/${REPO_NAME}`;
-  const DOCS_URL = `/Tafil/docs/`;
+  const DOCS_URL = `https://tafil.app/docs/`;
 
-  // Replace with your Gumroad product URL.
-  const GUMROAD_URL = `https://gumroad.com/`;
+  // Gumroad product URL - UPDATE THIS WITH YOUR ACTUAL PRODUCT URL
+  const GUMROAD_URL = `https://toseefahmad.gumroad.com/l/tafil`;
 
   const PRIVACY_URL = `${GITHUB_URL}/blob/main/docs/reference/privacy.md`;
   const CONTACT_EMAIL = `ahmadtouseef946@gmail.com`;
@@ -186,7 +188,7 @@ export default function App() {
           </nav>
           
           <a 
-            href={RELEASES_URL}
+            href={DOWNLOAD_URL}
             target="_blank" 
             rel="noopener noreferrer" 
             className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-black font-semibold px-5 py-2.5 rounded-full text-sm shadow-lg shadow-amber-500/20 hover:shadow-amber-500/40 transition-all"
@@ -228,7 +230,7 @@ export default function App() {
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
             <div className="flex flex-col items-center">
               <a
-                href={RELEASES_URL}
+                href={DOWNLOAD_URL}
               target="_blank" 
               rel="noopener noreferrer" 
               className="group flex items-center gap-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-black px-8 py-4 rounded-2xl font-bold shadow-xl shadow-amber-500/25 hover:shadow-2xl hover:shadow-amber-500/40 hover:scale-105 transition-all"
@@ -634,7 +636,7 @@ export default function App() {
                 <p className="text-xs text-zinc-500 mt-4">Secure checkout.</p>
 
                 <a
-                  href={RELEASES_URL}
+                  href={DOWNLOAD_URL}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-block mt-4 text-sm text-zinc-400 hover:text-amber-400 transition-colors"

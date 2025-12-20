@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TAFIL License Manager</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .container {
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      max-width: 500px;
+      width: 100%;
+      overflow: hidden;
+    }
+
+    .header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 32px;
+      text-align: center;
+    }
+
+    .header h1 {
+      font-size: 28px;
+      margin-bottom: 8px;
+    }
+
+    .header p {
+      opacity: 0.9;
+      font-size: 14px;
+    }
+
+    .content {
+      padding: 32px;
+    }
+
+    .status-badge {
+      display: inline-block;
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 16px;
+    }
+
+    .status-valid {
+      background: #d4edda;
+      color: #155724;
+    }
+
+    .status-invalid {
+      background: #f8d7da;
+      color: #721c24;
+    }
+
+    .license-info {
+      background: #f8f9fa;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 24px;
+    }
+
+    .license-info-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 12px;
+      font-size: 14px;
+    }
+
+    .license-info-row:last-child {
+      margin-bottom: 0;
+    }
+
+    .label {
+      color: #6c757d;
+      font-weight: 500;
+    }
+
+    .value {
+      color: #212529;
+      font-weight: 600;
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 600;
+      color: #495057;
+      font-size: 14px;
+    }
+
+    input[type="text"] {
+      width: 100%;
+      padding: 12px 16px;
+      border: 2px solid #e9ecef;
+      border-radius: 8px;
+      font-size: 14px;
+      font-family: monospace;
+      transition: border-color 0.2s;
+    }
+
+    input[type="text"]:focus {
+      outline: none;
+      border-color: #667eea;
+    }
+
+    input[type="text"]::placeholder {
+      color: #adb5bd;
+    }
+
+    .btn {
+      width: 100%;
+      padding: 14px 24px;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    }
+
+    .btn-primary:active {
+      transform: translateY(0);
+    }
+
+    .btn-secondary {
+      background: #6c757d;
+      color: white;
+      margin-top: 12px;
+    }
+
+    .btn-secondary:hover {
+      background: #5a6268;
+    }
+
+    .btn-danger {
+      background: #dc3545;
+      color: white;
+      margin-top: 12px;
+    }
+
+    .btn-danger:hover {
+      background: #c82333;
+    }
+
+    .btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .error-message {
+      background: #f8d7da;
+      color: #721c24;
+      padding: 12px 16px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      font-size: 14px;
+      border-left: 4px solid #dc3545;
+    }
+
+    .success-message {
+      background: #d4edda;
+      color: #155724;
+      padding: 12px 16px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      font-size: 14px;
+      border-left: 4px solid #28a745;
+    }
+
+    .loading {
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      border: 3px solid rgba(255, 255, 255, 0.3);
+      border-radius: 50%;
+      border-top-color: white;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .actions {
+      display: flex;
+      gap: 12px;
+      margin-top: 20px;
+    }
+
+    .btn-small {
+      flex: 1;
+      padding: 10px 16px;
+      font-size: 12px;
+    }
+
+    .fingerprint {
+      font-family: monospace;
+      font-size: 12px;
+      color: #6c757d;
+      background: #f8f9fa;
+      padding: 8px 12px;
+      border-radius: 4px;
+      margin-top: 8px;
+    }
+
+    #activationScreen, #statusScreen {
+      display: none;
+    }
+
+    .show {
+      display: block !important;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>🔐 TAFIL License</h1>
+      <p>Professional Project Manager</p>
+    </div>
+
+    <div class="content">
+      <!-- Activation Screen -->
+      <div id="activationScreen">
+        <div id="errorMsg" class="error-message" style="display: none;"></div>
+        
+        <div class="form-group">
+          <label for="licenseKeyInput">Enter License Key</label>
+          <input 
+            type="text" 
+            id="licenseKeyInput" 
+            placeholder="XXXX-XXXX-XXXX-XXXX-XXXX"
+            maxlength="29"
+          />
+        </div>
+
+        <button id="activateBtn" class="btn btn-primary">
+          Activate License
+        </button>
+
+        <div class="fingerprint">
+          Device ID: <span id="deviceFingerprintDisplay">Loading...</span>
+        </div>
+      </div>
+
+      <!-- Status Screen -->
+      <div id="statusScreen">
+        <div id="successMsg" class="success-message" style="display: none;"></div>
+
+        <div class="status-badge status-valid">
+          ✓ License Active
+        </div>
+
+        <div class="license-info">
+          <div class="license-info-row">
+            <span class="label">Email</span>
+            <span class="value" id="emailDisplay">-</span>
+          </div>
+          <div class="license-info-row">
+            <span class="label">Devices</span>
+            <span class="value" id="devicesDisplay">-</span>
+          </div>
+          <div class="license-info-row">
+            <span class="label">Expires</span>
+            <span class="value" id="expiryDisplay">-</span>
+          </div>
+        </div>
+
+        <div class="actions">
+          <button id="syncBtn" class="btn btn-secondary btn-small">
+            Sync License
+          </button>
+          <button id="deactivateBtn" class="btn btn-danger btn-small">
+            Deactivate
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // DOM Elements
+    const activationScreen = document.getElementById('activationScreen');
+    const statusScreen = document.getElementById('statusScreen');
+    const licenseKeyInput = document.getElementById('licenseKeyInput');
+    const activateBtn = document.getElementById('activateBtn');
+    const syncBtn = document.getElementById('syncBtn');
+    const deactivateBtn = document.getElementById('deactivateBtn');
+    const errorMsg = document.getElementById('errorMsg');
+    const successMsg = document.getElementById('successMsg');
+    const deviceFingerprintDisplay = document.getElementById('deviceFingerprintDisplay');
+
+    // Initialize
+    async function init() {
+      // Load device fingerprint
+      const fingerprint = await window.license.getFingerprint();
+      deviceFingerprintDisplay.textContent = fingerprint;
+
+      // Check current status
+      const status = await window.license.getStatus();
+      
+      if (status.isValid) {
+        showStatusScreen(status);
+      } else {
+        showActivationScreen(status.error);
+      }
+    }
+
+    // Show activation screen
+    function showActivationScreen(error) {
+      activationScreen.classList.add('show');
+      statusScreen.classList.remove('show');
+
+      if (error) {
+        const errorMessages = {
+          'NO_LICENSE': 'No license found. Please enter your license key.',
+          'INVALID_SIGNATURE': 'License signature is invalid. Please re-activate.',
+          'DEVICE_MISMATCH': 'This license is registered to a different device.',
+          'EXPIRED': 'Your license has expired.',
+          'UNKNOWN_ERROR': 'An unknown error occurred.'
+        };
+        showError(errorMessages[error] || error);
+      }
+    }
+
+    // Show status screen
+    function showStatusScreen(status) {
+      statusScreen.classList.add('show');
+      activationScreen.classList.remove('show');
+
+      if (status.license) {
+        document.getElementById('emailDisplay').textContent = status.license.email || '-';
+        
+        if (status.license.features) {
+          const devices = status.license.features.maxDevices || '-';
+          document.getElementById('devicesDisplay').textContent = devices;
+        }
+
+        const expiryDate = status.license.expiresAt 
+          ? new Date(status.license.expiresAt).toLocaleDateString()
+          : 'Never';
+        document.getElementById('expiryDisplay').textContent = expiryDate;
+      }
+    }
+
+    // Activate license
+    activateBtn.addEventListener('click', async () => {
+      const licenseKey = licenseKeyInput.value.trim().toUpperCase();
+      
+      if (!licenseKey) {
+        showError('Please enter a license key');
+        return;
+      }
+
+      // Simple validation
+      if (licenseKey.length !== 29 || licenseKey.split('-').length !== 5) {
+        showError('Invalid license key format. Use XXXX-XXXX-XXXX-XXXX-XXXX');
+        return;
+      }
+
+      activateBtn.disabled = true;
+      activateBtn.innerHTML = '<span class="loading"></span>';
+      hideError();
+
+      try {
+        const result = await window.license.activate(licenseKey);
+        
+        if (result.success) {
+          showSuccess('License activated successfully!');
+          setTimeout(() => {
+            const status = {
+              isValid: true,
+              license: {
+                email: result.licenseInfo.email,
+                expiresAt: result.licenseInfo.expiresAt,
+                features: {
+                  maxDevices: result.licenseInfo.maxDevices
+                }
+              }
+            };
+            showStatusScreen(status);
+          }, 1500);
+        } else {
+          showError(result.error || 'Activation failed');
+        }
+      } catch (error) {
+        showError(error.message || 'Network error. Please check your connection.');
+      } finally {
+        activateBtn.disabled = false;
+        activateBtn.textContent = 'Activate License';
+      }
+    });
+
+    // Sync license
+    syncBtn.addEventListener('click', async () => {
+      syncBtn.disabled = true;
+      syncBtn.innerHTML = '<span class="loading"></span>';
+
+      try {
+        const result = await window.license.sync();
+        
+        if (result.success) {
+          showSuccess('License synced successfully!');
+          setTimeout(() => hideSuccess(), 3000);
+        } else {
+          showError(result.error || 'Sync failed');
+        }
+      } catch (error) {
+        showError('Sync failed. Continuing offline.');
+      } finally {
+        syncBtn.disabled = false;
+        syncBtn.textContent = 'Sync License';
+      }
+    });
+
+    // Deactivate license
+    deactivateBtn.addEventListener('click', async () => {
+      if (!confirm('Are you sure you want to deactivate this device? You can reactivate it later if you have available slots.')) {
+        return;
+      }
+
+      deactivateBtn.disabled = true;
+      deactivateBtn.innerHTML = '<span class="loading"></span>';
+
+      try {
+        const result = await window.license.deactivate();
+        
+        if (result.success) {
+          showActivationScreen();
+        } else {
+          showError(result.error || 'Deactivation failed');
+        }
+      } catch (error) {
+        showError(error.message || 'Deactivation failed');
+      } finally {
+        deactivateBtn.disabled = false;
+        deactivateBtn.textContent = 'Deactivate';
+      }
+    });
+
+    // Auto-format license key input
+    licenseKeyInput.addEventListener('input', (e) => {
+      let value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+      let formatted = '';
+      
+      for (let i = 0; i < value.length && i < 25; i++) {
+        if (i > 0 && i % 4 === 0) {
+          formatted += '-';
+        }
+        formatted += value[i];
+      }
+      
+      e.target.value = formatted;
+    });
+
+    // Enter key to activate
+    licenseKeyInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        activateBtn.click();
+      }
+    });
+
+    // Helper functions
+    function showError(message) {
+      errorMsg.textContent = message;
+      errorMsg.style.display = 'block';
+    }
+
+    function hideError() {
+      errorMsg.style.display = 'none';
+    }
+
+    function showSuccess(message) {
+      successMsg.textContent = message;
+      successMsg.style.display = 'block';
+    }
+
+    function hideSuccess() {
+      successMsg.style.display = 'none';
+    }
+
+    // Initialize on load
+    init();
+  </script>
+</body>
+</html>
+
