@@ -1256,6 +1256,114 @@ ipcMain.handle('license-check-server', async () => {
 });
 
 // -------------------------------------------------
+// Feature Limits IPC Handlers (Free vs Pro)
+// -------------------------------------------------
+
+ipcMain.handle('limits:getCurrentTier', async () => {
+  try {
+    return licensing.featureLimits.getCurrentTier();
+  } catch (e) {
+    return 'free';
+  }
+});
+
+ipcMain.handle('limits:isPro', async () => {
+  try {
+    return licensing.featureLimits.isPro();
+  } catch (e) {
+    return false;
+  }
+});
+
+ipcMain.handle('limits:canCreateProject', async (_event, count) => {
+  try {
+    return licensing.featureLimits.canCreateProject(count);
+  } catch (e) {
+    return { allowed: true }; // Fail open
+  }
+});
+
+ipcMain.handle('limits:canSaveSnippet', async (_event, count) => {
+  try {
+    return licensing.featureLimits.canSaveSnippet(count);
+  } catch (e) {
+    return { allowed: true }; // Fail open
+  }
+});
+
+ipcMain.handle('limits:getProjectLimitInfo', async (_event, count) => {
+  try {
+    return licensing.featureLimits.getProjectLimitInfo(count);
+  } catch (e) {
+    return { tier: 'free', limit: 3, current: count, remaining: 3 - count };
+  }
+});
+
+ipcMain.handle('limits:getSnippetLimitInfo', async (_event, count) => {
+  try {
+    return licensing.featureLimits.getSnippetLimitInfo(count);
+  } catch (e) {
+    return { tier: 'free', limit: 10, current: count, remaining: 10 - count };
+  }
+});
+
+ipcMain.handle('limits:getHistoryLimitInfo', async () => {
+  try {
+    return licensing.featureLimits.getHistoryLimitInfo();
+  } catch (e) {
+    return { tier: 'free', days: '7 days', isLimited: true };
+  }
+});
+
+ipcMain.handle('limits:isLanguageAvailable', async (_event, lang) => {
+  try {
+    return licensing.featureLimits.isLanguageAvailable(lang);
+  } catch (e) {
+    return { allowed: true }; // Fail open
+  }
+});
+
+ipcMain.handle('limits:getAvailableLanguages', async () => {
+  try {
+    return licensing.featureLimits.getAvailableLanguages();
+  } catch (e) {
+    return { languages: ['javascript', 'python', 'shell'], isLimited: true };
+  }
+});
+
+ipcMain.handle('limits:canExport', async (_event, format) => {
+  try {
+    return licensing.featureLimits.canExport(format);
+  } catch (e) {
+    return { allowed: format === 'clipboard' }; // Always allow clipboard
+  }
+});
+
+ipcMain.handle('limits:getAvailableExports', async () => {
+  try {
+    return licensing.featureLimits.getAvailableExports();
+  } catch (e) {
+    return { tier: 'free', formats: ['clipboard'], isLimited: true };
+  }
+});
+
+ipcMain.handle('limits:getFeatureSummary', async () => {
+  try {
+    return licensing.featureLimits.getFeatureSummary();
+  } catch (e) {
+    return { tier: 'free', isPro: false };
+  }
+});
+
+ipcMain.handle('limits:getUpgradeMessage', async (_event, type, params) => {
+  try {
+    return licensing.featureLimits.getUpgradeMessage(type, params);
+  } catch (e) {
+    return { title: 'Upgrade to Pro', message: 'Unlock all features.' };
+  }
+});
+
+// -------------------------------------------------
 // IPC Handlers
 // -------------------------------------------------
 

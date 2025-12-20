@@ -8,6 +8,7 @@ const deviceId = require('./deviceId');
 const licenseLoader = require('./licenseLoader');
 const verifier = require('./verifier');
 const featureGuard = require('./featureGuard');
+const featureLimits = require('./featureLimits');
 const activator = require('./activator');
 const licenseManager = require('./license-manager');
 const { registerLicenseHandlers } = require('./license-ipc');
@@ -62,5 +63,17 @@ module.exports = {
     const status = featureGuard.getLicenseStatus();
     return status;
   },
+  
+  // Feature Limits (Free vs Pro)
+  featureLimits: featureLimits,
+  getCurrentTier: featureLimits.getCurrentTier,
+  isPro: featureLimits.isPro,
+  canCreateProject: featureLimits.canCreateProject,
+  canSaveSnippet: featureLimits.canSaveSnippet,
+  filterHistoryByTier: featureLimits.filterHistoryByTier,
+  isLanguageAvailable: featureLimits.isLanguageAvailable,
+  canExport: featureLimits.canExport,
+  getFeatureSummary: featureLimits.getFeatureSummary,
+  getUpgradeMessage: featureLimits.getUpgradeMessage,
 };
 

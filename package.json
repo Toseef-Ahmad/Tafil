@@ -77,15 +77,17 @@
       "category": "public.app-category.developer-tools",
       "icon": "build/icon.icns",
       "darkModeSupport": true,
-    "hardenedRuntime": true,
-    "gatekeeperAssess": false,
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
       "entitlements": "build/entitlements.mac.plist",
       "entitlementsInherit": "build/entitlements.mac.plist",
       "minimumSystemVersion": "10.13.0",
       "target": [
         {
           "target": "dmg",
-          "arch": ["universal"]
+          "arch": [
+            "universal"
+          ]
         }
       ],
       "extendInfo": {
@@ -200,6 +202,7 @@
   "devDependencies": {
     "concurrently": "^9.1.0",
     "cross-env": "^7.0.3",
+    "d3-sankey": "^0.12.3",
     "electron": "^33.4.11",
     "electron-builder": "^25.1.8",
     "esbuild": "^0.27.1",
@@ -208,7 +211,6 @@
   },
   "dependencies": {
     "@excalidraw/excalidraw": "^0.18.0",
-    "d3-sankey": "^0.12.3",
     "fs-extra": "^11.3.2",
     "monaco-editor": "^0.55.1",
     "portfinder": "^1.0.32",

@@ -305,6 +305,25 @@ function saveSnippet(name, code, tags = []) {
   return snippet;
 }
 
+// Async version that checks limits first
+async function saveSnippetWithLimitCheck(name, code, tags = []) {
+  const snippets = getSavedSnippets();
+  
+  // Check snippet limit
+  try {
+    const limitCheck = await window.electronAPI.featureLimits.canSaveSnippet(snippets.length);
+    if (!limitCheck.allowed) {
+      showSnippetLimitModal(snippets.length);
+      return null;
+    }
+  } catch (e) {
+    // Fail open
+    console.warn('Snippet limit check failed, allowing save:', e);
+  }
+  
+  return saveSnippet(name, code, tags);
+}
+
 function updateSnippet(id, updates) {
   const snippets = getSavedSnippets();
   const idx = snippets.findIndex(s => s.id === id);
@@ -538,13 +557,27 @@ function closeSaveSnippetModal() {
   pendingSnippetDefaultName = '';
 }
 
-function confirmSaveSnippet() {
+async function confirmSaveSnippet() {
   const input = document.getElementById('snippetNameInput');
   const name = input ? input.value.trim() : '';
   
   if (!pendingSnippetCode) {
     closeSaveSnippetModal();
     return;
+  }
+  
+  // Check snippet limit first
+  const snippets = getSavedSnippets();
+  try {
+    const limitCheck = await window.electronAPI.featureLimits.canSaveSnippet(snippets.length);
+    if (!limitCheck.allowed) {
+      closeSaveSnippetModal();
+      showSnippetLimitModal(snippets.length);
+      return;
+    }
+  } catch (e) {
+    // Fail open
+    console.warn('Snippet limit check failed, allowing save:', e);
   }
   
   const finalName = name || pendingSnippetDefaultName || `Snippet ${Date.now()}`;
@@ -8591,7 +8624,23 @@ function renderTemplateGrid() {
   });
 }
 
-function showCreateProjectModal() {
+async function showCreateProjectModal() {
+  // Check project limit first
+  try {
+    const limitCheck = await window.electronAPI.featureLimits.canCreateProject(currentProjects.length);
+    if (!limitCheck.allowed) {
+      showProjectLimitModal(currentProjects.length);
+      return;
+    }
+    // Show warning if near limit but still allow
+    if (limitCheck.warning && !upgradeNudgeShown) {
+      showNotification(limitCheck.warning, 'info');
+    }
+  } catch (e) {
+    // Fail open if limit check fails
+    console.warn('Limit check failed, allowing action:', e);
+  }
+  
   // Reset wizard state
   wizardStep = 1;
   selectedStack = null;
@@ -8987,4 +9036,396 @@ window.hideModuleSearchModal = hideModuleSearchModal;
 window.searchInModules = searchInModules;
 window.closeBlueprints = closeBlueprints;
 window.openBlueprints = openBlueprints;
+
+// =====================================================
+// Feature Limits System (Free vs Pro)
+// =====================================================
+
+// Upgrade Modal Elements
+const upgradeModal = document.getElementById('upgradeModal');
+const upgradeModalTitle = document.getElementById('upgradeModalTitle');
+const upgradeModalMessage = document.getElementById('upgradeModalMessage');
+const upgradeModalAction = document.getElementById('upgradeModalAction');
+const upgradeModalActions = document.getElementById('upgradeModalActions');
+const upgradeModalBenefits = document.getElementById('upgradeModalBenefits');
+const upgradeModalPrice = document.getElementById('upgradeModalPrice');
+const closeUpgradeModal = document.getElementById('closeUpgradeModal');
+const upgradeModalDismiss = document.getElementById('upgradeModalDismiss');
+const upgradeModalPrimary = document.getElementById('upgradeModalPrimary');
+const tierBadge = document.getElementById('tierBadge');
+
+// Track if upgrade nudge shown this session
+let upgradeNudgeShown = false;
+const GUMROAD_URL = 'https://toseefahmad.gumroad.com/l/tafil-pro';
+
+/**
+ * Show the upgrade modal with custom content
+ * @param {object} options - Modal configuration
+ */
+function showUpgradeModal(options = {}) {
+  const {
+    title = "🎉 You're Growing!",
+    message = "That means you're getting real work done.",
+    action = "Free includes this feature with limits.",
+    showBenefits = true,
+    showPrice = true,
+    primaryAction = 'upgrade',
+    primaryLabel = 'Learn about Pro',
+    secondaryAction = 'dismiss',
+    secondaryLabel = 'Maybe later',
+    softAction = null,
+    softActionLabel = null,
+    onPrimary = null,
+    onSecondary = null,
+    onSoftAction = null,
+  } = options;
+  
+  if (!upgradeModal) return;
+  
+  // Set content
+  if (upgradeModalTitle) upgradeModalTitle.textContent = title;
+  if (upgradeModalMessage) upgradeModalMessage.textContent = message;
+  if (upgradeModalAction) upgradeModalAction.textContent = action;
+  
+  // Show/hide sections
+  if (upgradeModalBenefits) upgradeModalBenefits.style.display = showBenefits ? 'block' : 'none';
+  if (upgradeModalPrice) upgradeModalPrice.style.display = showPrice ? 'block' : 'none';
+  
+  // Configure actions
+  if (upgradeModalActions) {
+    upgradeModalActions.innerHTML = '';
+    
+    // Soft action (e.g., "Archive a project")
+    if (softAction && softActionLabel) {
+      const softBtn = document.createElement('button');
+      softBtn.className = 'upgrade-btn-secondary';
+      softBtn.style.cssText = 'padding:10px 16px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#a1a1aa;font-size:13px;cursor:pointer;transition:all 0.2s;';
+      softBtn.textContent = softActionLabel;
+      softBtn.onclick = () => {
+        hideUpgradeModal();
+        if (onSoftAction) onSoftAction();
+      };
+      upgradeModalActions.appendChild(softBtn);
+    }
+    
+    // Secondary action (dismiss)
+    const secondaryBtn = document.createElement('button');
+    secondaryBtn.className = 'upgrade-btn-secondary';
+    secondaryBtn.style.cssText = 'padding:10px 16px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#a1a1aa;font-size:13px;cursor:pointer;transition:all 0.2s;';
+    secondaryBtn.textContent = secondaryLabel;
+    secondaryBtn.onclick = () => {
+      hideUpgradeModal();
+      if (onSecondary) onSecondary();
+    };
+    upgradeModalActions.appendChild(secondaryBtn);
+    
+    // Primary action
+    const primaryBtn = document.createElement('button');
+    primaryBtn.className = 'upgrade-btn-primary';
+    primaryBtn.style.cssText = 'padding:10px 20px;background:linear-gradient(135deg,#8b5cf6,#7c3aed);border:none;border-radius:8px;color:#fff;font-size:13px;font-weight:500;cursor:pointer;transition:all 0.2s;';
+    primaryBtn.textContent = primaryLabel;
+    primaryBtn.onclick = () => {
+      hideUpgradeModal();
+      if (primaryAction === 'upgrade') {
+        openGumroadPage();
+      } else if (onPrimary) {
+        onPrimary();
+      }
+    };
+    upgradeModalActions.appendChild(primaryBtn);
+  }
+  
+  // Show modal
+  upgradeModal.classList.remove('hidden');
+  upgradeNudgeShown = true;
+}
+
+/**
+ * Hide the upgrade modal
+ */
+function hideUpgradeModal() {
+  if (upgradeModal) {
+    upgradeModal.classList.add('hidden');
+  }
+}
+
+/**
+ * Open Gumroad purchase page
+ */
+function openGumroadPage() {
+  if (window.electronAPI && window.electronAPI.openInBrowser) {
+    // Open in default browser
+    require('electron').shell.openExternal(GUMROAD_URL);
+  } else {
+    window.open(GUMROAD_URL, '_blank');
+  }
+}
+
+/**
+ * Show project limit reached modal
+ */
+function showProjectLimitModal(currentCount) {
+  showUpgradeModal({
+    title: "🎉 You've filled up 3 projects!",
+    message: "That means you're getting real work done.",
+    action: "Free includes 3 projects. Pro unlocks unlimited projects so you can build without limits.",
+    showBenefits: true,
+    showPrice: true,
+    softAction: 'archive',
+    softActionLabel: 'Archive a project',
+    primaryLabel: 'See Pro',
+    onSoftAction: () => {
+      showNotification('Tip: Remove projects from the list to make room.', 'info');
+    },
+  });
+}
+
+/**
+ * Show snippet limit reached modal
+ */
+function showSnippetLimitModal(currentCount) {
+  showUpgradeModal({
+    title: "💾 Nice library! You've saved 10 snippets.",
+    message: "You're building something useful.",
+    action: "Free includes 10 snippets. Pro lets you save unlimited snippets — build your personal code library.",
+    showBenefits: true,
+    showPrice: true,
+    softAction: 'delete',
+    softActionLabel: 'Delete an old snippet',
+    primaryLabel: 'See Pro',
+    onSoftAction: () => {
+      showNotification('Tip: Delete old snippets to make room for new ones.', 'info');
+    },
+  });
+}
+
+/**
+ * Show language not available modal
+ */
+function showLanguageLimitModal(language) {
+  showUpgradeModal({
+    title: `✨ ${language} is a Pro language`,
+    message: "Free includes JavaScript, Python, and Shell.",
+    action: `Pro unlocks 15+ languages including ${language} for all your experiments.`,
+    showBenefits: true,
+    showPrice: true,
+    secondaryLabel: 'Use a free language',
+    primaryLabel: 'See Pro',
+  });
+}
+
+/**
+ * Show export limit modal
+ */
+function showExportLimitModal(format) {
+  showUpgradeModal({
+    title: `✨ Export to ${format} is a Pro feature`,
+    message: "You can still copy your code to clipboard.",
+    action: "Pro adds one-click export to Markdown, GitHub Gist, and PDF.",
+    showBenefits: false,
+    showPrice: true,
+    softAction: 'clipboard',
+    softActionLabel: 'Copy to clipboard',
+    primaryLabel: 'See Pro',
+    onSoftAction: () => {
+      // Copy current code to clipboard
+      if (monacoEditor) {
+        const code = monacoEditor.getValue();
+        navigator.clipboard.writeText(code);
+        showNotification('✓ Copied to clipboard', 'success');
+      }
+    },
+  });
+}
+
+/**
+ * Show history limit info
+ */
+function showHistoryLimitModal() {
+  showUpgradeModal({
+    title: "📜 Looking for older history?",
+    message: "Free keeps 7 days of execution history.",
+    action: "Pro keeps your full history forever — so you never lose an experiment.",
+    showBenefits: false,
+    showPrice: true,
+    secondaryLabel: "That's okay",
+    primaryLabel: 'Learn about Pro',
+  });
+}
+
+/**
+ * Show the feature comparison modal
+ */
+function showFeatureComparisonModal() {
+  showUpgradeModal({
+    title: "✨ TAFIL Pro",
+    message: "Power, speed, and unlimited capacity for serious developers.",
+    action: "One-time purchase. Yours forever. All future updates included.",
+    showBenefits: true,
+    showPrice: true,
+    primaryLabel: 'Buy Pro ($29)',
+    secondaryLabel: 'Maybe later',
+  });
+}
+
+/**
+ * Update tier badge
+ */
+async function updateTierBadge() {
+  if (!tierBadge) return;
+  
+  try {
+    const isPro = await window.electronAPI.featureLimits.isPro();
+    
+    if (isPro) {
+      tierBadge.textContent = 'PRO';
+      tierBadge.className = 'tier-badge pro';
+      tierBadge.title = 'TAFIL Pro — All features unlocked';
+    } else {
+      tierBadge.textContent = 'FREE';
+      tierBadge.className = 'tier-badge free';
+      tierBadge.title = 'Click to see Pro features';
+    }
+  } catch (e) {
+    // Default to free
+    tierBadge.textContent = 'FREE';
+    tierBadge.className = 'tier-badge free';
+  }
+}
+
+/**
+ * Check project limit before creating
+ */
+async function checkProjectLimit() {
+  try {
+    const result = await window.electronAPI.featureLimits.canCreateProject(currentProjects.length);
+    
+    if (!result.allowed) {
+      showProjectLimitModal(currentProjects.length);
+      return false;
+    }
+    
+    // Show warning if near limit
+    if (result.warning && !upgradeNudgeShown) {
+      showNotification(result.warning, 'info');
+    }
+    
+    return true;
+  } catch (e) {
+    // Fail open - allow the action
+    return true;
+  }
+}
+
+/**
+ * Check snippet limit before saving
+ */
+async function checkSnippetLimit() {
+  try {
+    const snippets = getSavedSnippets();
+    const result = await window.electronAPI.featureLimits.canSaveSnippet(snippets.length);
+    
+    if (!result.allowed) {
+      showSnippetLimitModal(snippets.length);
+      return false;
+    }
+    
+    return true;
+  } catch (e) {
+    // Fail open - allow the action
+    return true;
+  }
+}
+
+/**
+ * Check if language is available
+ */
+async function checkLanguageLimit(language) {
+  try {
+    const result = await window.electronAPI.featureLimits.isLanguageAvailable(language);
+    
+    if (!result.allowed) {
+      showLanguageLimitModal(language);
+      return false;
+    }
+    
+    return true;
+  } catch (e) {
+    // Fail open
+    return true;
+  }
+}
+
+/**
+ * Check export format availability
+ */
+async function checkExportLimit(format) {
+  try {
+    const result = await window.electronAPI.featureLimits.canExport(format);
+    
+    if (!result.allowed) {
+      showExportLimitModal(format);
+      return false;
+    }
+    
+    return true;
+  } catch (e) {
+    // Fail open
+    return true;
+  }
+}
+
+// Initialize tier badge and event listeners
+document.addEventListener('DOMContentLoaded', () => {
+  // Update tier badge
+  updateTierBadge();
+  
+  // Close upgrade modal on backdrop click
+  if (upgradeModal) {
+    upgradeModal.addEventListener('click', (e) => {
+      if (e.target === upgradeModal) {
+        hideUpgradeModal();
+      }
+    });
+  }
+  
+  // Close upgrade modal button
+  if (closeUpgradeModal) {
+    closeUpgradeModal.addEventListener('click', hideUpgradeModal);
+  }
+  
+  // Tier badge click - show comparison
+  if (tierBadge) {
+    tierBadge.addEventListener('click', async () => {
+      const isPro = await window.electronAPI.featureLimits.isPro();
+      if (!isPro) {
+        showFeatureComparisonModal();
+      } else {
+        showNotification('✨ You have TAFIL Pro — all features unlocked!', 'success');
+      }
+    });
+  }
+  
+  // Escape key to close upgrade modal
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && upgradeModal && !upgradeModal.classList.contains('hidden')) {
+      hideUpgradeModal();
+    }
+  });
+});
+
+// Expose upgrade functions globally
+window.showUpgradeModal = showUpgradeModal;
+window.hideUpgradeModal = hideUpgradeModal;
+window.showProjectLimitModal = showProjectLimitModal;
+window.showSnippetLimitModal = showSnippetLimitModal;
+window.showLanguageLimitModal = showLanguageLimitModal;
+window.showExportLimitModal = showExportLimitModal;
+window.showHistoryLimitModal = showHistoryLimitModal;
+window.showFeatureComparisonModal = showFeatureComparisonModal;
+window.checkProjectLimit = checkProjectLimit;
+window.checkSnippetLimit = checkSnippetLimit;
+window.checkLanguageLimit = checkLanguageLimit;
+window.checkExportLimit = checkExportLimit;
+window.updateTierBadge = updateTierBadge;
 

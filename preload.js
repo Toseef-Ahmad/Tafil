@@ -146,4 +146,21 @@ contextBridge.exposeInMainWorld('electronAPI', {
     isValid: () => ipcRenderer.invoke('license:isValid'),
     getFingerprint: () => ipcRenderer.invoke('license:getFingerprint')
   },
+  
+  // ~~~~~~~~~~~~~~ Feature Limits (Free vs Pro) ~~~~~~~~~~~~~~
+  featureLimits: {
+    getCurrentTier: () => ipcRenderer.invoke('limits:getCurrentTier'),
+    isPro: () => ipcRenderer.invoke('limits:isPro'),
+    canCreateProject: (count) => ipcRenderer.invoke('limits:canCreateProject', count),
+    canSaveSnippet: (count) => ipcRenderer.invoke('limits:canSaveSnippet', count),
+    getProjectLimitInfo: (count) => ipcRenderer.invoke('limits:getProjectLimitInfo', count),
+    getSnippetLimitInfo: (count) => ipcRenderer.invoke('limits:getSnippetLimitInfo', count),
+    getHistoryLimitInfo: () => ipcRenderer.invoke('limits:getHistoryLimitInfo'),
+    isLanguageAvailable: (lang) => ipcRenderer.invoke('limits:isLanguageAvailable', lang),
+    getAvailableLanguages: () => ipcRenderer.invoke('limits:getAvailableLanguages'),
+    canExport: (format) => ipcRenderer.invoke('limits:canExport', format),
+    getAvailableExports: () => ipcRenderer.invoke('limits:getAvailableExports'),
+    getFeatureSummary: () => ipcRenderer.invoke('limits:getFeatureSummary'),
+    getUpgradeMessage: (type, params) => ipcRenderer.invoke('limits:getUpgradeMessage', type, params),
+  },
 });
