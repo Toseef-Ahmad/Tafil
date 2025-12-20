@@ -17,11 +17,11 @@ const { saveLicense, removeLicense } = require('./licenseLoader');
 const { clearCache } = require('./featureGuard');
 
 // License server configuration
-// Change this to your actual server URL
+// Production server URL
 const LICENSE_SERVER = {
-  host: 'localhost', // Change to your server domain
-  port: 3001,        // Change to your server port
-  protocol: 'http',  // Change to 'https' in production
+  host: 'api.tafil.app',  // Production domain
+  port: 443,               // HTTPS port
+  protocol: 'https',       // Production uses HTTPS
 };
 
 // Build server URL
@@ -111,19 +111,41 @@ async function activateLicense(licenseKey, email) {
   const deviceId = getDeviceId();
   
   try {
-    const response = await makeRequest('POST', '/activate', {
-      licenseKey: key,
-      email: mail,
-      deviceId: deviceId,
+    const response = await makeRequest('POST', '/api/license/activate', {
+      license_key: key,
+      device_fingerprint: deviceId,
+      device_name: require('os').hostname() || 'TAFIL Device',
+      platform: require('os').platform(),
+      app_version: '1.0.0',
     });
     
-    // Response should contain: { success: true, license: { payload, signature } }
-    if (!response.success || !response.license) {
+    // Response format: { success: true, signedLicense: {data, signature}, licenseInfo: {...} }
+    if (!response.success || !response.signedLicense) {
       return { success: false, error: response.error || 'Activation failed' };
     }
     
+    // Save the complete signed license (new format) for proper verification
+    // We'll store both the original data and converted payload
+    const licenseToSave = {
+      // New format (for proper signature verification)
+      data: response.signedLicense.data,
+      signature: response.signedLicense.signature,
+      algorithm: response.signedLicense.algorithm,
+      // Old format (for backward compatibility)
+      payload: {
+        app: 'TAFIL',
+        licenseKey: response.signedLicense.data.licenseKey,
+        deviceId: deviceId,
+        email: response.signedLicense.data.email,
+        issuedAt: response.signedLicense.data.issuedAt,
+        expiresAt: response.signedLicense.data.expiresAt,
+        features: response.signedLicense.data.features,
+        maxDevices: response.signedLicense.data.features?.maxDevices || 3,
+      }
+    };
+    
     // Save the license locally
-    saveLicense(response.license);
+    saveLicense(licenseToSave);
     
     // Clear verification cache
     clearCache();
@@ -131,7 +153,8 @@ async function activateLicense(licenseKey, email) {
     return {
       success: true,
       message: 'License activated successfully!',
-      license: response.license,
+      license: licenseToSave,
+      licenseInfo: response.licenseInfo,
     };
     
   } catch (e) {
@@ -152,9 +175,9 @@ async function deactivateLicense(licenseKey, email) {
   }
   
   try {
-    const response = await makeRequest('POST', '/deactivate', {
-      licenseKey: licenseKey.trim().toUpperCase(),
-      email: email.trim().toLowerCase(),
+    const response = await makeRequest('POST', '/api/license/deactivate', {
+      license_key: licenseKey.trim().toUpperCase(),
+      device_fingerprint: getDeviceId(),
     });
     
     if (!response.success) {

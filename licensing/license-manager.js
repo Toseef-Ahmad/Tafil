@@ -8,13 +8,25 @@ const os = require('os');
 const fs = require('fs');
 const path = require('path');
 const { app } = require('electron');
+const deviceId = require('./deviceId');
 
-// License server URL - change in production
-const LICENSE_SERVER_URL = process.env.LICENSE_SERVER_URL || 'https://license.tafil.app';
+// License server URL - production
+const LICENSE_SERVER_URL = process.env.LICENSE_SERVER_URL || 'https://api.tafil.app';
 
 // Public key for verifying licenses (embedded in app)
 const PUBLIC_KEY = `-----BEGIN PUBLIC KEY-----
-REPLACE_WITH_ACTUAL_PUBLIC_KEY_FROM_SERVER
+MIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEAtU6rrbwTviPus/YGYL5J
+M5woVfg3M2/q5bjLl0KDgGPB+mDPaRnKllwTO/Vbyb/k4MeSsOTCFh5+nbHRkeVA
+jq2WcaOo4SJhanmVqe1ld3j84dyIyOxWWQ0OlxYmgGLFIw8dcpFi1nOqrWqk2PqD
+gLt/VR1+q3jWFPPh1QQ0s0z+HM/zfYbdbbjOLEYcw3YAc2+FaXic03nUKDYPlF/2
+qZxthdaGlkMxLDBaYewHLuhFlsxCsDcoodRNXhfoyIjSplgeail/MmsDsg9en+H2
+r+9dbuJmrgZkoNTG6wHEwvrXNmIBpxUSYQsrJCp7eg6Qm8RU5R4zPsiHtrUuRnHy
+kFfyET5QpecHKlgayIsxszAPsOGSx/PFWcZULiB9snG6UjCXO/ZBODftio0cdi0L
+/rnhCUZyA+LMgoS57jBGB/a3kvOdb02nBNtuY7gpyK50xhWbCTMgm6SQH6K+J6Jh
+qcd6X/Kn4ckUU/X5SKmVvmvbei5mIK06qQECIIEpPXyh23IyjPfWAl0t/ac0ohWR
+NoHqSdK7LOANJIsV6n3VFMGkR1RGqf2kF0RoGfA6mEZw44vLqUfzFp1MD4xX/LSc
+/9FmObGg6+kmufl9JzGEHdNY+ixgp7vVuN8ON1yXVZ59UD9AIHYIv57YHesMyZ0q
+q48zZj032cHQqRYk5thPLH0CAwEAAQ==
 -----END PUBLIC KEY-----`;
 
 // Grace period in days
@@ -40,29 +52,16 @@ class LicenseManager {
 
   /**
    * Generate stable device fingerprint
-   * Combines multiple hardware identifiers
+   * Uses install-based ID for stability across OS updates/hardware changes.
    */
   generateDeviceFingerprint() {
     if (this.deviceFingerprint) {
       return this.deviceFingerprint;
     }
 
-    const factors = [
-      os.hostname(),
-      os.platform(),
-      os.arch(),
-      os.cpus()[0].model,
-      os.totalmem().toString()
-    ];
-
-    // Create stable hash
-    const hash = crypto
-      .createHash('sha256')
-      .update(factors.join('|'))
-      .digest('hex');
-
-    this.deviceFingerprint = hash;
-    return hash;
+    const stableId = deviceId.getDeviceId();
+    this.deviceFingerprint = stableId;
+    return stableId;
   }
 
   /**
@@ -336,7 +335,17 @@ class LicenseManager {
       }
 
       const encrypted = fs.readFileSync(this.licenseFilePath, 'utf8');
-      const decrypted = this.decrypt(encrypted);
+      // Try decrypt with current fingerprint; fall back to legacy if needed.
+      let decrypted;
+      try {
+        decrypted = this.decrypt(encrypted, this.deviceFingerprint);
+      } catch (primaryErr) {
+        // Attempt legacy fingerprint (pre-stable change)
+        const legacyFingerprint = this.generateLegacyFingerprint();
+        decrypted = this.decrypt(encrypted, legacyFingerprint);
+        // If legacy works, re-encrypt with the stable fingerprint for the future.
+        this.saveLocalLicense(JSON.parse(decrypted));
+      }
       return JSON.parse(decrypted);
     } catch (error) {
       console.error('Failed to load local license:', error);
@@ -354,7 +363,7 @@ class LicenseManager {
         lastSyncAt: new Date().toISOString()
       };
       
-      const encrypted = this.encrypt(JSON.stringify(licenseWithMeta));
+      const encrypted = this.encrypt(JSON.stringify(licenseWithMeta), this.deviceFingerprint);
       fs.writeFileSync(this.licenseFilePath, encrypted, 'utf8');
       
       console.log('💾 License saved locally');
@@ -381,8 +390,8 @@ class LicenseManager {
    * Simple encryption for local storage
    * Not meant to prevent determined attacks, just obfuscation
    */
-  encrypt(text) {
-    const key = crypto.scryptSync(this.deviceFingerprint, 'salt', 32);
+  encrypt(text, fingerprint) {
+    const key = crypto.scryptSync(fingerprint, 'salt', 32);
     const iv = crypto.randomBytes(16);
     const cipher = crypto.createCipheriv('aes-256-cbc', key, iv);
     
@@ -395,18 +404,32 @@ class LicenseManager {
   /**
    * Simple decryption for local storage
    */
-  decrypt(text) {
+  decrypt(text, fingerprint) {
     const parts = text.split(':');
     const iv = Buffer.from(parts[0], 'hex');
     const encrypted = parts[1];
     
-    const key = crypto.scryptSync(this.deviceFingerprint, 'salt', 32);
+    const key = crypto.scryptSync(fingerprint, 'salt', 32);
     const decipher = crypto.createDecipheriv('aes-256-cbc', key, iv);
     
     let decrypted = decipher.update(encrypted, 'hex', 'utf8');
     decrypted += decipher.final('utf8');
     
     return decrypted;
+  }
+
+  /**
+   * Legacy fingerprint generator (pre-stable change) for migration
+   */
+  generateLegacyFingerprint() {
+    const factors = [
+      os.hostname(),
+      os.platform(),
+      os.arch(),
+      os.cpus()[0].model,
+      os.totalmem().toString()
+    ];
+    return crypto.createHash('sha256').update(factors.join('|')).digest('hex');
   }
 
   /**

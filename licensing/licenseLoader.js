@@ -49,8 +49,13 @@ function loadLicense() {
 
 // Save license to disk
 function saveLicense(licenseData) {
-  if (!licenseData || !licenseData.payload || !licenseData.signature) {
-    throw new Error('Invalid license data: missing payload or signature');
+  if (!licenseData || !licenseData.signature) {
+    throw new Error('Invalid license data: missing signature');
+  }
+  
+  // Accept either payload (old format) or data (new format)
+  if (!licenseData.payload && !licenseData.data) {
+    throw new Error('Invalid license data: missing payload or data');
   }
   
   const licensePath = getLicenseFilePath();
@@ -69,6 +74,7 @@ function saveLicense(licenseData) {
       { mode: 0o600 }
     );
     
+    console.log('✅ License saved successfully');
     return true;
   } catch (e) {
     console.error('Failed to save license:', e.message);

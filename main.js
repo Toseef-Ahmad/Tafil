@@ -121,6 +121,7 @@ function buildFailureDiagnostic({ projectPath, framework, suggestedPort, stdout,
   return null;
 }
 const { exec, spawn } = require('child_process');
+const { Worker } = require('worker_threads');
 const portfinder = require('portfinder');
 const { detectExternalNodeProcesses, getProcessOnPort } = require('./utils/externalProcessDetector');
 const { scanNodeProjects } = require('./utils/gitScanner');
@@ -925,11 +926,27 @@ function checkFullDiskAccess() {
   }
 }
 
+// Register new license system IPC handlers
+licensing.registerLicenseHandlers();
+
+// CRITICAL: Prevent running as root (causes permission nightmares)
+if (process.getuid && process.getuid() === 0) {
+  dialog.showErrorBox(
+    'Cannot Run as Root',
+    'TAFIL must not be run with sudo.\n\n' +
+    'Running as root causes permission issues with your projects and files.\n\n' +
+    'Please restart TAFIL normally:\n' +
+    '  npm start\n\n' +
+    'If you need help, visit: https://tafil.app/docs'
+  );
+  app.quit();
+  process.exit(1);
+}
+
 // ensureAdminPrivileges();
 // Once app is ready, create the tray
 app.whenReady().then(() => {
-  // ⚠️ ROOT USER WARNING
-  // Running as root causes permission issues with created projects
+  // Root check already done above, this is redundant now
   const isRunningAsRoot = process.getuid && process.getuid() === 0;
   if (isRunningAsRoot) {
     console.warn('⚠️ WARNING: Tafil is running as root (sudo)!');
@@ -1648,31 +1665,7 @@ function extractExpressions(code) {
 }
 
 ipcMain.handle('execute-js', async (_event, code) => {
-  const startTime = Date.now();
-  
   try {
-    const logs = [];
-    const inlineResults = [];
-    const errors = [];
-    
-    // Create custom console
-    const customConsole = {
-      log: (...args) => logs.push({ type: 'log', message: args.map(a => formatPlaygroundValue(a)).join(' ') }),
-      error: (...args) => logs.push({ type: 'error', message: args.map(a => formatPlaygroundValue(a)).join(' ') }),
-      warn: (...args) => logs.push({ type: 'warn', message: args.map(a => formatPlaygroundValue(a)).join(' ') }),
-      info: (...args) => logs.push({ type: 'info', message: args.map(a => formatPlaygroundValue(a)).join(' ') }),
-      dir: (obj) => logs.push({ type: 'log', message: formatPlaygroundValue(obj) }),
-      table: (data) => logs.push({ type: 'log', message: formatPlaygroundValue(data) }),
-      clear: () => logs.length = 0,
-      time: () => {},
-      timeEnd: () => {},
-      trace: () => {},
-      assert: () => {},
-      count: () => {},
-      group: () => {},
-      groupEnd: () => {},
-    };
-    
     // Extract expressions for inline results
     const expressions = extractExpressions(code);
     
@@ -1681,102 +1674,8 @@ ipcMain.handle('execute-js', async (_event, code) => {
       `try { __capture("${e.id}", ${e.line}, ${e.expr}); } catch(e) { __captureError("${e.id}", ${e.line}, e.message); }`
     ).join('\n');
     
-    const wrappedCode = `
-      (async () => {
-        const console = __console;
-        ${code}
-        ${captureCode}
-      })()
-    `;
-    
-    // Execute with sandboxed context
-    const vm = require('vm');
-    const capturedValues = new Map();
-    const capturedErrors = new Map();
-    
-    const context = vm.createContext({
-      __console: customConsole,
-      __capture: (id, line, value) => {
-        capturedValues.set(id, { line, value: formatPlaygroundValue(value) });
-      },
-      __captureError: (id, line, msg) => {
-        capturedErrors.set(id, { line, error: msg });
-      },
-      // Globals
-      setTimeout, setInterval, clearTimeout, clearInterval,
-      Promise, JSON, Math, Date, Array, Object, String, Number, Boolean,
-      RegExp, Error, Map, Set, WeakMap, WeakSet, Buffer,
-      Infinity, NaN, undefined, null: null,
-      parseInt, parseFloat, isNaN, isFinite, encodeURI, decodeURI,
-      encodeURIComponent, decodeURIComponent,
-      // Safe require
-      require: (mod) => {
-        const allowed = ['path', 'url', 'querystring', 'util', 'crypto', 'os'];
-        if (allowed.includes(mod)) return require(mod);
-        throw new Error(`Module '${mod}' not allowed`);
-      },
-      fetch: global.fetch,
-    });
-    
-    try {
-      const script = new vm.Script(wrappedCode, { 
-        timeout: 5000,
-        filename: 'playground.js',
-      });
-      await script.runInContext(context, { timeout: 5000 });
-    } catch (execError) {
-      // Parse error location if available
-      const lineMatch = execError.stack?.match(/:(\d+):/);
-      const errorLine = lineMatch ? parseInt(lineMatch[1]) : 1;
-      
-      errors.push({
-        line: errorLine,
-        message: execError.message,
-        type: execError.name || 'Error',
-      });
-      
-      return { 
-        success: false, 
-        error: execError.message, 
-        errorLine,
-        logs, 
-        inlineResults,
-        errors,
-        executionTime: Date.now() - startTime,
-      };
-    }
-    
-    // Build inline results from captured values
-    capturedValues.forEach((data, id) => {
-      inlineResults.push({
-        id,
-        line: data.line,
-        value: data.value,
-        type: 'value',
-      });
-    });
-    
-    // Add captured errors as inline results
-    capturedErrors.forEach((data, id) => {
-      inlineResults.push({
-        id,
-        line: data.line,
-        value: `⚠ ${data.error}`,
-        type: 'error',
-      });
-    });
-    
-    // Sort by line number
-    inlineResults.sort((a, b) => a.line - b.line);
-    
-    return { 
-      success: true, 
-      logs, 
-      inlineResults,
-      errors,
-      executionTime: Date.now() - startTime,
-    };
-    
+    const result = await runPlaygroundInWorker(code, captureCode, 2000);
+    return result;
   } catch (err) {
     return { 
       success: false, 
@@ -1784,10 +1683,168 @@ ipcMain.handle('execute-js', async (_event, code) => {
       logs: [], 
       inlineResults: [],
       errors: [{ line: 1, message: err.message, type: 'Error' }],
-      executionTime: Date.now() - startTime,
+      executionTime: 0,
     };
   }
 });
+
+async function runPlaygroundInWorker(code, captureCode, timeoutMs = 2000) {
+  return new Promise((resolve) => {
+    const worker = new Worker(`
+      const { parentPort } = require('worker_threads');
+      const vm = require('vm');
+
+      function formatPlaygroundValue(val, maxLen = 80) {
+        if (val === null) return 'null';
+        if (val === undefined) return 'undefined';
+        if (typeof val === 'function') {
+          const name = val.name || 'anonymous';
+          return \`ƒ \${name}()\`;
+        }
+        if (typeof val === 'symbol') return val.toString();
+        if (val instanceof Error) return \`Error: \${val.message}\`;
+        if (val instanceof Date) return val.toISOString();
+        if (val instanceof RegExp) return val.toString();
+        if (val instanceof Map) return \`Map(\${val.size})\`;
+        if (val instanceof Set) return \`Set(\${val.size})\`;
+        if (Array.isArray(val)) {
+          if (val.length === 0) return '[]';
+          if (val.length <= 5) {
+            const items = val.map(v => formatPlaygroundValue(v, 20)).join(', ');
+            return items.length > maxLen ? \`Array(\${val.length})\` : \`[\${items}]\`;
+          }
+          return \`Array(\${val.length})\`;
+        }
+        if (typeof val === 'object') {
+          try {
+            const keys = Object.keys(val);
+            if (keys.length === 0) return '{}';
+            if (keys.length <= 3) {
+              const pairs = keys.map(k => \`\${k}: \${formatPlaygroundValue(val[k], 15)}\`).join(', ');
+              return pairs.length > maxLen ? \`{\${keys.length} keys}\` : \`{\${pairs}}\`;
+            }
+            return \`{\${keys.length} keys}\`;
+          } catch {
+            return String(val);
+          }
+        }
+        if (typeof val === 'string') {
+          if (val.length > maxLen) return \`"\${val.slice(0, maxLen - 3)}..."\`;
+          return \`"\${val}"\`;
+        }
+        return String(val);
+      }
+
+      parentPort.on('message', async ({ code, captureCode, timeoutMs }) => {
+        const startTime = Date.now();
+        const logs = [];
+        const inlineResults = [];
+        const errors = [];
+        const capturedValues = new Map();
+        const capturedErrors = new Map();
+
+        const customConsole = {
+          log: (...args) => logs.push({ type: 'log', message: args.map(a => formatPlaygroundValue(a)).join(' ') }),
+          error: (...args) => logs.push({ type: 'error', message: args.map(a => formatPlaygroundValue(a)).join(' ') }),
+          warn: (...args) => logs.push({ type: 'warn', message: args.map(a => formatPlaygroundValue(a)).join(' ') }),
+          info: (...args) => logs.push({ type: 'info', message: args.map(a => formatPlaygroundValue(a)).join(' ') }),
+          dir: (obj) => logs.push({ type: 'log', message: formatPlaygroundValue(obj) }),
+          table: (data) => logs.push({ type: 'log', message: formatPlaygroundValue(data) }),
+          clear: () => logs.length = 0,
+          time: () => {},
+          timeEnd: () => {},
+          trace: () => {},
+          assert: () => {},
+          count: () => {},
+          group: () => {},
+          groupEnd: () => {},
+        };
+
+        const wrappedCode = \`
+          (async () => {
+            const console = __console;
+            \${code}
+            \${captureCode}
+          })()
+        \`;
+
+        const context = vm.createContext({
+          __console: customConsole,
+          __capture: (id, line, value) => {
+            capturedValues.set(id, { line, value: formatPlaygroundValue(value) });
+          },
+          __captureError: (id, line, msg) => {
+            capturedErrors.set(id, { line, error: msg });
+          },
+          setTimeout, setInterval, clearTimeout, clearInterval,
+          Promise, JSON, Math, Date, Array, Object, String, Number, Boolean,
+          RegExp, Error, Map, Set, WeakMap, WeakSet, Buffer,
+          Infinity, NaN, undefined, null: null,
+          parseInt, parseFloat, isNaN, isFinite, encodeURI, decodeURI,
+          encodeURIComponent, decodeURIComponent,
+          require: (mod) => { throw new Error("Module '" + mod + "' not allowed"); },
+          fetch: global.fetch,
+        });
+
+        try {
+          const script = new vm.Script(wrappedCode, { timeout: timeoutMs, filename: 'playground.js' });
+          const result = script.runInContext(context, { timeout: timeoutMs });
+          if (result && typeof result.then === 'function') {
+            await Promise.race([
+              result,
+              new Promise((_, reject) => setTimeout(() => reject(new Error('Execution timeout')), timeoutMs))
+            ]);
+          }
+        } catch (execError) {
+          const lineMatch = execError.stack && execError.stack.match(/:(\\d+):/);
+          const errorLine = lineMatch ? parseInt(lineMatch[1]) : 1;
+          errors.push({
+            line: errorLine,
+            message: execError.message,
+            type: execError.name || 'Error',
+          });
+        }
+
+        capturedValues.forEach((data, id) => {
+          inlineResults.push({ id, line: data.line, value: data.value, type: 'value' });
+        });
+        capturedErrors.forEach((data, id) => {
+          inlineResults.push({ id, line: data.line, value: \`⚠ \${data.error}\`, type: 'error' });
+        });
+        inlineResults.sort((a, b) => a.line - b.line);
+
+        const cappedLogs = logs.slice(0, 200);
+
+        parentPort.postMessage({
+          success: errors.length === 0,
+          logs: cappedLogs,
+          inlineResults,
+          errors,
+          executionTime: Date.now() - startTime,
+        });
+      });
+    `, { eval: true });
+
+    const hardTimeout = setTimeout(() => {
+      worker.terminate();
+      resolve({ success: false, error: 'Execution timed out', logs: [], inlineResults: [], errors: [{ message: 'Execution timed out' }] });
+    }, timeoutMs + 750);
+
+    worker.on('message', (msg) => {
+      clearTimeout(hardTimeout);
+      worker.terminate();
+      resolve(msg);
+    });
+
+    worker.on('error', (err) => {
+      clearTimeout(hardTimeout);
+      worker.terminate();
+      resolve({ success: false, error: err.message, logs: [], inlineResults: [], errors: [{ message: err.message }] });
+    });
+
+    worker.postMessage({ code, captureCode, timeoutMs });
+  });
+}
 
 // SSH Module IPC Handlers
 ipcMain.handle('select-ssh-key-file', async () => {

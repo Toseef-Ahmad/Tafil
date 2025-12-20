@@ -73,10 +73,15 @@ function guardAction(actionName) {
     };
   }
   
-  // Check feature-specific permissions
+  // License is valid - check features
   const features = v.features || {};
   
-  // Map actions to required features
+  // If license has proFeatures: true, allow everything
+  if (features.proFeatures === true || features.pro === true) {
+    return { allowed: true };
+  }
+  
+  // Map actions to required features (for granular licenses)
   const actionFeatures = {
     'project.create': 'projects',
     'project.run': 'projects',
@@ -148,14 +153,18 @@ function checkIntegrity() {
   const license = loadLicense();
   if (!license) return false;
   
-  // Verify basic structure
-  if (!license.payload || !license.signature) return false;
+  // Verify basic structure (support both old and new formats)
+  if (!license.signature) return false;
+  if (!license.payload && !license.data) return false;
   
-  // Verify device
-  if (license.payload.deviceId !== getDeviceId()) return false;
+  const payload = license.payload || license.data;
   
-  // Verify app name
-  if (license.payload.app !== 'TAFIL') return false;
+  // Verify device (support both deviceId and deviceFingerprint)
+  const deviceId = payload.deviceId || payload.deviceFingerprint;
+  if (deviceId && deviceId !== getDeviceId()) return false;
+  
+  // Verify app name (optional for new format)
+  if (payload.app && payload.app !== 'TAFIL') return false;
   
   return true;
 }
@@ -171,12 +180,18 @@ function getLicenseStatus() {
       status: 'unknown',
       message: 'Unable to check license',
       needsActivation: true,
+      isPro: false,
     };
   }
   
   if (v.valid) {
+    const features = v.features || {};
+    const isPro = features.proFeatures === true || features.pro === true;
+    
     return {
       status: 'active',
+      isPro: isPro,
+      allFeaturesUnlocked: isPro,
       message: 'License is active',
       needsActivation: false,
       features: v.features,

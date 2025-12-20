@@ -1,19 +1,7 @@
 /**
  * Tafil Licensing Module
  * 
- * Offline-first licensing system.
- * 
- * Usage:
- *   const licensing = require('./licensing');
- * 
- *   // Check license on startup (OFFLINE)
- *   const status = licensing.checkLicense();
- * 
- *   // Activate (requires network)
- *   await licensing.activate(key, email);
- * 
- *   // Feature guards (OFFLINE)
- *   if (licensing.canCreateProject()) { ... }
+ * Offline-first licensing system with server integration
  */
 
 const deviceId = require('./deviceId');
@@ -21,15 +9,17 @@ const licenseLoader = require('./licenseLoader');
 const verifier = require('./verifier');
 const featureGuard = require('./featureGuard');
 const activator = require('./activator');
+const licenseManager = require('./license-manager');
+const { registerLicenseHandlers } = require('./license-ipc');
 
-// Re-export everything
+// Re-export everything (keeping backward compatibility)
 module.exports = {
   // Device ID
   getDeviceId: deviceId.getDeviceId,
   getShortDeviceId: deviceId.getShortDeviceId,
   isCurrentDevice: deviceId.isCurrentDevice,
   
-  // License loading
+  // License loading (old system - kept for compatibility)
   loadLicense: licenseLoader.loadLicense,
   saveLicense: licenseLoader.saveLicense,
   removeLicense: licenseLoader.removeLicense,
@@ -62,6 +52,10 @@ module.exports = {
   deactivateLicense: activator.deactivateLicense,
   fetchPublicKey: activator.fetchPublicKey,
   checkServerConnection: activator.checkServerConnection,
+  
+  // New server-based license manager
+  licenseManager: licenseManager,
+  registerLicenseHandlers: registerLicenseHandlers,
   
   // Quick check function
   checkLicense: () => {

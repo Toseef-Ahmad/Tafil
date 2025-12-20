@@ -136,4 +136,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
   licenseCheckAction: (actionName) => ipcRenderer.invoke('license-check-action', actionName),
   licenseGetInfo: () => ipcRenderer.invoke('license-get-info'),
   licenseCheckServer: () => ipcRenderer.invoke('license-check-server'),
+  
+  // New license system (server-based)
+  license: {
+    getStatus: () => ipcRenderer.invoke('license:getStatus'),
+    activate: (licenseKey) => ipcRenderer.invoke('license:activate', licenseKey),
+    sync: () => ipcRenderer.invoke('license:sync'),
+    deactivate: () => ipcRenderer.invoke('license:deactivate'),
+    isValid: () => ipcRenderer.invoke('license:isValid'),
+    getFingerprint: () => ipcRenderer.invoke('license:getFingerprint')
+  },
 });

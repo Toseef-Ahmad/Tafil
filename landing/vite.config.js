@@ -3,6 +3,6 @@ import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   plugins: [react()],
-  base: '/Tafil/',
+  base: '/', // Changed from '/Tafil/' for Vercel deployment
 })
 

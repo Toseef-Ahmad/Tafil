@@ -15,18 +15,22 @@ const crypto = require('crypto');
 const { loadLicense } = require('./licenseLoader');
 const { getDeviceId, isCurrentDevice } = require('./deviceId');
 
-// Public key for license verification
+// Public key for license verification (RSA-4096 from production server)
 // This is embedded in the app and used to verify signatures
 // The private key is NEVER included in the client
 const PUBLIC_KEY = `-----BEGIN PUBLIC KEY-----
-MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA0Z3VS5JJcds3xfn0QLHM
-7fHnHgYqpSPxGXxvBgGMEv6ACLW3x7HrLh5pBdqMGjGqpKwXz3dDvdqMoq3TYZth
-HG3mHnxvLzJpZvCBfgxDPKzf6RzYGXE1n7cNvZMGfDWmM9jY8z8XhZKlsX9yPBvz
-Y5xJbmhXvBhqGQYhqDPvxZ3HqMGvBZpXjxCvq8YGMzVfGwXpQDvLqMhGQYxvCBwZ
-JxKlsX9yPBvzY5xJbmhXvBhqGQYhqDPvxZ3HqMGvBZpXjxCvq8YGMzVfGwXpQDvL
-qMhGQYxvCBwZJxKlsX9yPBvzY5xJbmhXvBhqGQYhqDPvxZ3HqMGvBZpXjxCvq8YG
-MzVfGwXpQDvLqMhGQYxvCBwZJxKlsX9yPBvzY5xJbmhXvBhqGQYhqDPvxZ3HqMGv
-BQIDAQAB
+MIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEAtU6rrbwTviPus/YGYL5J
+M5woVfg3M2/q5bjLl0KDgGPB+mDPaRnKllwTO/Vbyb/k4MeSsOTCFh5+nbHRkeVA
+jq2WcaOo4SJhanmVqe1ld3j84dyIyOxWWQ0OlxYmgGLFIw8dcpFi1nOqrWqk2PqD
+gLt/VR1+q3jWFPPh1QQ0s0z+HM/zfYbdbbjOLEYcw3YAc2+FaXic03nUKDYPlF/2
+qZxthdaGlkMxLDBaYewHLuhFlsxCsDcoodRNXhfoyIjSplgeail/MmsDsg9en+H2
+r+9dbuJmrgZkoNTG6wHEwvrXNmIBpxUSYQsrJCp7eg6Qm8RU5R4zPsiHtrUuRnHy
+kFfyET5QpecHKlgayIsxszAPsOGSx/PFWcZULiB9snG6UjCXO/ZBODftio0cdi0L
+/rnhCUZyA+LMgoS57jBGB/a3kvOdb02nBNtuY7gpyK50xhWbCTMgm6SQH6K+J6Jh
+qcd6X/Kn4ckUU/X5SKmVvmvbei5mIK06qQECIIEpPXyh23IyjPfWAl0t/ac0ohWR
+NoHqSdK7LOANJIsV6n3VFMGkR1RGqf2kF0RoGfA6mEZw44vLqUfzFp1MD4xX/LSc
+/9FmObGg6+kmufl9JzGEHdNY+ixgp7vVuN8ON1yXVZ59UD9AIHYIv57YHesMyZ0q
+q48zZj032cHQqRYk5thPLH0CAwEAAQ==
 -----END PUBLIC KEY-----`;
 
 // App name that must match in license
@@ -44,14 +48,28 @@ const VerifyResult = {
   TAMPERED: 'tampered',
 };
 
-// Verify signature of license payload
-function verifySignature(payload, signature) {
+// Verify signature of license (handles both old and new formats)
+function verifySignature(license, signature) {
   try {
-    const verify = crypto.createVerify('SHA256');
-    verify.update(JSON.stringify(payload));
-    verify.end();
+    // If license has 'data' field, use it (new server format)
+    const dataToVerify = license.data || license;
     
-    return verify.verify(PUBLIC_KEY, signature, 'base64');
+    // Create canonical JSON string (sorted keys) - matches server
+    const dataString = JSON.stringify(dataToVerify, Object.keys(dataToVerify).sort());
+    
+    // Verify using RSA-PSS (matches server signature)
+    const isValid = crypto.verify(
+      'sha256',
+      Buffer.from(dataString),
+      {
+        key: PUBLIC_KEY,
+        padding: crypto.constants.RSA_PKCS1_PSS_PADDING,
+        saltLength: crypto.constants.RSA_PSS_SALTLEN_MAX_SIGN
+      },
+      Buffer.from(signature, 'base64')
+    );
+    
+    return isValid;
   } catch (e) {
     console.error('Signature verification error:', e.message);
     return false;
@@ -85,10 +103,13 @@ function verifyLicense() {
     };
   }
   
-  const { payload, signature } = license;
+  const { payload, signature, data } = license;
   
-  // Check structure
-  if (!validatePayloadStructure(payload)) {
+  // Use payload for compatibility checks
+  const licensePayload = payload || data;
+  
+  // Check structure (allow missing 'app' field for new format)
+  if (!licensePayload || typeof licensePayload !== 'object') {
     return {
       valid: false,
       code: VerifyResult.INVALID_STRUCTURE,
@@ -96,8 +117,8 @@ function verifyLicense() {
     };
   }
   
-  // Verify cryptographic signature
-  if (!verifySignature(payload, signature)) {
+  // Verify cryptographic signature (pass whole license for new format support)
+  if (!verifySignature(license, signature)) {
     return {
       valid: false,
       code: VerifyResult.INVALID_SIGNATURE,
@@ -105,8 +126,8 @@ function verifyLicense() {
     };
   }
   
-  // Check app name
-  if (payload.app !== APP_NAME) {
+  // Check app name (optional for new format)
+  if (licensePayload.app && licensePayload.app !== APP_NAME) {
     return {
       valid: false,
       code: VerifyResult.WRONG_APP,
@@ -114,21 +135,24 @@ function verifyLicense() {
     };
   }
   
-  // Check device ID
-  if (!isCurrentDevice(payload.deviceId)) {
+  // Check device ID (support both deviceId and deviceFingerprint)
+  const licenseDeviceId = licensePayload.deviceId || licensePayload.deviceFingerprint;
+  if (licenseDeviceId && !isCurrentDevice(licenseDeviceId)) {
     return {
       valid: false,
       code: VerifyResult.WRONG_DEVICE,
       message: 'License is registered to a different device',
       currentDevice: getDeviceId(),
-      licenseDevice: payload.deviceId,
+      licenseDevice: licenseDeviceId,
     };
   }
   
-  // Check expiration (if set)
-  if (payload.validUntil && payload.validUntil > 0) {
+  // Check expiration (support both validUntil timestamp and expiresAt ISO string)
+  const expiryTime = licensePayload.validUntil || (licensePayload.expiresAt ? new Date(licensePayload.expiresAt).getTime() / 1000 : null);
+  if (expiryTime && expiryTime > 0) {
     const now = Math.floor(Date.now() / 1000);
-    if (now > payload.validUntil) {
+    const gracePeriod = (licensePayload.gracePeriodDays || 30) * 24 * 60 * 60;
+    if (now > (expiryTime + gracePeriod)) {
       return {
         valid: false,
         code: VerifyResult.EXPIRED,
@@ -137,13 +161,20 @@ function verifyLicense() {
     }
   }
   
-  // All checks passed
+  // All checks passed - return with all features enabled
   return {
     valid: true,
     code: VerifyResult.VALID,
     message: 'License is valid',
-    payload: payload,
-    features: payload.features || {},
+    payload: licensePayload,
+    features: licensePayload.features || {
+      pro: true,
+      projects: true,
+      playground: true,
+      blueprint: true,
+      ssh: true,
+      maxDevices: licensePayload.maxDevices || 3
+    },
   };
 }
 
@@ -165,12 +196,17 @@ function getLicenseFeatures() {
 // Check if a specific feature is enabled
 function hasFeature(featureName) {
   const features = getLicenseFeatures();
+  // If proFeatures is true, all features are enabled
+  if (features.proFeatures === true || features.pro === true) {
+    return true;
+  }
   return features[featureName] === true;
 }
 
 // Check if Pro license
 function isPro() {
-  return hasFeature('pro');
+  const features = getLicenseFeatures();
+  return features.pro === true || features.proFeatures === true;
 }
 
 module.exports = {

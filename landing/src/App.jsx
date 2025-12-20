@@ -18,17 +18,17 @@ export default function App() {
 
   const screenshots = [
     {
-      src: "/Tafil/screenshots/dashboard.png",
+      src: "/screenshots/dashboard.png",
       label: "Dashboard",
       desc: "Every project on your machine — location, status, and state",
     },
     {
-      src: "/Tafil/screenshots/collections.png",
+      src: "/screenshots/collections.png",
       label: "Collections",
       desc: "Group projects by client, stack, or priority (without reorganizing folders)",
     },
     {
-      src: "/Tafil/screenshots/insights.png",
+      src: "/screenshots/insights.png",
       label: "Project Blueprint",
       desc: "Notes, tasks, diagrams, and context — stored with the project",
     },
@@ -292,6 +292,89 @@ export default function App() {
             <span className="flex items-center gap-2 hover:text-zinc-300 transition-colors">
               <span className="text-lg">🐧</span> Linux
             </span>
+          </div>
+        </div>
+      </section>
+
+      {/* What TAFIL IS / IS NOT - CRITICAL CLARITY */}
+      <section className="relative z-10 py-16 px-6 bg-zinc-900/30">
+        <div className="max-w-5xl mx-auto">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl md:text-4xl font-bold mb-4">
+              Let's Be Clear: TAFIL is NOT an IDE
+            </h2>
+            <p className="text-xl text-zinc-400">
+              It works <span className="text-amber-400 font-semibold">WITH</span> your IDE, not instead of it
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-8">
+            {/* TAFIL IS */}
+            <div className="bg-emerald-500/5 border-2 border-emerald-500/20 rounded-2xl p-8">
+              <div className="text-emerald-400 text-lg font-bold mb-4 flex items-center gap-2">
+                <span className="text-2xl">✅</span> TAFIL IS:
+              </div>
+              <ul className="space-y-3 text-zinc-300">
+                <li className="flex items-start gap-3">
+                  <span className="text-emerald-400 mt-1">→</span>
+                  <span>A <strong>project orchestrator</strong> that finds and manages all your projects</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <span className="text-emerald-400 mt-1">→</span>
+                  <span>A <strong>second brain</strong> that remembers context, notes, and decisions</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <span className="text-emerald-400 mt-1">→</span>
+                  <span>A <strong>one-click runner</strong> that figures out how to start each project</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <span className="text-emerald-400 mt-1">→</span>
+                  <span>A <strong>mission control layer</strong> ABOVE your IDE and terminal</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <span className="text-emerald-400 mt-1">→</span>
+                  <span><strong>100% offline</strong> - your data never leaves your machine</span>
+                </li>
+              </ul>
+            </div>
+
+            {/* TAFIL IS NOT */}
+            <div className="bg-red-500/5 border-2 border-red-500/20 rounded-2xl p-8">
+              <div className="text-red-400 text-lg font-bold mb-4 flex items-center gap-2">
+                <span className="text-2xl">❌</span> TAFIL IS NOT:
+              </div>
+              <ul className="space-y-3 text-zinc-300">
+                <li className="flex items-start gap-3">
+                  <span className="text-red-400 mt-1">×</span>
+                  <span>Not an IDE (keep using VS Code, WebStorm, Cursor)</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <span className="text-red-400 mt-1">×</span>
+                  <span>Not a code editor (write code in your favorite editor)</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <span className="text-red-400 mt-1">×</span>
+                  <span>Not cloud-based (no data collection, no tracking)</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <span className="text-red-400 mt-1">×</span>
+                  <span>Not a subscription (one-time $49, lifetime license)</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <span className="text-red-400 mt-1">×</span>
+                  <span>Not trying to replace your workflow (it enhances it)</span>
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          <div className="mt-12 text-center">
+            <div className="inline-block bg-zinc-800/50 border border-zinc-700 rounded-xl px-6 py-4">
+              <p className="text-lg text-zinc-300">
+                <strong className="text-amber-400">Think of it like this:</strong> VS Code writes code. 
+                GitHub stores code. TAFIL <strong>orchestrates projects</strong>.
+              </p>
+            </div>
           </div>
         </div>
       </section>
@@ -591,35 +674,61 @@ export default function App() {
       <section id="pricing" className="relative z-10 py-20 px-6">
         <div className="max-w-4xl mx-auto">
           <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">One-Time Purchase</h2>
+            <h2 className="text-3xl md:text-4xl font-bold mb-4">Simple, Honest Pricing</h2>
             <p className="text-zinc-400 text-lg">
-              Single license. Lifetime use. No subscription.
+              One-time payment. Lifetime license. No subscription ever.
             </p>
           </div>
 
-          <div className="bg-zinc-900/60 backdrop-blur-sm rounded-3xl p-8 md:p-12 border border-zinc-800 shadow-2xl">
+          <div className="bg-gradient-to-br from-zinc-900/80 to-zinc-800/80 backdrop-blur-sm rounded-3xl p-8 md:p-12 border-2 border-amber-500/20 shadow-2xl shadow-amber-500/10">
             <div className="flex flex-col md:flex-row items-center justify-between gap-8">
-              <div className="flex-1 text-center md:text-left">
-                <h3 className="text-3xl md:text-4xl font-bold mb-2">Tafil License</h3>
-                <p className="text-zinc-400 mb-6">Buy once. Keep it. Use it offline.</p>
+              <div className="flex-1">
+                <div className="flex items-baseline gap-3 mb-6">
+                  <span className="text-6xl md:text-7xl font-bold bg-gradient-to-r from-amber-400 to-orange-400 bg-clip-text text-transparent">
+                    $49
+                  </span>
+                  <span className="text-2xl text-zinc-500 line-through">$99</span>
+                  <span className="text-sm bg-emerald-500/20 text-emerald-400 px-3 py-1 rounded-full border border-emerald-500/30">
+                    Launch Price
+                  </span>
+                </div>
+
+                <h3 className="text-2xl font-bold mb-4">TAFIL Pro</h3>
                 
-                <ul className="space-y-3 text-left">
+                <ul className="space-y-3 mb-8">
                   <li className="flex items-center gap-3 text-zinc-300">
-                    <span className="text-amber-400">✓</span> Single license
+                    <span className="text-emerald-400 text-lg">✓</span>
+                    <span><strong>Lifetime license</strong> (one-time payment)</span>
                   </li>
                   <li className="flex items-center gap-3 text-zinc-300">
-                    <span className="text-amber-400">✓</span> Lifetime use
+                    <span className="text-emerald-400 text-lg">✓</span>
+                    <span><strong>3 device activations</strong> (Mac, Windows, Linux)</span>
                   </li>
                   <li className="flex items-center gap-3 text-zinc-300">
-                    <span className="text-amber-400">✓</span> Updates included while actively maintained
+                    <span className="text-emerald-400 text-lg">✓</span>
+                    <span><strong>All future updates</strong> included</span>
                   </li>
                   <li className="flex items-center gap-3 text-zinc-300">
-                    <span className="text-amber-400">✓</span> No subscription
+                    <span className="text-emerald-400 text-lg">✓</span>
+                    <span><strong>100% offline</strong> - your data stays on your machine</span>
                   </li>
                   <li className="flex items-center gap-3 text-zinc-300">
-                    <span className="text-amber-400">✓</span> Works fully offline
+                    <span className="text-emerald-400 text-lg">✓</span>
+                    <span><strong>Priority email support</strong></span>
+                  </li>
+                  <li className="flex items-center gap-3 text-zinc-300">
+                    <span className="text-emerald-400 text-lg">✓</span>
+                    <span><strong>No subscription</strong>, no tracking, no cloud lock-in</span>
                   </li>
                 </ul>
+
+                <div className="flex items-center gap-2 text-sm text-zinc-400 bg-zinc-800/50 border border-zinc-700 rounded-xl px-4 py-3">
+                  <svg className="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span className="text-emerald-400 font-semibold">30-day money-back guarantee.</span>
+                  <span>No questions asked.</span>
+                </div>
               </div>
 
               <div className="flex-shrink-0 text-center">
@@ -627,23 +736,36 @@ export default function App() {
                   href={GUMROAD_URL}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-black font-bold px-10 py-4 rounded-2xl shadow-xl shadow-amber-500/25 hover:shadow-2xl hover:shadow-amber-500/40 hover:scale-105 transition-all"
+                  className="inline-flex flex-col items-center gap-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-black font-bold px-12 py-6 rounded-2xl shadow-2xl shadow-amber-500/30 hover:shadow-amber-500/50 hover:scale-105 transition-all"
                 >
-                  Buy on Gumroad
-                  <span className="opacity-60">→</span>
+                  <span className="text-2xl">Buy TAFIL Pro</span>
+                  <span className="text-sm opacity-80">Secure checkout on Gumroad</span>
                 </a>
                 
-                <p className="text-xs text-zinc-500 mt-4">Secure checkout.</p>
+                <p className="text-xs text-zinc-500 mt-4">
+                  ✓ Instant delivery via email
+                </p>
 
                 <a
                   href={DOWNLOAD_URL}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-block mt-4 text-sm text-zinc-400 hover:text-amber-400 transition-colors"
+                  className="inline-block mt-6 text-sm text-zinc-400 hover:text-amber-400 transition-colors border-b border-zinc-700 hover:border-amber-400"
                 >
-                  Download builds →
+                  Download directly (requires license) →
                 </a>
               </div>
+            </div>
+          </div>
+
+          {/* Why Paid */}
+          <div className="mt-12 text-center">
+            <div className="inline-block max-w-2xl bg-zinc-800/30 border border-zinc-700 rounded-xl px-6 py-4">
+              <p className="text-sm text-zinc-400">
+                <strong className="text-zinc-300">Why paid?</strong> Building and maintaining professional
+                developer tools takes time. Your payment supports ongoing development, updates, and support.
+                No ads, no data collection, no compromises.
+              </p>
             </div>
           </div>
         </div>
@@ -679,6 +801,106 @@ export default function App() {
               </p>
             </div>
           </div>
+        </div>
+      </section>
+
+      {/* FAQ Section */}
+      <section className="relative z-10 py-20 px-6 bg-zinc-900/20">
+        <div className="max-w-4xl mx-auto">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl md:text-4xl font-bold mb-4">Frequently Asked Questions</h2>
+            <p className="text-zinc-400 text-lg">Everything you need to know</p>
+          </div>
+
+          <div className="space-y-6">
+            <div className="bg-zinc-900/50 backdrop-blur-sm rounded-2xl border border-zinc-800 p-6 hover:border-zinc-700 transition-colors">
+              <h3 className="text-xl font-bold text-white mb-3">Is TAFIL an IDE or code editor?</h3>
+              <p className="text-zinc-400">
+                No. TAFIL works <strong className="text-white">WITH</strong> your existing IDE (VS Code, WebStorm, Cursor, etc.).
+                Think of it as mission control for your projects - it doesn't replace your tools, it orchestrates them.
+              </p>
+            </div>
+
+            <div className="bg-zinc-900/50 backdrop-blur-sm rounded-2xl border border-zinc-800 p-6 hover:border-zinc-700 transition-colors">
+              <h3 className="text-xl font-bold text-white mb-3">Do I need internet to use TAFIL?</h3>
+              <p className="text-zinc-400">
+                No. After initial license activation, TAFIL works <strong className="text-white">100% offline</strong>.
+                Your data stays on your machine. No cloud dependency. Ever.
+              </p>
+            </div>
+
+            <div className="bg-zinc-900/50 backdrop-blur-sm rounded-2xl border border-zinc-800 p-6 hover:border-zinc-700 transition-colors">
+              <h3 className="text-xl font-bold text-white mb-3">What if I change computers?</h3>
+              <p className="text-zinc-400">
+                Each license includes <strong className="text-white">3 device activations</strong>. You can deactivate
+                old devices and activate new ones anytime through the TAFIL app or admin dashboard.
+              </p>
+            </div>
+
+            <div className="bg-zinc-900/50 backdrop-blur-sm rounded-2xl border border-zinc-800 p-6 hover:border-zinc-700 transition-colors">
+              <h3 className="text-xl font-bold text-white mb-3">Is there a subscription?</h3>
+              <p className="text-zinc-400">
+                <strong className="text-white">No.</strong> $49 one-time payment. Lifetime license.
+                All future updates included. No recurring charges. Ever.
+              </p>
+            </div>
+
+            <div className="bg-zinc-900/50 backdrop-blur-sm rounded-2xl border border-zinc-800 p-6 hover:border-zinc-700 transition-colors">
+              <h3 className="text-xl font-bold text-white mb-3">What if TAFIL doesn't work for me?</h3>
+              <p className="text-zinc-400">
+                <strong className="text-emerald-400">30-day money-back guarantee.</strong> If TAFIL doesn't solve
+                your project chaos, email <a href={`mailto:${CONTACT_EMAIL}`} className="text-amber-400 hover:underline">{CONTACT_EMAIL}</a> for
+                a full refund. No questions asked.
+              </p>
+            </div>
+
+            <div className="bg-zinc-900/50 backdrop-blur-sm rounded-2xl border border-zinc-800 p-6 hover:border-zinc-700 transition-colors">
+              <h3 className="text-xl font-bold text-white mb-3">Which platforms are supported?</h3>
+              <p className="text-zinc-400">
+                TAFIL works on <strong className="text-white">macOS</strong> (10.13+, Intel & Apple Silicon),
+                <strong className="text-white"> Windows</strong> (10/11), and
+                <strong className="text-white"> Linux</strong> (Ubuntu 18.04+, Fedora, etc.).
+                Download all versions at <a href={DOWNLOAD_URL} className="text-amber-400 hover:underline" target="_blank" rel="noopener noreferrer">download.tafil.app</a>
+              </p>
+            </div>
+
+            <div className="bg-zinc-900/50 backdrop-blur-sm rounded-2xl border border-zinc-800 p-6 hover:border-zinc-700 transition-colors">
+              <h3 className="text-xl font-bold text-white mb-3">How does licensing work?</h3>
+              <p className="text-zinc-400">
+                After purchase on Gumroad, you'll receive a license key via email. Enter it in TAFIL to activate.
+                The license is tied to your device (not your email), works offline for 30+ days between syncs,
+                and can be moved to new devices within your 3-device limit.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Final CTA */}
+      <section className="relative z-10 py-20 px-6">
+        <div className="max-w-3xl mx-auto text-center">
+          <h2 className="text-4xl md:text-5xl font-bold mb-6">
+            Ready to Take Control of Your Projects?
+          </h2>
+          <p className="text-xl text-zinc-400 mb-10">
+            Join developers who've already simplified their workflow
+          </p>
+
+          <a
+            href={GUMROAD_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-black font-bold text-xl px-12 py-5 rounded-2xl shadow-2xl shadow-amber-500/30 hover:shadow-amber-500/50 hover:scale-105 transition-all"
+          >
+            <span>Buy TAFIL Pro - $49</span>
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+            </svg>
+          </a>
+
+          <p className="text-sm text-zinc-500 mt-6">
+            One-time payment • Instant delivery • 30-day guarantee
+          </p>
         </div>
       </section>
 
