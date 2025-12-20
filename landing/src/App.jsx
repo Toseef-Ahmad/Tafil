@@ -384,7 +384,8 @@ export default function App() {
   // Download URLs (Cloudflare R2 - direct downloads)
   const DOWNLOAD_MAC_URL = `https://download.tafil.app/TAFIL-1.0.0-mac-universal.dmg`;
   const DOWNLOAD_WINDOWS_URL = `https://download.tafil.app/TAFIL-1.0.0-windows.exe`;
-  const DOWNLOAD_LINUX_URL = `https://download.tafil.app/TAFIL-1.0.0-linux.AppImage`;
+  const DOWNLOAD_LINUX_X64_URL = `https://download.tafil.app/TAFIL-1.0.0-linux-x64.AppImage`;
+  const DOWNLOAD_LINUX_ARM64_URL = `https://download.tafil.app/TAFIL-1.0.0-linux-arm64.AppImage`;
   
   // Other URLs
   const GUMROAD_URL = `https://tafil.gumroad.com/l/tafil-license`;
@@ -412,7 +413,7 @@ export default function App() {
   const getDownloadURL = () => {
     switch (detectedOS) {
       case 'windows': return DOWNLOAD_WINDOWS_URL;
-      case 'linux': return DOWNLOAD_LINUX_URL;
+      case 'linux': return DOWNLOAD_LINUX_X64_URL; // Default to x64, ARM users can choose below
       default: return DOWNLOAD_MAC_URL;
     }
   };
@@ -505,7 +506,7 @@ export default function App() {
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
               </svg>
-              Buy Pro License - $29
+              Buy Pro License - $49
             </a>
           </div>
 
@@ -583,7 +584,7 @@ export default function App() {
               </div>
               <h3 className="text-xl font-bold mb-3">Upgrade (Optional)</h3>
               <p className="text-zinc-400 text-sm">
-                Need advanced features? Buy a Pro license ($29) — one-time payment, lifetime access.
+                Need advanced features? Buy a Pro license ($49) — one-time payment, lifetime access.
               </p>
             </div>
 
@@ -697,8 +698,8 @@ export default function App() {
               <div className="text-center mb-8">
                 <h3 className="text-2xl font-bold mb-2">TAFIL Pro</h3>
                 <div className="flex items-baseline justify-center gap-2 mb-2">
-                  <span className="text-5xl font-bold bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">$29</span>
-                  <span className="text-zinc-500 line-through text-xl">$49</span>
+                  <span className="text-5xl font-bold bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">$49</span>
+                  <span className="text-zinc-500 line-through text-xl">$79</span>
                 </div>
                 <p className="text-zinc-400">One-time payment · Lifetime license</p>
               </div>
@@ -786,7 +787,7 @@ export default function App() {
                 rel="noopener noreferrer"
                 className="block w-full mt-8 py-4 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 rounded-xl font-bold text-center shadow-lg shadow-purple-500/30 hover:shadow-purple-500/50 transition-all"
               >
-                Buy Pro License - $29
+                Buy Pro License - $49
               </a>
 
               <p className="text-center text-xs text-zinc-500 mt-4">
@@ -864,7 +865,7 @@ export default function App() {
                 </li>
                 <li className="flex items-start gap-3">
                   <span className="text-red-400 mt-1">×</span>
-                  <span>Not a subscription (one-time $29 for Pro)</span>
+                  <span>Not a subscription (one-time $49 for Pro)</span>
                 </li>
                 <li className="flex items-start gap-3">
                   <span className="text-red-400 mt-1">×</span>
@@ -897,7 +898,7 @@ export default function App() {
               <h3 className="text-xl font-bold text-white mb-3">Do I need to pay to download TAFIL?</h3>
               <p className="text-zinc-400">
                 <strong className="text-white">No!</strong> Download is completely free. You can use TAFIL Free forever.
-                Pay only if you want Pro features ($29 one-time).
+                Pay only if you want Pro features ($49 one-time).
               </p>
             </div>
 
@@ -985,14 +986,22 @@ export default function App() {
             <div className="bg-zinc-900/60 backdrop-blur-sm rounded-2xl border border-zinc-800 p-8 text-center hover:border-emerald-500/50 transition-all group">
               <div className="text-5xl mb-4">🐧</div>
               <h3 className="text-xl font-bold mb-2">Linux</h3>
-              <p className="text-sm text-zinc-400 mb-6">Ubuntu, Fedora, Debian</p>
-              <a
-                href={DOWNLOAD_LINUX_URL}
-                className="block w-full py-3 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-500 rounded-xl font-semibold text-sm transition-all group-hover:shadow-lg group-hover:shadow-emerald-500/20"
-              >
-                Download AppImage
-              </a>
-              <p className="text-xs text-zinc-500 mt-3">Ubuntu 18.04+</p>
+              <p className="text-sm text-zinc-400 mb-4">Ubuntu, Fedora, Debian</p>
+              <div className="space-y-2">
+                <a
+                  href={DOWNLOAD_LINUX_X64_URL}
+                  className="block w-full py-3 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-500 rounded-xl font-semibold text-sm transition-all group-hover:shadow-lg group-hover:shadow-emerald-500/20"
+                >
+                  Download x64
+                </a>
+                <a
+                  href={DOWNLOAD_LINUX_ARM64_URL}
+                  className="block w-full py-2.5 border border-emerald-500/30 hover:bg-emerald-500/10 rounded-xl font-medium text-sm text-emerald-400 transition-all"
+                >
+                  Download ARM64
+                </a>
+              </div>
+              <p className="text-xs text-zinc-500 mt-3">Ubuntu 18.04+ • AppImage</p>
             </div>
           </div>
 
@@ -1038,7 +1047,7 @@ export default function App() {
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 px-8 py-3 rounded-xl font-bold transition-all hover:scale-105"
               >
-                Buy Pro License - $29
+                Buy Pro License - $49
                 <span className="text-xs opacity-70">(one-time)</span>
               </a>
             </div>
@@ -1073,7 +1082,7 @@ export default function App() {
               rel="noopener noreferrer"
               className="inline-flex items-center gap-3 border-2 border-zinc-700 hover:border-purple-500 bg-zinc-900/50 backdrop-blur text-white font-semibold text-lg px-10 py-5 rounded-2xl hover:bg-zinc-800/50 transition-all"
             >
-              Buy Pro License - $29
+              Buy Pro License - $49
             </a>
           </div>
 
