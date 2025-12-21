@@ -1039,6 +1039,27 @@ function clearBlueprintInlineWidgets() {
   }
 }
 
+function updateBlueprintAutoRunStatus() {
+  if (!blueprintAutoRunStatus) return;
+
+  if (isBlueprintAutoRunEnabled) {
+    blueprintAutoRunStatus.innerHTML = '<span class="status-dot"></span><span class="status-text">Auto</span>';
+    blueprintAutoRunStatus.classList.add('active');
+  } else {
+    blueprintAutoRunStatus.innerHTML = '<span class="status-dot"></span><span class="status-text">Manual</span>';
+    blueprintAutoRunStatus.classList.remove('active');
+  }
+}
+
+function triggerBlueprintAutoRun() {
+  if (!isBlueprintAutoRunEnabled || isBlueprintExecuting) return;
+  
+  clearTimeout(blueprintAutoRunTimeout);
+  blueprintAutoRunTimeout = setTimeout(() => {
+    runEditorCode();
+  }, 400); // 400ms debounce for auto-run
+}
+
 function applyBlueprintInlineResults(inlineResults) {
   if (!blueprintCodeMonacoEditor || !monacoInstance) return 0;
   const model = blueprintCodeMonacoEditor.getModel();
@@ -6593,6 +6614,8 @@ const runEditorBtn = document.getElementById('runEditorBtn');
 const clearEditorOutputBtn = document.getElementById('clearEditorOutputBtn');
 const editorOutput = document.getElementById('editorOutput');
 const toggleBlueprintLayoutBtn = document.getElementById('toggleBlueprintLayoutBtn');
+const toggleBlueprintAutoRunBtn = document.getElementById('toggleBlueprintAutoRunBtn');
+const blueprintAutoRunStatus = document.getElementById('blueprintAutoRunStatus');
 const blueprintSplit = document.getElementById('blueprintSplit');
 const blueprintResizer = document.getElementById('blueprintResizer');
 const blueprintOutputPanel = document.getElementById('blueprintOutputPanel');
@@ -6666,6 +6689,9 @@ let blueprintGoalMonacoEditor = null;
 let blueprintCodeMonacoEditor = null;
 let blueprintInlineWidgets = [];
 let blueprintInlineDecorations = [];
+let isBlueprintAutoRunEnabled = localStorage.getItem('blueprintAutoRun') !== 'false'; // Default true
+let blueprintAutoRunTimeout = null;
+let isBlueprintExecuting = false;
 
 function getBlueprintGoalValue() {
   // Prefer structured editor state when available (ProseMirror).
@@ -6944,6 +6970,9 @@ async function ensureBlueprintCodeMonacoEditor() {
         editorSaveStatus.classList.remove('active');
       }
       editorSaveTimeout = setTimeout(saveEditorContent, 1000);
+      
+      // Trigger auto-run
+      triggerBlueprintAutoRun();
     });
 
     setTimeout(() => {
@@ -7842,7 +7871,10 @@ async function saveEditorContent() {
 async function runEditorCode() {
   const code = getBlueprintEditorValue();
   if (!code || !code.trim()) return;
+  if (isBlueprintExecuting) return;
 
+  isBlueprintExecuting = true;
+  
   // Clear and show running state
   clearEditorOutput();
   clearBlueprintInlineWidgets();
@@ -7895,9 +7927,23 @@ async function runEditorCode() {
     if ((!result.logs || result.logs.length === 0) && inlineCount === 0) {
       appendEditorOutputLine('No output', 'info');
     }
+    
+    // Update auto-run status on success
+    if (blueprintAutoRunStatus && isBlueprintAutoRunEnabled) {
+      blueprintAutoRunStatus.innerHTML = '<span class="status-dot"></span><span class="status-text">✓</span>';
+      blueprintAutoRunStatus.classList.add('active');
+    }
   } catch (err) {
     clearBlueprintInlineWidgets();
     appendEditorOutputLine(err?.message || String(err), 'error');
+    
+    // Update status on error
+    if (blueprintAutoRunStatus) {
+      blueprintAutoRunStatus.innerHTML = '<span class="status-dot" style="background:#ef4444;"></span><span class="status-text">✗</span>';
+      blueprintAutoRunStatus.classList.remove('active');
+    }
+  } finally {
+    isBlueprintExecuting = false;
   }
 }
 
@@ -9086,6 +9132,18 @@ function initBlueprintListeners() {
       showNotification(isBlueprintHorizontalLayout ? 'Side by side layout' : 'Stacked layout', 'info');
     });
   }
+  
+  // Blueprint Editor Auto-run Toggle
+  if (toggleBlueprintAutoRunBtn) {
+    updateBlueprintAutoRunStatus();
+    
+    toggleBlueprintAutoRunBtn.addEventListener('click', () => {
+      isBlueprintAutoRunEnabled = !isBlueprintAutoRunEnabled;
+      localStorage.setItem('blueprintAutoRun', isBlueprintAutoRunEnabled ? 'true' : 'false');
+      updateBlueprintAutoRunStatus();
+      showNotification(isBlueprintAutoRunEnabled ? 'Auto-run enabled' : 'Auto-run disabled', 'info');
+    });
+  }
 
   // Initialize goal editor with live preview
   initGoalEditor();
@@ -9116,6 +9174,9 @@ function initBlueprintListeners() {
         editorSaveStatus.classList.remove('active');
       }
       editorSaveTimeout = setTimeout(saveEditorContent, 1000);
+      
+      // Trigger auto-run for textarea fallback
+      triggerBlueprintAutoRun();
     });
 
     blueprintEditorTextarea.addEventListener('keydown', (e) => {
