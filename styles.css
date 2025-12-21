@@ -1562,6 +1562,139 @@ body[data-theme] #playgroundPanel h2 {
   color: var(--text-primary) !important;
 }
 
+/* Playground Layout Toggle - Side by Side */
+.playground-split {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  position: relative;
+}
+
+.playground-split.horizontal {
+  flex-direction: row !important;
+}
+
+.playground-split .playground-editor-panel {
+  flex: 1;
+  min-height: 100px;
+  overflow: hidden;
+  position: relative;
+}
+
+.playground-split.horizontal .playground-editor-panel {
+  min-height: unset;
+  min-width: 200px;
+  flex: 1;
+  height: 100% !important;
+}
+
+.playground-split .playground-output-panel {
+  flex-shrink: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-primary, #09090b);
+}
+
+.playground-split.horizontal .playground-output-panel {
+  min-width: 200px;
+  max-width: none;
+  max-height: none;
+  height: 100% !important;
+  width: 300px;
+}
+
+.playground-split .playground-output {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.playground-split .output-header {
+  flex-shrink: 0;
+  background: var(--bg-secondary, rgba(0,0,0,0.15));
+  border-bottom: 1px solid var(--border-subtle, rgba(255,255,255,0.04));
+}
+
+/* Output panel scrollbar styling */
+.playground-output::-webkit-scrollbar {
+  width: 6px;
+}
+
+.playground-output::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.playground-output::-webkit-scrollbar-thumb {
+  background: var(--border-subtle, rgba(255,255,255,0.1));
+  border-radius: 3px;
+}
+
+.playground-output::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted, rgba(255,255,255,0.2));
+}
+
+/* Resizer - Slim divider like RunJS */
+.playground-resizer {
+  background: var(--border-subtle, rgba(255,255,255,0.08));
+  flex-shrink: 0;
+  position: relative;
+  z-index: 10;
+  transition: background 0.15s ease;
+}
+
+/* Vertical layout - horizontal resizer */
+.playground-split:not(.horizontal) .playground-resizer {
+  height: 1px;
+  width: 100%;
+  cursor: ns-resize;
+}
+
+/* Horizontal layout - vertical resizer */
+.playground-split.horizontal .playground-resizer {
+  width: 1px;
+  height: 100%;
+  cursor: ew-resize;
+}
+
+/* Expand hit area for easier grabbing */
+.playground-resizer::before {
+  content: '';
+  position: absolute;
+  z-index: 11;
+}
+
+.playground-split:not(.horizontal) .playground-resizer::before {
+  left: 0;
+  right: 0;
+  top: -4px;
+  bottom: -4px;
+}
+
+.playground-split.horizontal .playground-resizer::before {
+  top: 0;
+  bottom: 0;
+  left: -4px;
+  right: -4px;
+}
+
+.playground-resizer:hover,
+.playground-resizer.dragging {
+  background: var(--accent-primary, #8b5cf6);
+}
+
+/* When dragging, show a thicker line */
+.playground-resizer.dragging {
+  background: var(--accent-primary, #8b5cf6);
+}
+
+.playground-split:not(.horizontal) .playground-resizer.dragging {
+  height: 2px;
+}
+
+.playground-split.horizontal .playground-resizer.dragging {
+  width: 2px;
+}
+
 /* ============================================
    LIGHT THEME SPECIFIC OVERRIDES
    Ensure proper contrast and visibility

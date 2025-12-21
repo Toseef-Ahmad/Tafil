@@ -49,6 +49,12 @@ const runCodeBtn = document.getElementById("runCodeBtn");
 const clearOutputBtn = document.getElementById("clearOutputBtn");
 const saveSnippetBtn = document.getElementById("saveSnippetBtn");
 const toggleAutoRunBtn = document.getElementById("toggleAutoRunBtn");
+const toggleLayoutBtn = document.getElementById("toggleLayoutBtn");
+const playgroundSplit = document.getElementById("playgroundSplit");
+const playgroundResizer = document.getElementById("playgroundResizer");
+const outputPanel = document.getElementById("outputPanel");
+const layoutIconVertical = document.getElementById("layoutIconVertical");
+const layoutIconHorizontal = document.getElementById("layoutIconHorizontal");
 const autoRunStatus = document.getElementById("autoRunStatus");
 const executionTimeEl = document.getElementById("executionTime");
 
@@ -236,6 +242,7 @@ let createdProjectData = null;
 let monacoEditor = null;
 let monacoInstance = null;
 let isAutoRunEnabled = true;
+let isHorizontalLayout = localStorage.getItem('playgroundLayout') === 'horizontal';
 let autoRunTimeout = null;
 let autoSaveTimeout = null;
 let lastRunTime = 0;
@@ -4703,6 +4710,30 @@ console.log('Ready to code!')
       });
     }
 
+    // Toggle layout button (vertical/horizontal)
+    if (toggleLayoutBtn && playgroundSplit) {
+      // Apply saved layout on init
+      updatePlaygroundLayout();
+      
+      // Initialize resizer drag functionality
+      initPlaygroundResizer();
+      
+      toggleLayoutBtn.addEventListener('click', () => {
+        isHorizontalLayout = !isHorizontalLayout;
+        localStorage.setItem('playgroundLayout', isHorizontalLayout ? 'horizontal' : 'vertical');
+        updatePlaygroundLayout();
+        
+        // Refresh Monaco editor layout after toggle
+        setTimeout(() => {
+          if (monacoEditor) {
+            monacoEditor.layout();
+          }
+        }, 100);
+        
+        showNotification(isHorizontalLayout ? 'Side by side layout' : 'Stacked layout', 'info');
+      });
+    }
+
     // Clear output
       if (clearOutputBtn) {
         clearOutputBtn.addEventListener('click', () => {
@@ -4885,6 +4916,133 @@ function updateAutoRunStatus() {
     autoRunStatus.style.color = '#71717a';
     autoRunStatus.style.background = 'rgba(255,255,255,0.05)';
   }
+}
+
+function updatePlaygroundLayout() {
+  if (!playgroundSplit) return;
+  
+  if (isHorizontalLayout) {
+    playgroundSplit.classList.add('horizontal');
+    // Restore saved width or use default
+    const savedWidth = localStorage.getItem('playgroundOutputWidth');
+    if (outputPanel) {
+      outputPanel.style.height = '';
+      outputPanel.style.width = savedWidth || '300px';
+    }
+    // Update icons
+    if (layoutIconVertical) layoutIconVertical.style.display = 'none';
+    if (layoutIconHorizontal) layoutIconHorizontal.style.display = 'block';
+    // Update button title
+    if (toggleLayoutBtn) toggleLayoutBtn.title = 'Switch to Stacked Layout';
+  } else {
+    playgroundSplit.classList.remove('horizontal');
+    // Restore saved height or use default
+    const savedHeight = localStorage.getItem('playgroundOutputHeight');
+    if (outputPanel) {
+      outputPanel.style.width = '';
+      outputPanel.style.height = savedHeight || '200px';
+    }
+    // Update icons
+    if (layoutIconVertical) layoutIconVertical.style.display = 'block';
+    if (layoutIconHorizontal) layoutIconHorizontal.style.display = 'none';
+    // Update button title
+    if (toggleLayoutBtn) toggleLayoutBtn.title = 'Switch to Side by Side Layout';
+  }
+  
+  // Trigger Monaco layout refresh
+  if (monacoEditor) {
+    setTimeout(() => monacoEditor.layout(), 50);
+  }
+}
+
+// Initialize resizer drag functionality
+function initPlaygroundResizer() {
+  if (!playgroundResizer || !playgroundSplit || !outputPanel) return;
+  
+  let isDragging = false;
+  let startPos = 0;
+  let startSize = 0;
+  
+  const startDrag = (e) => {
+    isDragging = true;
+    playgroundResizer.classList.add('dragging');
+    document.body.style.cursor = isHorizontalLayout ? 'ew-resize' : 'ns-resize';
+    document.body.style.userSelect = 'none';
+    
+    if (e.type === 'touchstart') {
+      startPos = isHorizontalLayout ? e.touches[0].clientX : e.touches[0].clientY;
+    } else {
+      startPos = isHorizontalLayout ? e.clientX : e.clientY;
+    }
+    
+    startSize = isHorizontalLayout ? outputPanel.offsetWidth : outputPanel.offsetHeight;
+    
+    e.preventDefault();
+  };
+  
+  const doDrag = (e) => {
+    if (!isDragging) return;
+    
+    let currentPos;
+    if (e.type === 'touchmove') {
+      currentPos = isHorizontalLayout ? e.touches[0].clientX : e.touches[0].clientY;
+    } else {
+      currentPos = isHorizontalLayout ? e.clientX : e.clientY;
+    }
+    
+    // Calculate delta (reversed because output is at end)
+    const delta = startPos - currentPos;
+    let newSize = startSize + delta;
+    
+    // Clamp size
+    const minSize = 60;
+    const containerSize = isHorizontalLayout ? playgroundSplit.offsetWidth : playgroundSplit.offsetHeight;
+    const maxSize = containerSize - 150; // Leave at least 150px for editor
+    
+    newSize = Math.max(minSize, Math.min(maxSize, newSize));
+    
+    if (isHorizontalLayout) {
+      outputPanel.style.width = newSize + 'px';
+    } else {
+      outputPanel.style.height = newSize + 'px';
+    }
+    
+    // Refresh Monaco layout
+    if (monacoEditor) {
+      monacoEditor.layout();
+    }
+  };
+  
+  const endDrag = () => {
+    if (!isDragging) return;
+    
+    isDragging = false;
+    playgroundResizer.classList.remove('dragging');
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+    
+    // Save size to localStorage
+    if (isHorizontalLayout) {
+      localStorage.setItem('playgroundOutputWidth', outputPanel.style.width);
+    } else {
+      localStorage.setItem('playgroundOutputHeight', outputPanel.style.height);
+    }
+    
+    // Final Monaco layout refresh
+    if (monacoEditor) {
+      monacoEditor.layout();
+    }
+  };
+  
+  // Mouse events
+  playgroundResizer.addEventListener('mousedown', startDrag);
+  document.addEventListener('mousemove', doDrag);
+  document.addEventListener('mouseup', endDrag);
+  
+  // Touch events for mobile
+  playgroundResizer.addEventListener('touchstart', startDrag, { passive: false });
+  document.addEventListener('touchmove', doDrag, { passive: false });
+  document.addEventListener('touchend', endDrag);
 }
 
 async function runCode() {
