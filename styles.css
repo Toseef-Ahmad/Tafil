@@ -160,7 +160,7 @@ body:not(.light-mode) {
   left: 0;
   right: 0;
   height: 1px;
-  background: linear-gradient(90deg, transparent, var(--border-hover), transparent);
+  background: var(--border-hover);
   opacity: 0;
   transition: opacity 0.2s ease;
 }
@@ -633,7 +633,7 @@ body:not(.light-mode) {
   cursor: pointer;
   transition: all 0.2s ease;
   border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
-  background: linear-gradient(135deg, rgba(139, 92, 246, 0.1), rgba(249, 115, 22, 0.1));
+  background: rgba(139, 92, 246, 0.1);
   color: var(--text-secondary, #a1a1aa);
   position: relative;
   overflow: hidden;
@@ -643,7 +643,7 @@ body:not(.light-mode) {
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(249, 115, 22, 0.2));
+  background: rgba(139, 92, 246, 0.2);
   opacity: 0;
   transition: opacity 0.2s ease;
 }

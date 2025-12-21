@@ -2281,7 +2281,7 @@ async function showProjectInsights(projectPath) {
               ${snapshot.environment?.detectedKeys?.length > 0 ? `<div>Env vars: ${snapshot.environment.detectedKeys.length} detected</div>` : ''}
             </div>
             <div class="flex gap-2">
-              <button id="restoreProjectBtn" class="px-3 py-1.5 text-xs rounded-lg font-medium" style="background: linear-gradient(135deg, #10b981, #059669); color: white;">
+              <button id="restoreProjectBtn" class="px-3 py-1.5 text-xs rounded-lg font-medium" style="background: #10b981; color: white;">
                 🔄 Restore Project
               </button>
               <button id="createSnapshotBtn" class="px-3 py-1.5 text-xs rounded-lg font-medium" style="background: rgba(255,255,255,0.1); color: #fafafa; border: 1px solid rgba(255,255,255,0.1);">
@@ -2289,7 +2289,7 @@ async function showProjectInsights(projectPath) {
               </button>
             </div>`
           : `<div class="text-xs mb-2" style="color: #71717a;">No snapshot saved yet</div>
-            <button id="createSnapshotBtn" class="px-3 py-1.5 text-xs rounded-lg font-medium" style="background: linear-gradient(135deg, #8b5cf6, #7c3aed); color: white;">
+            <button id="createSnapshotBtn" class="px-3 py-1.5 text-xs rounded-lg font-medium" style="background: #8b5cf6; color: white;">
               📸 Create Snapshot
             </button>`
         }
@@ -5132,7 +5132,7 @@ function createSSHHostCard(host) {
       </div>
 
       <div class="flex items-center gap-2">
-        <button id="ssh-connect-${host.id}" class="flex-1 px-4 py-2.5 rounded-lg text-xs font-semibold transition-all hover:scale-[1.02]" style="background: ${hasSession ? 'rgba(16, 185, 129, 0.15)' : 'linear-gradient(135deg, #10b981, #059669)'}; color: ${hasSession ? '#10b981' : 'white'}; border: ${hasSession ? '1px solid rgba(16, 185, 129, 0.3)' : 'none'};">
+        <button id="ssh-connect-${host.id}" class="flex-1 px-4 py-2.5 rounded-lg text-xs font-semibold transition-all hover:scale-[1.02]" style="background: ${hasSession ? 'rgba(16, 185, 129, 0.15)' : '#10b981'}; color: ${hasSession ? '#10b981' : 'white'}; border: ${hasSession ? '1px solid rgba(16, 185, 129, 0.3)' : 'none'};">
           ${hasSession ? (isActive ? 'Active' : 'Switch to Terminal') : 'Connect'}
         </button>
         <button id="ssh-delete-${host.id}" class="px-3 py-2.5 rounded-lg text-xs font-medium transition-all" style="background: rgba(244, 63, 94, 0.15); color: #f43f5e; border: 1px solid rgba(244, 63, 94, 0.2);" title="Delete">
@@ -8820,7 +8820,7 @@ function setWizardStep(step) {
       // Completed step
       stepEl.style.opacity = '1';
       if (numEl) {
-        numEl.style.background = 'linear-gradient(135deg, #10b981, #059669)';
+        numEl.style.background = '#10b981';
         numEl.style.color = 'white';
         numEl.innerHTML = '✓';
       }
@@ -8829,7 +8829,7 @@ function setWizardStep(step) {
       // Current step
       stepEl.style.opacity = '1';
       if (numEl) {
-        numEl.style.background = 'linear-gradient(135deg, #8b5cf6, #7c3aed)';
+        numEl.style.background = '#8b5cf6';
         numEl.style.color = 'white';
         numEl.textContent = stepNum;
       }
@@ -9206,7 +9206,7 @@ function showUpgradeModal(options = {}) {
     // Primary action
     const primaryBtn = document.createElement('button');
     primaryBtn.className = 'upgrade-btn-primary';
-    primaryBtn.style.cssText = 'padding:10px 20px;background:linear-gradient(135deg,#8b5cf6,#7c3aed);border:none;border-radius:8px;color:#fff;font-size:13px;font-weight:500;cursor:pointer;transition:all 0.2s;';
+    primaryBtn.style.cssText = 'padding:10px 20px;background:#8b5cf6;border:none;border-radius:8px;color:#fff;font-size:13px;font-weight:500;cursor:pointer;transition:all 0.2s;';
     primaryBtn.textContent = primaryLabel;
     primaryBtn.onclick = () => {
       hideUpgradeModal();

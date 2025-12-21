@@ -312,9 +312,8 @@
     .module-tab svg { width: 18px; height: 18px; transition: all 0.2s ease; }
     .module-tab:hover { color: #a1a1aa; background: rgba(255,255,255,0.06); transform: translateY(-1px); }
     .module-tab.active { 
-      background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+      background: #8b5cf6;
       color: white; font-weight: 600;
-      box-shadow: 0 4px 12px rgba(139, 92, 246, 0.25);
     }
     .module-tab.active svg { stroke: white; transform: scale(1.05); }
 
@@ -917,7 +916,7 @@
     <!-- Sidebar Header -->
     <div class="flex items-center justify-between p-3 border-b" style="border-color: rgba(255,255,255,0.06);">
       <div class="flex items-center gap-2">
-        <div class="w-7 h-7 rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
+        <div class="w-7 h-7 rounded-lg bg-violet-600 flex items-center justify-center">
           <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m7 11 2-2-2-2"/><path d="M11 13h4"/><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/></svg>
         </div>
         <span class="sidebar-text text-sm font-semibold">Tafil</span>
@@ -981,7 +980,7 @@
       
       <!-- Create Project Action -->
       <div class="border-t pt-3" style="border-color: rgba(255,255,255,0.06);">
-        <div class="sidebar-item" id="createProjectBtn" data-tooltip="Create New Project" style="background: linear-gradient(135deg, rgba(139, 92, 246, 0.15), rgba(6, 182, 212, 0.1)); border: 1px solid rgba(139, 92, 246, 0.25); margin-bottom: 8px;">
+        <div class="sidebar-item" id="createProjectBtn" data-tooltip="Create New Project" style="background: rgba(139, 92, 246, 0.15); border: 1px solid rgba(139, 92, 246, 0.25); margin-bottom: 8px;">
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
           <span class="sidebar-text" style="color: #a78bfa; font-weight: 600;">Create Project</span>
         </div>
@@ -1123,13 +1122,13 @@
       
       <!-- Empty State -->
       <div id="emptyState" class="hidden flex flex-col items-center justify-center py-20">
-        <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-violet-500/20 to-purple-600/20 flex items-center justify-center mb-4">
+        <div class="w-16 h-16 rounded-2xl bg-violet-500/20 flex items-center justify-center mb-4">
           <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/></svg>
         </div>
         <h3 class="text-base font-semibold mb-1" style="color: #fafafa;">No projects found</h3>
         <p class="text-sm mb-4" style="color: #71717a;">Create a new project or scan your folders to get started</p>
         <div class="flex gap-2 flex-wrap justify-center">
-          <button id="emptyStateCreateProject" class="px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2" style="background: linear-gradient(135deg, #8b5cf6, #06b6d4); color: white; box-shadow: 0 4px 15px rgba(139, 92, 246, 0.3);">
+          <button id="emptyStateCreateProject" class="px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2" style="background: #8b5cf6; color: white;">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
             Create Project
           </button>
@@ -1163,7 +1162,7 @@
             <button id="toggleAutoRunBtn" class="action-btn" title="Toggle Auto-run (⌘⇧R)">
               <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg>
             </button>
-            <button id="runCodeBtn" class="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all" style="background: linear-gradient(135deg, #10b981, #059669); color: white;">
+            <button id="runCodeBtn" class="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all" style="background: #10b981; color: white;">
               <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="5 3 19 12 5 21 5 3"/></svg>
               Run
               <span class="text-xs opacity-70">⌘↵</span>
@@ -1205,7 +1204,7 @@
             <h1 class="text-lg font-semibold" style="color: #fafafa;">SSH Hosts</h1>
             <p class="text-xs" style="color: #71717a;">Connect to your servers with one click</p>
           </div>
-          <button id="addHostBtn" class="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all" style="background: linear-gradient(135deg, #8b5cf6, #7c3aed); color: white;">
+          <button id="addHostBtn" class="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all" style="background: #8b5cf6; color: white;">
             <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
             Add Host
           </button>
@@ -1218,12 +1217,12 @@
         
         <!-- Empty State -->
         <div id="sshEmptyState" class="flex flex-col items-center justify-center py-20">
-          <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-violet-500/20 to-purple-600/20 flex items-center justify-center mb-4">
+          <div class="w-16 h-16 rounded-2xl bg-violet-500/20 flex items-center justify-center mb-4">
             <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
           </div>
           <h3 class="text-base font-semibold mb-1" style="color: #fafafa;">No SSH hosts configured</h3>
           <p class="text-sm mb-4 text-center max-w-sm" style="color: #71717a;">Add your first host to connect to servers with one click</p>
-          <button id="sshEmptyAddBtn" class="px-4 py-2 rounded-lg text-sm font-medium transition-all" style="background: linear-gradient(135deg, #8b5cf6, #7c3aed); color: white;">
+          <button id="sshEmptyAddBtn" class="px-4 py-2 rounded-lg text-sm font-medium transition-all" style="background: #8b5cf6; color: white;">
             Add Your First Host
           </button>
         </div>
@@ -1294,7 +1293,7 @@
         <p class="text-sm" style="color: #a1a1aa;">This project requires dependencies to be installed before running. Would you like to install them now?</p>
       </div>
       <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 8px; padding: 16px; border-top: 1px solid rgba(255,255,255,0.06);">
-        <button id="modalInstallBtn" class="px-4 py-2 rounded-lg text-sm font-medium" style="background: linear-gradient(135deg, #8b5cf6, #7c3aed); color: white;">
+        <button id="modalInstallBtn" class="px-4 py-2 rounded-lg text-sm font-medium" style="background: #8b5cf6; color: white;">
           Install Dependencies
         </button>
       </div>
@@ -1368,7 +1367,7 @@
         <textarea id="fixItNoteInput" placeholder="e.g., Port conflict resolved by stopping other project on port 3000..." rows="2" style="width: 100%; padding: 8px; border-radius: 6px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #fafafa; font-size: 12px; font-family: inherit; resize: vertical; min-height: 50px;"></textarea>
         <div class="flex gap-2 mt-2 justify-end">
           <button id="skipNoteBtn" class="text-xs px-3 py-1.5 rounded-lg" style="background: rgba(255,255,255,0.05); color: #71717a; border: 1px solid rgba(255,255,255,0.1);">Skip</button>
-          <button id="saveNoteBtn" class="text-xs px-3 py-1.5 rounded-lg font-medium" style="background: linear-gradient(135deg, #8b5cf6, #7c3aed); color: white;">Save Note</button>
+          <button id="saveNoteBtn" class="text-xs px-3 py-1.5 rounded-lg font-medium" style="background: #8b5cf6; color: white;">Save Note</button>
         </div>
       </div>
     </div>
@@ -1454,7 +1453,7 @@
         <input type="text" id="newCollectionInput" placeholder="Collection name..." style="width: 100%; padding: 10px 12px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: #fafafa; font-size: 14px; outline: none;" />
       </div>
       <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 8px; padding: 16px; border-top: 1px solid rgba(255,255,255,0.06);">
-        <button id="createCollectionBtn" class="px-4 py-2 rounded-lg text-sm font-medium" style="background: linear-gradient(135deg, #8b5cf6, #7c3aed); color: white;">
+        <button id="createCollectionBtn" class="px-4 py-2 rounded-lg text-sm font-medium" style="background: #8b5cf6; color: white;">
           Create
         </button>
       </div>
@@ -1463,11 +1462,11 @@
 
   <!-- Modal: Create New Project Wizard -->
   <div id="createProjectModal" class="modal-backdrop hidden" style="position: fixed; inset: 0; background: rgba(0, 0, 0, 0.8); z-index: 150; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(4px);">
-    <div class="modal animate-slide-up" style="background: linear-gradient(180deg, #1a1a1f 0%, #18181b 100%); border: 1px solid rgba(255, 255, 255, 0.1); color: #fafafa; border-radius: 16px; width: 640px; max-width: 95vw; max-height: 90vh; display: flex; flex-direction: column; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);">
+    <div class="modal animate-slide-up" style="background: #18181b; border: 1px solid rgba(255, 255, 255, 0.1); color: #fafafa; border-radius: 16px; width: 640px; max-width: 95vw; max-height: 90vh; display: flex; flex-direction: column; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);">
       <!-- Header -->
       <div class="modal-header" style="display: flex; align-items: center; justify-content: space-between; padding: 20px 24px; border-bottom: 1px solid rgba(255,255,255,0.06);">
         <div style="display: flex; align-items: center; gap: 12px;">
-          <div style="width: 40px; height: 40px; border-radius: 10px; background: linear-gradient(135deg, #8b5cf6, #06b6d4); display: flex; align-items: center; justify-content: center; font-size: 20px;">🚀</div>
+          <div style="width: 40px; height: 40px; border-radius: 10px; background: #8b5cf6; display: flex; align-items: center; justify-content: center; font-size: 20px;">🚀</div>
           <div>
             <h3 style="font-size: 16px; font-weight: 600; margin: 0;">Create New Project</h3>
             <p style="font-size: 12px; color: #71717a; margin: 0;">Bootstrap a new project with Tafil</p>
@@ -1483,7 +1482,7 @@
         <!-- Step Indicator -->
         <div id="projectWizardSteps" style="display: flex; justify-content: center; gap: 8px; margin-bottom: 24px;">
           <div class="wizard-step active" data-step="1" style="display: flex; align-items: center; gap: 8px;">
-            <div class="step-number" style="width: 28px; height: 28px; border-radius: 50%; background: linear-gradient(135deg, #8b5cf6, #7c3aed); color: white; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600;">1</div>
+            <div class="step-number" style="width: 28px; height: 28px; border-radius: 50%; background: #8b5cf6; color: white; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600;">1</div>
             <span style="font-size: 13px; color: #fafafa;">Stack</span>
           </div>
           <div style="width: 40px; height: 2px; background: rgba(255,255,255,0.1); align-self: center;"></div>
@@ -1602,7 +1601,7 @@
             <p id="successProjectPath" style="font-size: 13px; color: #71717a; margin-bottom: 24px;"></p>
             
             <div style="display: flex; gap: 12px; justify-content: center;">
-              <button id="openInEditorBtn" style="padding: 12px 24px; background: linear-gradient(135deg, #8b5cf6, #7c3aed); border: none; border-radius: 10px; color: white; font-size: 14px; font-weight: 500; cursor: pointer; display: flex; align-items: center; gap: 8px;">
+              <button id="openInEditorBtn" style="padding: 12px 24px; background: #8b5cf6; border: none; border-radius: 10px; color: white; font-size: 14px; font-weight: 500; cursor: pointer; display: flex; align-items: center; gap: 8px;">
                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>
                 Open in Editor
               </button>
@@ -1638,7 +1637,7 @@
           <button id="wizardCancelBtn" class="px-4 py-2 rounded-lg text-sm font-medium" style="background: rgba(255,255,255,0.05); color: #a1a1aa;">
             Cancel
           </button>
-          <button id="wizardNextBtn" class="px-4 py-2 rounded-lg text-sm font-medium" style="background: linear-gradient(135deg, #8b5cf6, #7c3aed); color: white;">
+          <button id="wizardNextBtn" class="px-4 py-2 rounded-lg text-sm font-medium" style="background: #8b5cf6; color: white;">
             Next →
           </button>
         </div>
@@ -1896,7 +1895,7 @@
       </div>
       <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 8px; padding: 16px; border-top: 1px solid rgba(255,255,255,0.06);">
         <button id="cancelSSHHostBtn" class="px-4 py-2 rounded-lg text-sm font-medium" style="background: rgba(255,255,255,0.05); color: #a1a1aa;">Cancel</button>
-        <button id="saveSSHHostBtn" class="px-4 py-2 rounded-lg text-sm font-medium" style="background: linear-gradient(135deg, #8b5cf6, #7c3aed); color: white;">Save Host</button>
+        <button id="saveSSHHostBtn" class="px-4 py-2 rounded-lg text-sm font-medium" style="background: #8b5cf6; color: white;">Save Host</button>
       </div>
     </div>
   </div>
@@ -1916,7 +1915,7 @@
               </button>
               <span style="font-size: 14px; font-weight: 600; color: #fafafa;">Blueprints</span>
             </div>
-            <button id="addModuleBtn" class="action-btn" title="Add Module" style="background: linear-gradient(135deg, #8b5cf6, #7c3aed); color: white; width: 28px; height: 28px;">
+            <button id="addModuleBtn" class="action-btn" title="Add Module" style="background: #8b5cf6; color: white; width: 28px; height: 28px;">
               <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
             </button>
           </div>
@@ -2000,12 +1999,12 @@
           
           <!-- Empty State -->
           <div id="moduleEmptyState" class="module-empty-state" style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; text-align: center; padding: 40px;">
-            <div style="width: 80px; height: 80px; border-radius: 20px; background: linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(124, 58, 237, 0.1)); display: flex; align-items: center; justify-content: center; margin-bottom: 20px;">
+            <div style="width: 80px; height: 80px; border-radius: 20px; background: rgba(139, 92, 246, 0.15); display: flex; align-items: center; justify-content: center; margin-bottom: 20px;">
               <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="7.5 4.21 12 6.81 16.5 4.21"/><polyline points="7.5 19.79 7.5 14.6 3 12"/><polyline points="21 12 16.5 14.6 16.5 19.79"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
             </div>
             <h3 style="font-size: 18px; font-weight: 600; color: #fafafa; margin-bottom: 8px;">Start with a Module</h3>
             <p style="font-size: 13px; color: #71717a; max-width: 360px; margin-bottom: 24px;">Create your first module to organize features, tasks, and ideas for this project. Each module has its own goals, kanban board, and brainstorm canvas.</p>
-            <button id="createFirstModuleBtn" style="display: flex; align-items: center; gap: 8px; padding: 12px 24px; background: linear-gradient(135deg, #8b5cf6, #7c3aed); color: white; border: none; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s ease;">
+            <button id="createFirstModuleBtn" style="display: flex; align-items: center; gap: 8px; padding: 12px 24px; background: #8b5cf6; color: white; border: none; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s ease;">
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
               Create First Module
             </button>
@@ -2089,7 +2088,7 @@
                   <button id="clearCanvasBtn" class="action-btn" title="Clear Canvas" style="padding: 6px 10px; font-size: 11px; color: #f43f5e;">
                     <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/></svg>
                   </button>
-                  <button id="fullscreenCanvasBtn" class="action-btn" title="Toggle Fullscreen" style="padding: 6px 10px; font-size: 11px; background: linear-gradient(135deg, #8b5cf6, #7c3aed); color: white;">
+                  <button id="fullscreenCanvasBtn" class="action-btn" title="Toggle Fullscreen" style="padding: 6px 10px; font-size: 11px; background: #8b5cf6; color: white;">
                     <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
                   </button>
                 </div>
@@ -2218,7 +2217,7 @@
       </div>
       <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 8px; padding: 16px; border-top: 1px solid rgba(255,255,255,0.06);">
         <button id="cancelAddModuleBtn" class="px-4 py-2 rounded-lg text-sm font-medium" style="background: rgba(255,255,255,0.05); color: #a1a1aa;">Cancel</button>
-        <button id="confirmAddModuleBtn" class="px-4 py-2 rounded-lg text-sm font-medium" style="background: linear-gradient(135deg, #8b5cf6, #7c3aed); color: white;">Create Module</button>
+        <button id="confirmAddModuleBtn" class="px-4 py-2 rounded-lg text-sm font-medium" style="background: #8b5cf6; color: white;">Create Module</button>
       </div>
     </div>
   </div>
@@ -2265,7 +2264,7 @@
       </div>
       <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 8px; padding: 16px; border-top: 1px solid rgba(255,255,255,0.06);">
         <button id="cancelAddTaskBtn" class="px-4 py-2 rounded-lg text-sm font-medium" style="background: rgba(255,255,255,0.05); color: #a1a1aa;">Cancel</button>
-        <button id="confirmAddTaskBtn" class="px-4 py-2 rounded-lg text-sm font-medium" style="background: linear-gradient(135deg, #10b981, #059669); color: white;">Add Task</button>
+        <button id="confirmAddTaskBtn" class="px-4 py-2 rounded-lg text-sm font-medium" style="background: #10b981; color: white;">Add Task</button>
       </div>
     </div>
   </div>
@@ -2303,7 +2302,7 @@
       </div>
       <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 8px; padding: 16px; border-top: 1px solid rgba(255,255,255,0.06);">
         <button id="cancelAddLinkBtn" class="px-4 py-2 rounded-lg text-sm font-medium" style="background: rgba(255,255,255,0.05); color: #a1a1aa;">Cancel</button>
-        <button id="confirmAddLinkBtn" class="px-4 py-2 rounded-lg text-sm font-medium" style="background: linear-gradient(135deg, #0ea5e9, #0284c7); color: white;">Add Link</button>
+        <button id="confirmAddLinkBtn" class="px-4 py-2 rounded-lg text-sm font-medium" style="background: #0ea5e9; color: white;">Add Link</button>
       </div>
     </div>
   </div>
@@ -2340,7 +2339,7 @@
     <div class="modal-content" style="background:#18181b;border:1px solid rgba(139, 92, 246, 0.3);border-radius:16px;padding:32px;width:440px;max-width:90vw;box-shadow:0 25px 50px rgba(0,0,0,0.5);">
       <!-- Header -->
       <div style="text-align:center;margin-bottom:24px;">
-        <div style="width:64px;height:64px;margin:0 auto 16px;background:linear-gradient(135deg, #8b5cf6, #6366f1);border-radius:16px;display:flex;align-items:center;justify-content:center;">
+        <div style="width:64px;height:64px;margin:0 auto 16px;background:#8b5cf6;border-radius:16px;display:flex;align-items:center;justify-content:center;">
           <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21 2-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0 3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
         </div>
         <h2 id="licenseModalTitle" style="margin:0 0 8px;font-size:20px;font-weight:700;color:#fafafa;">Activate Tafil</h2>
@@ -2375,7 +2374,7 @@
         
         <!-- Buttons -->
         <div style="display:flex;gap:12px;">
-          <button id="licenseActivateBtn" style="flex:1;padding:12px 20px;background:linear-gradient(135deg, #8b5cf6, #6366f1);border:none;border-radius:8px;color:#fff;font-size:14px;font-weight:600;cursor:pointer;transition:transform 0.15s, box-shadow 0.15s;">
+          <button id="licenseActivateBtn" style="flex:1;padding:12px 20px;background:#8b5cf6;border:none;border-radius:8px;color:#fff;font-size:14px;font-weight:600;cursor:pointer;transition:transform 0.15s, box-shadow 0.15s;">
             Activate License
           </button>
         </div>
@@ -2545,7 +2544,7 @@
       border-color: rgba(139,92,246,0.3);
     }
     .tier-badge.pro {
-      background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+      background: #8b5cf6;
       color: white;
       border: none;
     }
