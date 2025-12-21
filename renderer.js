@@ -501,12 +501,23 @@ function renderSnippetHistory() {
 let pendingSnippetCode = '';
 let pendingSnippetDefaultName = '';
 
-function showSaveSnippetDialog() {
+async function showSaveSnippetDialog() {
   console.log('showSaveSnippetDialog called');
   
   if (!monacoEditor) {
     showNotification('Editor not ready', 'error');
     return;
+  }
+  
+  // NEW: Check if user is Pro - snippets are a Pro feature
+  try {
+    const isPro = await window.electronAPI.featureLimits.isPro();
+    if (!isPro) {
+      showSnippetProPaywall();
+      return;
+    }
+  } catch (e) {
+    console.warn('Pro check failed:', e);
   }
   
   const code = monacoEditor.getValue();
@@ -664,6 +675,9 @@ async function checkLicenseOnStartup() {
     // Update any license status indicators in the UI
     updateLicenseStatusUI();
     
+    // Initialize Pro Timer (20-minute daily pass for free users)
+    initProTimer();
+    
   } catch (e) {
     console.error('Error checking license:', e);
   }
@@ -735,6 +749,678 @@ function hideLicenseModal() {
     modal.classList.add('hidden');
     modal.style.display = 'none';
   }
+}
+
+// =====================================================
+// Pro Feature Upgrade Modal
+// =====================================================
+
+// =====================================================
+// "Taste of Power" Quota-Based Paywall
+// =====================================================
+
+const QUOTA_INFO = {
+  typescriptExecutions: {
+    icon: '📘',
+    title: "You're a Power User!",
+    subtitle: "You've used your daily 15 TypeScript runs",
+    benefit: 'Upgrade to Pro for unlimited TypeScript execution',
+    color: '#3b82f6',
+  },
+  pythonExecutions: {
+    icon: '🐍',
+    title: 'Python Power User!',
+    subtitle: "You've used your daily 15 Python runs",
+    benefit: 'Upgrade to Pro for unlimited Python execution',
+    color: '#10b981',
+  },
+  sshSessions: {
+    icon: '🔐',
+    title: 'SSH Session Limit',
+    subtitle: "You've used your daily SSH session",
+    benefit: 'Upgrade to Pro for unlimited SSH connections',
+    color: '#8b5cf6',
+  },
+  sshSessionMinutes: {
+    icon: '⏱️',
+    title: 'Session Time Limit',
+    subtitle: 'Your 10-minute SSH session has ended',
+    benefit: 'Upgrade to Pro for unlimited session time',
+    color: '#f59e0b',
+  },
+  blueprints: {
+    icon: '📋',
+    title: 'Blueprint Limit',
+    subtitle: "You're using your 1 free blueprint",
+    benefit: 'Upgrade to Pro for unlimited blueprints',
+    color: '#8b5cf6',
+  },
+  timeTravelFull: {
+    icon: '⏱️',
+    title: 'See Full History',
+    subtitle: 'Free shows last 3 states',
+    benefit: 'Upgrade to Pro for complete variable history',
+    color: '#8b5cf6',
+  },
+  snippets: {
+    icon: '💾',
+    title: 'Snippet Limit Reached',
+    subtitle: "You've saved 5 snippets",
+    benefit: 'Upgrade to Pro for unlimited snippets',
+    color: '#8b5cf6',
+  },
+  collections: {
+    icon: '📁',
+    title: 'Collection Limit Reached',
+    subtitle: "You've created 3 collections",
+    benefit: 'Upgrade to Pro for unlimited collections',
+    color: '#8b5cf6',
+  },
+};
+
+// Legacy compatibility
+const PRO_FEATURE_INFO = {
+  ssh: { ...QUOTA_INFO.sshSessions, highlights: [] },
+  blueprints: { ...QUOTA_INFO.blueprints, highlights: [] },
+  timeTravel: { ...QUOTA_INFO.timeTravelFull, highlights: [] },
+  typescript: { ...QUOTA_INFO.typescriptExecutions, highlights: [] },
+  python: { ...QUOTA_INFO.pythonExecutions, highlights: [] },
+  snippets: { ...QUOTA_INFO.snippets, highlights: [] },
+  collections: { ...QUOTA_INFO.collections, highlights: [] },
+};
+
+/**
+ * Show glassmorphism quota paywall
+ * Beautiful, non-intrusive upgrade prompt
+ */
+async function showQuotaPaywall(quotaType, options = {}) {
+  const info = QUOTA_INFO[quotaType] || QUOTA_INFO.typescriptExecutions;
+  
+  // Get reset time
+  let resetDisplay = '';
+  try {
+    const summary = await window.electronAPI.usage.getSummary();
+    if (summary.resetTime) {
+      resetDisplay = `Resets in ${summary.resetTime.display}`;
+    }
+  } catch (e) {}
+  
+  // Remove existing modal if any
+  const existingModal = document.getElementById('quotaPaywall');
+  if (existingModal) existingModal.remove();
+  
+  const modal = document.createElement('div');
+  modal.id = 'quotaPaywall';
+  modal.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    animation: quotaFadeIn 0.3s ease;
+  `;
+  
+  modal.innerHTML = `
+    <div class="quota-card" style="
+      background: rgba(24, 24, 27, 0.95);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 20px;
+      width: 380px;
+      max-width: 90vw;
+      overflow: hidden;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(139, 92, 246, 0.1);
+      animation: quotaSlideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    ">
+      <!-- Icon & Title -->
+      <div style="padding: 32px 24px 20px; text-align: center;">
+        <div style="
+          font-size: 56px;
+          margin-bottom: 16px;
+          filter: drop-shadow(0 4px 8px rgba(0,0,0,0.3));
+        ">${info.icon}</div>
+        <h2 style="
+          font-size: 20px;
+          font-weight: 700;
+          color: white;
+          margin: 0 0 8px 0;
+          letter-spacing: -0.3px;
+        ">${info.title}</h2>
+        <p style="
+          font-size: 14px;
+          color: #a1a1aa;
+          margin: 0;
+          line-height: 1.5;
+        ">${info.subtitle}</p>
+        ${resetDisplay ? `<p style="font-size: 12px; color: #71717a; margin: 8px 0 0 0;">${resetDisplay}</p>` : ''}
+        <p style="font-size: 12px; margin: 8px 0 0 0;">
+          <a href="https://tafil.app/#pricing" target="_blank" style="color: #a78bfa; text-decoration: none; font-weight: 500;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">Get a license at tafil.app →</a>
+        </p>
+      </div>
+      
+      <!-- Upgrade Card -->
+      <div style="padding: 0 24px 24px;">
+        <div style="
+          background: linear-gradient(135deg, rgba(139, 92, 246, 0.2) 0%, rgba(99, 102, 241, 0.15) 100%);
+          border: 1px solid rgba(139, 92, 246, 0.3);
+          border-radius: 12px;
+          padding: 16px;
+          margin-bottom: 20px;
+        ">
+          <div style="display: flex; align-items: center; justify-content: space-between;">
+            <div>
+              <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
+                <span style="
+                  background: linear-gradient(135deg, #8b5cf6, #6366f1);
+                  color: white;
+                  font-size: 10px;
+                  font-weight: 700;
+                  padding: 3px 8px;
+                  border-radius: 4px;
+                  letter-spacing: 1px;
+                  text-transform: uppercase;
+                ">PRO</span>
+                <span style="color: #e4e4e7; font-size: 13px; font-weight: 600;">Code Without Limits</span>
+              </div>
+              <p style="color: #a1a1aa; font-size: 12px; margin: 0;">One-time • Forever yours</p>
+            </div>
+            <div style="text-align: right;">
+              <div style="font-size: 28px; font-weight: 800; color: white;">$29</div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Pro Benefits List -->
+        <div style="margin-bottom: 20px;">
+          <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px; color: #e4e4e7; font-size: 13px;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+            Unlimited TypeScript & Python runs
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px; color: #e4e4e7; font-size: 13px;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+            Unlimited SSH sessions
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px; color: #e4e4e7; font-size: 13px;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+            Full Time Travel history
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px; color: #e4e4e7; font-size: 13px;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+            Unlimited blueprints & snippets
+          </div>
+        </div>
+        
+        <!-- Buttons -->
+        <div style="display: flex; gap: 10px;">
+          <button id="quotaPaywallDismiss" style="
+            flex: 1;
+            padding: 12px 16px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            color: #a1a1aa;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+          ">Wait for Reset</button>
+          <button id="quotaPaywallUpgrade" style="
+            flex: 1.5;
+            padding: 12px 16px;
+            background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%);
+            border: none;
+            border-radius: 10px;
+            color: white;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+          ">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+            Upgrade Now
+          </button>
+        </div>
+      </div>
+    </div>
+    
+    <style>
+      @keyframes quotaFadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+      }
+      @keyframes quotaSlideUp {
+        from { opacity: 0; transform: translateY(30px) scale(0.95); }
+        to { opacity: 1; transform: translateY(0) scale(1); }
+      }
+      #quotaPaywallDismiss:hover {
+        background: rgba(255, 255, 255, 0.1);
+        color: #e4e4e7;
+      }
+      #quotaPaywallUpgrade:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 20px rgba(139, 92, 246, 0.4);
+      }
+    </style>
+  `;
+  
+  document.body.appendChild(modal);
+  
+  // Event handlers
+  document.getElementById('quotaPaywallDismiss').addEventListener('click', () => {
+    modal.remove();
+  });
+  
+  document.getElementById('quotaPaywallUpgrade').addEventListener('click', () => {
+    modal.remove();
+    showLicenseModal(false);
+  });
+  
+  // Close on backdrop click
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) {
+      modal.remove();
+    }
+  });
+  
+  // Close on Escape
+  const handleEscape = (e) => {
+    if (e.key === 'Escape') {
+      modal.remove();
+      document.removeEventListener('keydown', handleEscape);
+    }
+  };
+  document.addEventListener('keydown', handleEscape);
+}
+
+// Alias for compatibility
+function showProFeatureModal(featureKey) {
+  const quotaMap = {
+    ssh: 'sshSessions',
+    blueprints: 'blueprints',
+    timeTravel: 'timeTravelFull',
+    typescript: 'typescriptExecutions',
+    python: 'pythonExecutions',
+    snippets: 'snippets',
+    collections: 'collections',
+  };
+  showQuotaPaywall(quotaMap[featureKey] || featureKey);
+}
+
+/**
+ * Show Snippet Pro Paywall - beautiful modal for "Free-to-Run, Pay-to-Save" model
+ */
+function showSnippetProPaywall() {
+  // Remove existing modal if any
+  const existingModal = document.getElementById('snippetProPaywall');
+  if (existingModal) existingModal.remove();
+  
+  const modal = document.createElement('div');
+  modal.id = 'snippetProPaywall';
+  modal.style.cssText = `
+    position: fixed; inset: 0; z-index: 10000;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(0, 0, 0, 0.7); backdrop-filter: blur(8px);
+  `;
+  
+  modal.innerHTML = `
+    <div style="
+      background: linear-gradient(135deg, #1a1a1f 0%, #0f0f12 100%);
+      border: 1px solid rgba(139, 92, 246, 0.3);
+      border-radius: 16px; padding: 32px; max-width: 420px; width: 90%;
+      box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5), 0 0 100px rgba(139, 92, 246, 0.1);
+      animation: modalSlideIn 0.3s ease-out;
+    ">
+      <div style="text-align: center;">
+        <div style="
+          width: 64px; height: 64px; margin: 0 auto 20px;
+          background: linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(236, 72, 153, 0.2));
+          border-radius: 16px; display: flex; align-items: center; justify-content: center;
+          font-size: 32px;
+        ">💾</div>
+        
+        <h3 style="margin: 0 0 8px; font-size: 20px; font-weight: 600; color: #f4f4f5;">
+          Snippets are a Pro Feature
+        </h3>
+        
+        <p style="margin: 0 0 24px; color: #a1a1aa; font-size: 14px; line-height: 1.6;">
+          You're using TAFIL like a pro! Save your code snippets forever with a one-time Pro license.
+        </p>
+        
+        <div style="
+          background: rgba(139, 92, 246, 0.1); border: 1px solid rgba(139, 92, 246, 0.2);
+          border-radius: 12px; padding: 16px; margin-bottom: 24px; text-align: left;
+        ">
+          <div style="color: #e4e4e7; font-size: 13px; font-weight: 500; margin-bottom: 12px;">
+            ✨ What you get with Pro:
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 8px; color: #a1a1aa; font-size: 12px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="color: #22c55e;">✓</span> Unlimited snippet saving
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="color: #22c55e;">✓</span> Unlimited SSH terminal sessions
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="color: #22c55e;">✓</span> Unlimited Blueprint modules
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="color: #22c55e;">✓</span> Full Time Travel history
+            </div>
+          </div>
+        </div>
+        
+        <div style="display: flex; gap: 12px;">
+          <button id="snippetPaywallClose" style="
+            flex: 1; padding: 12px 20px; border-radius: 8px;
+            background: transparent; border: 1px solid rgba(255, 255, 255, 0.1);
+            color: #a1a1aa; font-size: 14px; font-weight: 500; cursor: pointer;
+            transition: all 0.2s;
+          " onmouseover="this.style.background='rgba(255,255,255,0.05)'"
+             onmouseout="this.style.background='transparent'">
+            Keep Coding
+          </button>
+          <button id="snippetPaywallUpgrade" style="
+            flex: 1; padding: 12px 20px; border-radius: 8px;
+            background: linear-gradient(135deg, #8b5cf6, #a855f7);
+            border: none; color: white; font-size: 14px; font-weight: 600;
+            cursor: pointer; transition: all 0.2s;
+          " onmouseover="this.style.transform='translateY(-1px)';this.style.boxShadow='0 4px 20px rgba(139, 92, 246, 0.4)'"
+             onmouseout="this.style.transform='none';this.style.boxShadow='none'">
+            Upgrade to Pro
+          </button>
+        </div>
+        
+        <p style="margin: 16px 0 0; color: #52525b; font-size: 11px;">
+          Your code is safe! Keep experimenting, save when you're Pro.
+        </p>
+      </div>
+    </div>
+  `;
+  
+  document.body.appendChild(modal);
+  
+  // Event handlers
+  document.getElementById('snippetPaywallClose').onclick = () => modal.remove();
+  document.getElementById('snippetPaywallUpgrade').onclick = () => {
+    modal.remove();
+    showLicenseModal(false);
+  };
+  modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+}
+
+// =====================================================
+// PRO TIMER CONTROLLER (20-Minute Daily Pass)
+// =====================================================
+
+let proTimerInterval = null;
+let isProTimerActive = false;
+let isViewOnlyMode = false;
+let viewOnlyOverlayDismissed = false; // Track if user dismissed the overlay
+
+/**
+ * Initialize Pro Timer UI
+ */
+async function initProTimer() {
+  const timerStatus = document.getElementById('proTimerStatus');
+  const timerDisplay = document.getElementById('proTimerDisplay');
+  const viewOnlyOverlay = document.getElementById('viewOnlyOverlay');
+  const viewOnlyDismiss = document.getElementById('viewOnlyDismiss');
+  const viewOnlyUpgrade = document.getElementById('viewOnlyUpgrade');
+  
+  if (!timerStatus || !timerDisplay) return;
+  
+  // Check if Pro user (hide timer for Pro)
+  try {
+    const isPro = await window.electronAPI.featureLimits.isPro();
+    if (isPro) {
+      timerStatus.style.display = 'none';
+      // Hide Pro badges on buttons
+      document.querySelectorAll('.pro-badge-mini').forEach(badge => {
+        badge.style.display = 'none';
+      });
+      return;
+    }
+  } catch (e) {}
+  
+  // Get initial status
+  await updateProTimerDisplay();
+  
+  // Setup view-only overlay handlers
+  if (viewOnlyDismiss) {
+    viewOnlyDismiss.addEventListener('click', () => {
+      viewOnlyOverlayDismissed = true; // Mark as dismissed so it won't show again
+      hideViewOnlyOverlay();
+      enableViewOnlyMode();
+    });
+  }
+  
+  if (viewOnlyUpgrade) {
+    viewOnlyUpgrade.addEventListener('click', () => {
+      hideViewOnlyOverlay();
+      showLicenseModal(false);
+    });
+  }
+  
+  // Timer click shows status
+  timerStatus.addEventListener('click', async () => {
+    const status = await window.electronAPI.proTimer.getStatus();
+    if (status.isExpired) {
+      showViewOnlyOverlay();
+    } else {
+      showNotification(`Pro Trial: ${status.display} remaining today`, 'info');
+    }
+  });
+}
+
+/**
+ * Check if user is in a Pro feature section (SSH or Blueprints)
+ */
+function isInProFeatureSection() {
+  // Check if in SSH section
+  if (activeModule === 'ssh') return true;
+  
+  // Check if Blueprint panel is open
+  const blueprintModal = document.getElementById('blueprintModal');
+  if (blueprintModal && !blueprintModal.classList.contains('hidden')) return true;
+  
+  return false;
+}
+
+/**
+ * Update Pro Timer display
+ */
+async function updateProTimerDisplay() {
+  const timerStatus = document.getElementById('proTimerStatus');
+  const timerDisplay = document.getElementById('proTimerDisplay');
+  
+  if (!timerStatus || !timerDisplay) return;
+  
+  try {
+    const status = await window.electronAPI.proTimer.getStatus();
+    
+    if (status.isPro || status.unlimited) {
+      timerStatus.style.display = 'none';
+      return;
+    }
+    
+    // NEW: Only show timer when in Pro feature sections (SSH or Blueprints)
+    // Hide timer when user is in Projects or Playground (free sections)
+    if (!isInProFeatureSection()) {
+      timerStatus.style.display = 'none';
+      return;
+    }
+    
+    // Show timer for free users using Pro features
+    if (isProTimerActive || status.secondsUsed > 0) {
+      timerStatus.style.display = 'flex';
+      timerDisplay.textContent = status.display;
+      
+      // Color based on remaining time
+      if (status.secondsRemaining <= 60) {
+        timerStatus.style.borderColor = 'rgba(239, 68, 68, 0.3)';
+        timerStatus.style.background = 'rgba(239, 68, 68, 0.1)';
+        timerStatus.style.color = '#f87171';
+      } else if (status.secondsRemaining <= 300) {
+        timerStatus.style.borderColor = 'rgba(245, 158, 11, 0.3)';
+        timerStatus.style.background = 'rgba(245, 158, 11, 0.1)';
+        timerStatus.style.color = '#fbbf24';
+      } else {
+        timerStatus.style.borderColor = 'rgba(139, 92, 246, 0.2)';
+        timerStatus.style.background = 'rgba(139, 92, 246, 0.1)';
+        timerStatus.style.color = '#a78bfa';
+      }
+      
+      // Check if expired
+      if (status.isExpired) {
+        showViewOnlyOverlay();
+      } else if (viewOnlyOverlayDismissed && !status.isExpired) {
+        // Timer reset (new day) - reset the dismissed flag and view-only mode
+        viewOnlyOverlayDismissed = false;
+        if (isViewOnlyMode) {
+          disableViewOnlyMode();
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('Pro timer update failed:', e);
+  }
+}
+
+/**
+ * Start Pro Timer when using Pro features
+ */
+async function startProTimer() {
+  try {
+    const isPro = await window.electronAPI.featureLimits.isPro();
+    if (isPro) return true;
+    
+    // Check if can use Pro features
+    const canUse = await window.electronAPI.proTimer.canUse();
+    if (!canUse.allowed) {
+      showViewOnlyOverlay();
+      return false;
+    }
+    
+    // Start the timer
+    await window.electronAPI.proTimer.start();
+    isProTimerActive = true;
+    
+    // Update display every second
+    if (!proTimerInterval) {
+      proTimerInterval = setInterval(updateProTimerDisplay, 1000);
+    }
+    
+    // Show timer status
+    const timerStatus = document.getElementById('proTimerStatus');
+    if (timerStatus) timerStatus.style.display = 'flex';
+    
+    return true;
+  } catch (e) {
+    console.warn('Start pro timer failed:', e);
+    return true; // Fail open
+  }
+}
+
+/**
+ * Stop Pro Timer when leaving Pro features
+ */
+async function stopProTimer() {
+  try {
+    await window.electronAPI.proTimer.stop();
+    isProTimerActive = false;
+    
+    if (proTimerInterval) {
+      clearInterval(proTimerInterval);
+      proTimerInterval = null;
+    }
+  } catch (e) {}
+}
+
+/**
+ * Show View-Only Overlay
+ */
+async function showViewOnlyOverlay() {
+  // Don't show if user already dismissed and is in view-only mode
+  if (viewOnlyOverlayDismissed && isViewOnlyMode) {
+    return;
+  }
+  
+  const overlay = document.getElementById('viewOnlyOverlay');
+  const resetTimeEl = document.getElementById('viewOnlyResetTime');
+  
+  if (!overlay) return;
+  
+  try {
+    const status = await window.electronAPI.proTimer.getStatus();
+    if (resetTimeEl && status.resetTime) {
+      resetTimeEl.textContent = `Resets in ${status.resetTime.display}`;
+    }
+  } catch (e) {}
+  
+  overlay.style.display = 'flex';
+}
+
+/**
+ * Hide View-Only Overlay
+ */
+function hideViewOnlyOverlay() {
+  const overlay = document.getElementById('viewOnlyOverlay');
+  if (overlay) overlay.style.display = 'none';
+}
+
+/**
+ * Enable View-Only Mode (disable editing)
+ */
+function enableViewOnlyMode() {
+  isViewOnlyMode = true;
+  
+  // Make Monaco editors read-only
+  if (monacoEditor) {
+    monacoEditor.updateOptions({ readOnly: true });
+  }
+  if (typeof blueprintCodeMonacoEditor !== 'undefined' && blueprintCodeMonacoEditor) {
+    blueprintCodeMonacoEditor.updateOptions({ readOnly: true });
+  }
+  
+  // Disable run buttons
+  const runButtons = document.querySelectorAll('#runCodeBtn, #runEditorBtn');
+  runButtons.forEach(btn => {
+    if (btn) btn.disabled = true;
+  });
+  
+  // Show view-only indicator
+  showNotification('View-Only Mode: Your work is safe. Upgrade to continue editing.', 'warning');
+}
+
+/**
+ * Disable View-Only Mode (re-enable editing)
+ */
+function disableViewOnlyMode() {
+  isViewOnlyMode = false;
+  
+  // Make Monaco editors editable
+  if (monacoEditor) {
+    monacoEditor.updateOptions({ readOnly: false });
+  }
+  if (typeof blueprintCodeMonacoEditor !== 'undefined' && blueprintCodeMonacoEditor) {
+    blueprintCodeMonacoEditor.updateOptions({ readOnly: false });
+  }
+  
+  // Enable run buttons
+  const runButtons = document.querySelectorAll('#runCodeBtn, #runEditorBtn');
+  runButtons.forEach(btn => {
+    if (btn) btn.disabled = false;
+  });
 }
 
 // Show license status message
@@ -857,12 +1543,80 @@ async function deactivateLicense() {
 }
 
 // Update license status UI elements
-function updateLicenseStatusUI() {
-  // Add license indicator to settings or sidebar
-  const settingsBtn = document.getElementById('settingsBtn');
-  if (settingsBtn && licenseStatus.status !== 'active') {
-    // Could add a visual indicator here
+async function updateLicenseStatusUI() {
+  try {
+    const isPro = await window.electronAPI.featureLimits.isPro();
+    
+    // Update SSH Pro badge (show for free users - SSH has 20-min limit)
+    const sshProBadge = document.getElementById('sshProBadge');
+    if (sshProBadge) {
+      sshProBadge.style.display = isPro ? 'none' : 'inline-block';
+    }
+    
+    // Playground is FREE for all - never show Pro badge
+    // "Free-to-Run, Pay-to-Save" model: Execution is free, snippets require Pro
+    const playgroundProBadge = document.getElementById('playgroundProBadge');
+    if (playgroundProBadge) {
+      playgroundProBadge.style.display = 'none'; // Always hidden - playground is free!
+    }
+    
+    // Save Snippet Pro badge (show for free users - saving is the gate!)
+    const saveSnippetProBadge = document.getElementById('saveSnippetProBadge');
+    if (saveSnippetProBadge) {
+      saveSnippetProBadge.style.display = isPro ? 'none' : 'inline-block';
+    }
+    
+    // Update Upgrade button visibility
+    const upgradeBtn = document.getElementById('upgradeBtn');
+    if (upgradeBtn) {
+      upgradeBtn.style.display = isPro ? 'none' : 'flex';
+    }
+    
+    // Update tier badge
+    updateTierBadge();
+    
+    // Update language selectors to show quota info
+    updateLanguageSelectorsForTier(isPro);
+    
+    // If free, show usage summary in sidebar
+    if (!isPro) {
+      updateUsageSummaryUI();
+    }
+    
+  } catch (e) {
+    console.warn('Could not update license UI:', e);
   }
+}
+
+// Update usage summary display
+async function updateUsageSummaryUI() {
+  try {
+    const summary = await window.electronAPI.usage.getSummary();
+    
+    // Could add a usage indicator somewhere in the sidebar
+    // For now, the quota is shown when users hit limits
+    
+  } catch (e) {
+    // Silent fail
+  }
+}
+
+// Update language selectors based on tier
+// NEW: All languages are FREE to run - no restrictions
+function updateLanguageSelectorsForTier(isPro) {
+  const playgroundLangSelect = document.getElementById('playgroundLanguageSelect');
+  const blueprintLangSelect = document.getElementById('blueprintLanguageSelect');
+  
+  [playgroundLangSelect, blueprintLangSelect].forEach(select => {
+    if (!select) return;
+    
+    // All languages are free now - remove any lock icons
+    const options = select.querySelectorAll('option');
+    options.forEach(option => {
+      option.textContent = option.textContent.replace(' 🔒', '');
+      option.disabled = false;
+    });
+  });
 }
 
 // Initialize license modal
@@ -1302,10 +2056,22 @@ function applyInlineResults(inlineResults, version) {
       border: none;
     `;
     
-    // Time Travel: Click to show history popover
+    // Time Travel: Click to show history popover (Pro feature)
     if (hasHistory) {
-      node.addEventListener('click', (e) => {
+      node.addEventListener('click', async (e) => {
         e.stopPropagation();
+        
+        // Check Pro access for Time Travel
+        try {
+          const canUse = await window.electronAPI.featureLimits.canUseTimeTravel();
+          if (!canUse.allowed) {
+            showProFeatureModal('timeTravel');
+            return;
+          }
+        } catch (err) {
+          // Fail open
+        }
+        
         showValueHistoryPopover(node, item.history, line);
       });
       node.addEventListener('mouseenter', () => {
@@ -1509,6 +2275,14 @@ document.addEventListener("DOMContentLoaded", async () => {
   
   // Event listeners - Settings
   if (settingsBtn) settingsBtn.addEventListener("click", showSettingsModal);
+  
+  // Upgrade button in sidebar
+  const upgradeBtn = document.getElementById('upgradeBtn');
+  if (upgradeBtn) {
+    upgradeBtn.addEventListener('click', () => {
+      showLicenseModal(false);
+    });
+  }
   if (closeSettingsBtn) closeSettingsBtn.addEventListener("click", hideSettingsModal);
   if (cancelSettingsBtn) cancelSettingsBtn.addEventListener("click", hideSettingsModal);
   if (saveSettingsBtn) saveSettingsBtn.addEventListener("click", saveSettings);
@@ -2179,8 +2953,21 @@ function renderCollections() {
   });
 }
 
-function showNewCollectionModal() {
+async function showNewCollectionModal() {
   console.log('showNewCollectionModal called');
+  
+  // Check collection limit
+  try {
+    const userCollections = collections.filter(c => !c.isSystem);
+    const limitCheck = await window.electronAPI.featureLimits.canCreateCollection(userCollections.length);
+    if (!limitCheck.allowed) {
+      showProFeatureModal('collections');
+      return;
+    }
+  } catch (e) {
+    console.warn('Could not check collection limit:', e);
+  }
+  
   if (newCollectionModal) {
     newCollectionModal.classList.remove('hidden');
     if (newCollectionInput) {
@@ -4273,9 +5060,10 @@ async function populateCardContent(card, project) {
       <button class="action-btn insights-button" style="background: ${btnBg}; color: ${btnColor};" title="View insights">
         ${Icons.chart}
       </button>
-      <button class="blueprint-btn blueprints-button" title="Open Blueprints">
+      <button class="blueprint-btn blueprints-button" title="Open Blueprints" style="position: relative;">
         <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="7.5 4.21 12 6.81 16.5 4.21"/><polyline points="7.5 19.79 7.5 14.6 3 12"/><polyline points="21 12 16.5 14.6 16.5 19.79"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
         Blueprints
+        <span class="pro-badge-mini" style="position: absolute; top: -4px; right: -4px; background: linear-gradient(135deg, #8b5cf6, #6366f1); color: white; font-size: 7px; font-weight: 700; padding: 1px 4px; border-radius: 3px; letter-spacing: 0.3px;">PRO</span>
       </button>
       ${dependenciesInstalled 
         ? `<button class="action-btn remove-modules-button" style="background: ${btnBg}; color: ${btnColor};" title="Remove node_modules">
@@ -4348,12 +5136,7 @@ async function attemptRunProject(projectPath) {
 }
 
 async function runProjectWithPort(projectPath, customPort = null) {
-  // License check for running projects
-  const allowed = await checkLicenseForAction('project.run');
-  if (!allowed) {
-    return;
-  }
-  
+  // Projects always run for free - no license check needed
   setCardStatus(projectPath, customPort ? `Starting on :${customPort}...` : 'Starting...', 'info');
   updateSingleCard(projectPath);
   
@@ -4802,7 +5585,9 @@ function initModuleTabs() {
   }
 }
 
-function switchModule(moduleName) {
+async function switchModule(moduleName) {
+  // SSH is accessible to everyone - quota checked when connecting
+  
   activeModule = moduleName;
   localStorage.setItem('activeModule', moduleName);
 
@@ -4840,6 +5625,9 @@ function switchModule(moduleName) {
       monacoEditor.layout();
     }, 100);
   }
+  
+  // Update Pro Timer visibility based on current section
+  updateProTimerDisplay();
 }
 
 // =====================================================
@@ -5139,8 +5927,18 @@ console.log('Ready to code!')
       playgroundLanguage.value = currentPlaygroundLanguage;
       updateMonacoLanguage(monacoEditor, currentPlaygroundLanguage);
       
-      playgroundLanguage.addEventListener('change', (e) => {
-        currentPlaygroundLanguage = e.target.value;
+      playgroundLanguage.addEventListener('change', async (e) => {
+        const newLang = e.target.value;
+        
+        // Show quota status for TypeScript/Python (but allow selection)
+        if (newLang === 'typescript' || newLang === 'python') {
+          const quotaStatus = await window.electronAPI.featureLimits.getLanguageQuotaStatus(newLang);
+          if (!quotaStatus.unlimited && quotaStatus.remaining > 0) {
+            showNotification(`${quotaStatus.display} ${newLang === 'typescript' ? 'TypeScript' : 'Python'} runs remaining today`, 'info');
+          }
+        }
+        
+        currentPlaygroundLanguage = newLang;
         localStorage.setItem('playgroundLanguage', currentPlaygroundLanguage);
         updateMonacoLanguage(monacoEditor, currentPlaygroundLanguage);
         showNotification(`Switched to ${getLanguageDisplayName(currentPlaygroundLanguage)}`, 'info');
@@ -5630,12 +6428,6 @@ function initBlueprintResizer() {
 async function runCode() {
   if (!monacoEditor || !codeOutput) return Promise.resolve();
   
-  // License check for playground (silent - don't block auto-run)
-  // This check is intentionally lightweight for auto-run scenarios
-  if (licenseStatus.needsActivation) {
-    // Still allow execution but could limit features in the future
-  }
-  
   // Prevent concurrent executions
   if (isExecuting) {
     return Promise.resolve();
@@ -5647,6 +6439,9 @@ async function runCode() {
     return Promise.resolve();
   }
   lastRunTime = now;
+  
+  // NEW: All languages run for FREE - no time limits
+  // Pro Timer is only for SSH and Blueprints now
   
   // Increment execution version to track this run
   const thisVersion = ++executionVersion;
@@ -6148,6 +6943,12 @@ async function connectSSHHost(host) {
       renderActiveSessionsSidebar(); // Update sidebar to show active state
       showNotification(`Switched to ${host.name}`, 'info');
       return;
+    }
+
+    // Start Pro Timer for SSH (Pro feature with time limit)
+    const canUse = await startProTimer();
+    if (!canUse) {
+      return; // Time expired
     }
 
     showNotification(`Connecting to ${host.name}...`, 'info');
@@ -7176,6 +7977,20 @@ async function ensureBlueprintCodeMonacoEditor() {
 async function openBlueprints(projectPath) {
   if (!projectPath) return;
   
+  // Check if Pro user or can use Pro features
+  let isReadOnlyMode = false;
+  const isPro = await window.electronAPI.featureLimits.isPro();
+  
+  if (!isPro) {
+    // Try to start Pro Timer - if can't, open in read-only mode
+    const canUse = await startProTimer();
+    if (!canUse) {
+      // Time expired - open in READ-ONLY mode instead of blocking
+      isReadOnlyMode = true;
+      showNotification('📖 Opening in View-Only mode. Upgrade to Pro to edit.', 'info');
+    }
+  }
+  
   blueprintProjectPath = projectPath;
   
   try {
@@ -7220,12 +8035,121 @@ async function openBlueprints(projectPath) {
     selectedModule = null;
     showModuleEmptyState();
     
-    console.log('📦 Blueprints opened for:', projectName);
+    // Apply read-only mode if time expired
+    if (isReadOnlyMode) {
+      setBlueprintReadOnlyMode(true);
+    } else {
+      setBlueprintReadOnlyMode(false);
+    }
+    
+    console.log('📦 Blueprints opened for:', projectName, isReadOnlyMode ? '(read-only)' : '');
     
   } catch (err) {
     console.error('Error opening blueprints:', err);
     showNotification('Failed to load blueprints', 'error');
   }
+}
+
+// Track blueprint read-only state
+let isBlueprintReadOnly = false;
+
+/**
+ * Set Blueprint read-only mode
+ * In read-only mode: can view everything, but cannot edit or create
+ */
+function setBlueprintReadOnlyMode(readOnly) {
+  isBlueprintReadOnly = readOnly;
+  
+  // Make Monaco editors read-only
+  if (typeof blueprintCodeMonacoEditor !== 'undefined' && blueprintCodeMonacoEditor) {
+    blueprintCodeMonacoEditor.updateOptions({ readOnly: readOnly });
+  }
+  if (typeof blueprintGoalMonacoEditor !== 'undefined' && blueprintGoalMonacoEditor) {
+    blueprintGoalMonacoEditor.updateOptions({ readOnly: readOnly });
+  }
+  
+  // Disable/enable "Add Module" button
+  const addModuleBtn = document.getElementById('addModuleBtn');
+  if (addModuleBtn) {
+    addModuleBtn.disabled = readOnly;
+    addModuleBtn.style.opacity = readOnly ? '0.5' : '1';
+    addModuleBtn.style.cursor = readOnly ? 'not-allowed' : 'pointer';
+    addModuleBtn.title = readOnly ? 'Upgrade to Pro to add modules' : 'Add Module';
+  }
+  
+  // Disable/enable "Create First Module" button
+  const createFirstModuleBtn = document.getElementById('createFirstModuleBtn');
+  if (createFirstModuleBtn) {
+    createFirstModuleBtn.disabled = readOnly;
+    createFirstModuleBtn.style.opacity = readOnly ? '0.5' : '1';
+  }
+  
+  // Disable/enable delete module button
+  const deleteModuleBtn = document.getElementById('deleteModuleBtn');
+  if (deleteModuleBtn) {
+    deleteModuleBtn.disabled = readOnly;
+    deleteModuleBtn.style.opacity = readOnly ? '0.5' : '1';
+  }
+  
+  // Disable/enable task add button
+  const addTaskBtn = document.getElementById('addTaskBtn');
+  if (addTaskBtn) {
+    addTaskBtn.disabled = readOnly;
+    addTaskBtn.style.opacity = readOnly ? '0.5' : '1';
+  }
+  
+  // Disable/enable resource add buttons
+  const addLinkBtn = document.getElementById('addLinkBtn');
+  const addFileRefBtn = document.getElementById('addFileRefBtn');
+  if (addLinkBtn) {
+    addLinkBtn.disabled = readOnly;
+    addLinkBtn.style.opacity = readOnly ? '0.5' : '1';
+  }
+  if (addFileRefBtn) {
+    addFileRefBtn.disabled = readOnly;
+    addFileRefBtn.style.opacity = readOnly ? '0.5' : '1';
+  }
+  
+  // Send read-only state to Excalidraw iframe
+  const excalidrawFrame = document.getElementById('excalidrawFrame');
+  if (excalidrawFrame && excalidrawFrame.contentWindow) {
+    excalidrawFrame.contentWindow.postMessage({
+      type: 'setReadOnly',
+      readOnly: readOnly
+    }, '*');
+  }
+  
+  // Show/hide read-only indicator
+  let readOnlyIndicator = document.getElementById('blueprintReadOnlyIndicator');
+  if (readOnly) {
+    if (!readOnlyIndicator) {
+      readOnlyIndicator = document.createElement('div');
+      readOnlyIndicator.id = 'blueprintReadOnlyIndicator';
+      readOnlyIndicator.style.cssText = `
+        position: absolute; top: 8px; right: 60px; z-index: 100;
+        background: rgba(245, 158, 11, 0.2); border: 1px solid rgba(245, 158, 11, 0.4);
+        color: #fbbf24; font-size: 11px; font-weight: 500;
+        padding: 4px 10px; border-radius: 6px;
+        display: flex; align-items: center; gap: 6px;
+      `;
+      readOnlyIndicator.innerHTML = `
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/>
+        </svg>
+        View Only
+      `;
+      const modalContent = document.querySelector('#blueprintModal .modal-content');
+      if (modalContent) {
+        modalContent.style.position = 'relative';
+        modalContent.appendChild(readOnlyIndicator);
+      }
+    }
+    readOnlyIndicator.style.display = 'flex';
+  } else if (readOnlyIndicator) {
+    readOnlyIndicator.style.display = 'none';
+  }
+  
+  console.log('📦 Blueprint read-only mode:', readOnly);
 }
 
 function closeBlueprints() {
@@ -7242,6 +8166,13 @@ function closeBlueprints() {
   selectedModule = null;
   currentBlueprintView = 'goal';
   excalidrawReady = false;
+  isBlueprintReadOnly = false;
+  
+  // Stop Pro Timer when closing Blueprints
+  stopProTimer();
+  
+  // Update Pro Timer visibility
+  updateProTimerDisplay();
   
   console.log('📦 Blueprints closed');
 }
@@ -8593,11 +9524,22 @@ function toggleCanvasFullscreen() {
         canvasViewEl.offsetHeight; // Force reflow
         canvasViewEl.style.display = '';
       }
-      // Reinitialize canvas if needed
-      if (currentBlueprintView === 'canvas') {
-        loadCanvasContent();
-      }
+      // Refresh Excalidraw after resize
+      refreshExcalidraw();
     }, 50);
+  }
+  
+  // Always refresh Excalidraw after fullscreen toggle
+  setTimeout(refreshExcalidraw, 100);
+}
+
+/**
+ * Refresh Excalidraw canvas after resize
+ */
+function refreshExcalidraw() {
+  const excalidrawFrame = document.getElementById('excalidrawFrame');
+  if (excalidrawFrame && excalidrawFrame.contentWindow) {
+    excalidrawFrame.contentWindow.postMessage({ type: 'refresh' }, '*');
   }
 }
 
@@ -8815,8 +9757,22 @@ async function removeResourceItem(resourceId, type) {
 // Module CRUD
 // =====================================================
 
-function showAddModuleModal() {
+async function showAddModuleModal() {
   if (!addModuleModal) return;
+  
+  // Check module limit for free users (1 module per blueprint)
+  try {
+    const isPro = await window.electronAPI.featureLimits.isPro();
+    if (!isPro) {
+      const currentModuleCount = blueprintData?.modules?.length || 0;
+      if (currentModuleCount >= 1) {
+        showModuleLimitModal();
+        return;
+      }
+    }
+  } catch (e) {
+    // Fail open
+  }
   
   // Reset form
   if (newModuleTitle) newModuleTitle.value = '';
@@ -8834,6 +9790,121 @@ function showAddModuleModal() {
   
   addModuleModal.classList.remove('hidden');
   if (newModuleTitle) newModuleTitle.focus();
+}
+
+/**
+ * Show module limit reached modal
+ */
+function showModuleLimitModal() {
+  // Remove existing if any
+  const existing = document.getElementById('moduleLimitModal');
+  if (existing) existing.remove();
+  
+  const modal = document.createElement('div');
+  modal.id = 'moduleLimitModal';
+  modal.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(8px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    animation: fadeIn 0.2s ease;
+  `;
+  
+  modal.innerHTML = `
+    <div style="
+      background: rgba(24, 24, 27, 0.95);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 16px;
+      padding: 28px;
+      max-width: 380px;
+      text-align: center;
+      box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5);
+    ">
+      <div style="font-size: 48px; margin-bottom: 12px;">📦</div>
+      <h2 style="font-size: 18px; font-weight: 700; color: white; margin: 0 0 8px 0;">
+        1 Module per Blueprint
+      </h2>
+      <p style="font-size: 13px; color: #a1a1aa; margin: 0 0 12px 0; line-height: 1.5;">
+        Free tier supports 1 Blueprint module per project.<br>
+        Upgrade to Pro for unlimited multi-module workflows.
+      </p>
+      <p style="font-size: 12px; margin: 0 0 20px 0;">
+        <a href="https://tafil.app/#pricing" target="_blank" style="color: #a78bfa; text-decoration: none; font-weight: 500;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">Get a license at tafil.app →</a>
+      </p>
+      
+      <div style="
+        background: rgba(139, 92, 246, 0.1);
+        border: 1px solid rgba(139, 92, 246, 0.2);
+        border-radius: 10px;
+        padding: 12px;
+        margin-bottom: 16px;
+        text-align: left;
+      ">
+        <div style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: #e4e4e7; margin-bottom: 6px;">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+          Unlimited Kanban boards
+        </div>
+        <div style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: #e4e4e7; margin-bottom: 6px;">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+          Excalidraw diagrams
+        </div>
+        <div style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: #e4e4e7;">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+          Notes & documentation
+        </div>
+      </div>
+      
+      <div style="display: flex; gap: 8px;">
+        <button id="moduleLimitDismiss" style="
+          flex: 1;
+          padding: 10px;
+          background: rgba(255, 255, 255, 0.05);
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          border-radius: 8px;
+          color: #a1a1aa;
+          font-size: 13px;
+          cursor: pointer;
+        ">Keep 1 Module</button>
+        <button id="moduleLimitUpgrade" style="
+          flex: 1.5;
+          padding: 10px;
+          background: linear-gradient(135deg, #8b5cf6, #6366f1);
+          border: none;
+          border-radius: 8px;
+          color: white;
+          font-size: 13px;
+          font-weight: 600;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 4px;
+        ">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+          Upgrade to Pro
+        </button>
+      </div>
+    </div>
+  `;
+  
+  document.body.appendChild(modal);
+  
+  document.getElementById('moduleLimitDismiss').addEventListener('click', () => modal.remove());
+  document.getElementById('moduleLimitUpgrade').addEventListener('click', () => {
+    modal.remove();
+    showLicenseModal(false);
+  });
+  
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) modal.remove();
+  });
 }
 
 function hideAddModuleModal() {
@@ -9224,6 +10295,17 @@ function initBlueprintListeners() {
     addModuleBtn.addEventListener('click', showAddModuleModal);
   }
   
+  // Add ResizeObserver for Excalidraw container
+  const excalidrawContainer = document.getElementById('excalidrawContainer');
+  if (excalidrawContainer && typeof ResizeObserver !== 'undefined') {
+    const resizeObserver = new ResizeObserver(() => {
+      // Debounce the refresh
+      clearTimeout(window._excalidrawResizeTimeout);
+      window._excalidrawResizeTimeout = setTimeout(refreshExcalidraw, 100);
+    });
+    resizeObserver.observe(excalidrawContainer);
+  }
+  
   // Create first module button
   if (createFirstModuleBtn) {
     createFirstModuleBtn.addEventListener('click', showAddModuleModal);
@@ -9330,8 +10412,27 @@ function initBlueprintListeners() {
     // Restore saved language
     blueprintLanguage.value = currentBlueprintLanguage;
     
-    blueprintLanguage.addEventListener('change', (e) => {
-      currentBlueprintLanguage = e.target.value;
+    blueprintLanguage.addEventListener('change', async (e) => {
+      const newLang = e.target.value;
+      
+      // Check Pro access for TypeScript and Python
+      if (newLang === 'typescript') {
+        const canUse = await window.electronAPI.featureLimits.canExecuteTypeScript();
+        if (!canUse.allowed) {
+          showProFeatureModal('typescript');
+          blueprintLanguage.value = currentBlueprintLanguage; // Revert
+          return;
+        }
+      } else if (newLang === 'python') {
+        const canUse = await window.electronAPI.featureLimits.canExecutePython();
+        if (!canUse.allowed) {
+          showProFeatureModal('python');
+          blueprintLanguage.value = currentBlueprintLanguage; // Revert
+          return;
+        }
+      }
+      
+      currentBlueprintLanguage = newLang;
       localStorage.setItem('blueprintLanguage', currentBlueprintLanguage);
       
       // Update Monaco language if available
@@ -10109,12 +11210,7 @@ async function handleWizardNext() {
 }
 
 async function createNewProject() {
-  // License check for project creation
-  const allowed = await checkLicenseForAction('project.create');
-  if (!allowed) {
-    return;
-  }
-  
+  // Projects are always free - no license check needed
   if (creationLog) creationLog.innerHTML = '';
   
   const logMessage = (msg, type = 'info') => {
@@ -10426,19 +11522,7 @@ function showProjectLimitModal(currentCount) {
  * Show snippet limit reached modal
  */
 function showSnippetLimitModal(currentCount) {
-  showUpgradeModal({
-    title: "💾 Nice library! You've saved 10 snippets.",
-    message: "You're building something useful.",
-    action: "Free includes 10 snippets. Pro lets you save unlimited snippets — build your personal code library.",
-    showBenefits: true,
-    showPrice: true,
-    softAction: 'delete',
-    softActionLabel: 'Delete an old snippet',
-    primaryLabel: 'See Pro',
-    onSoftAction: () => {
-      showNotification('Tip: Delete old snippets to make room for new ones.', 'info');
-    },
-  });
+  showProFeatureModal('snippets');
 }
 
 /**

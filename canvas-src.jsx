@@ -6,41 +6,87 @@ import { Excalidraw, exportToBlob, exportToSvg } from '@excalidraw/excalidraw';
 
 function ExcalidrawCanvas() {
   const [excalidrawAPI, setExcalidrawAPI] = useState(null);
+  const [viewMode, setViewMode] = useState(false); // Read-only mode
+  const [dimensions, setDimensions] = useState({ width: '100%', height: '100%' });
+  const containerRef = useRef(null);
   const [initialData, setInitialData] = useState({
     elements: [],
     appState: {
       theme: 'dark',
       viewBackgroundColor: '#0a0a0b',
+      // Default stroke color to BLACK for visibility
+      currentItemStrokeColor: '#000000',
+      currentItemBackgroundColor: 'transparent',
+      currentItemFillStyle: 'hachure',
+      currentItemStrokeWidth: 1,
+      currentItemRoughness: 1,
+      currentItemOpacity: 100,
+      currentItemFontFamily: 1,
+      currentItemFontSize: 20,
+      currentItemTextAlign: 'left',
+      // For dark theme, use lighter stroke for contrast
+      gridSize: null,
     },
   });
   const saveTimeoutRef = useRef(null);
   const currentModuleRef = useRef(null);
 
+  // ResizeObserver for proper scaling
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const { width, height } = entry.contentRect;
+        setDimensions({ width: `${width}px`, height: `${height}px` });
+        
+        // Refresh Excalidraw when size changes
+        if (excalidrawAPI) {
+          excalidrawAPI.refresh();
+        }
+      }
+    });
+
+    resizeObserver.observe(container);
+    return () => resizeObserver.disconnect();
+  }, [excalidrawAPI]);
+
   // Listen for messages from parent window
   useEffect(() => {
     const handleMessage = (event) => {
-      const { type, data, moduleId } = event.data || {};
+      const { type, data, moduleId, readOnly } = event.data || {};
       
       if (type === 'load') {
         currentModuleRef.current = moduleId;
+        
+        // Default appState with BLACK stroke for dark theme visibility
+        const defaultAppState = {
+          theme: 'dark',
+          viewBackgroundColor: '#0a0a0b',
+          currentItemStrokeColor: '#e4e4e7', // Light stroke on dark background
+          currentItemBackgroundColor: 'transparent',
+          currentItemFillStyle: 'hachure',
+          currentItemStrokeWidth: 2,
+          currentItemRoughness: 1,
+        };
         
         // Update scene with new data
         if (excalidrawAPI) {
           const elements = data?.elements || [];
           const appState = {
-            theme: 'dark',
-            viewBackgroundColor: '#0a0a0b',
+            ...defaultAppState,
             ...data?.appState,
           };
           excalidrawAPI.updateScene({ elements, appState });
           excalidrawAPI.scrollToContent();
+          excalidrawAPI.refresh();
         } else {
           // Set initial data for when component mounts
           setInitialData({
             elements: data?.elements || [],
             appState: {
-              theme: 'dark',
-              viewBackgroundColor: '#0a0a0b',
+              ...defaultAppState,
               ...data?.appState,
             },
           });
@@ -53,6 +99,14 @@ function ExcalidrawCanvas() {
         if (excalidrawAPI) {
           excalidrawAPI.resetScene();
         }
+      } else if (type === 'setReadOnly') {
+        // Handle read-only mode toggle
+        setViewMode(readOnly === true);
+      } else if (type === 'refresh') {
+        // Force refresh on resize
+        if (excalidrawAPI) {
+          excalidrawAPI.refresh();
+        }
       }
     };
 
@@ -64,8 +118,22 @@ function ExcalidrawCanvas() {
     return () => window.removeEventListener('message', handleMessage);
   }, [excalidrawAPI]);
 
-  // Auto-save on changes
+  // Handle window resize
+  useEffect(() => {
+    const handleResize = () => {
+      if (excalidrawAPI) {
+        excalidrawAPI.refresh();
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [excalidrawAPI]);
+
+  // Auto-save on changes (only if not in view mode)
   const handleChange = useCallback((elements, appState) => {
+    if (viewMode) return; // Don't save in read-only mode
+    
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);
     }
@@ -76,6 +144,8 @@ function ExcalidrawCanvas() {
         appState: {
           viewBackgroundColor: appState.viewBackgroundColor,
           currentItemFontFamily: appState.currentItemFontFamily,
+          currentItemStrokeColor: appState.currentItemStrokeColor,
+          currentItemBackgroundColor: appState.currentItemBackgroundColor,
           zoom: appState.zoom,
           scrollX: appState.scrollX,
           scrollY: appState.scrollY,
@@ -85,7 +155,7 @@ function ExcalidrawCanvas() {
       
       window.parent.postMessage({ type: 'save', data }, '*');
     }, 500);
-  }, []);
+  }, [viewMode]);
 
   // Export canvas
   const exportCanvas = async (format) => {
@@ -131,7 +201,19 @@ function ExcalidrawCanvas() {
   };
 
   return (
-    <div style={{ width: '100%', height: '100%' }}>
+    <div 
+      ref={containerRef}
+      style={{ 
+        width: '100%', 
+        height: '100%',
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        overflow: 'hidden',
+      }}
+    >
       <Excalidraw
         excalidrawAPI={(api) => setExcalidrawAPI(api)}
         initialData={initialData}
@@ -139,12 +221,16 @@ function ExcalidrawCanvas() {
         theme="dark"
         UIOptions={{
           canvasActions: {
-            loadScene: true,
+            loadScene: !viewMode,
             saveAsImage: true,
             export: { saveFileToDisk: false },
+            clearCanvas: !viewMode,
+          },
+          tools: {
+            image: !viewMode,
           },
         }}
-        viewModeEnabled={false}
+        viewModeEnabled={viewMode}
         zenModeEnabled={false}
         gridModeEnabled={false}
         langCode="en"

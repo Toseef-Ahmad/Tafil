@@ -1,13 +1,13 @@
 # 🎯 TAFIL Free vs Pro Feature System
 
-## Overview
+## Overview: "Taste of Power" Model
 
-A psychologically intelligent Free vs Pro system that:
-- Makes FREE users love the app and keep it installed
-- Makes PRO feel like a natural, inevitable upgrade
-- Avoids anger, frustration, or "I must uninstall" reactions
-- Creates long-term retention and word-of-mouth
-- Maximizes revenue WITHOUT dark patterns
+A revenue-optimized monetization system that:
+- Lets FREE users **experience ALL features** with daily quotas
+- Creates **desire to upgrade** when they hit limits mid-task
+- Uses **glassmorphism paywalls** that feel premium, not annoying
+- Converts users who are **already hooked** on the workflow
+- Never hard-locks features - always provides a "taste"
 
 ---
 
@@ -19,33 +19,57 @@ A psychologically intelligent Free vs Pro system that:
 | `licensing/index.js` | Re-exports limit functions |
 | `main.js` | IPC handlers for limits |
 | `preload.js` | Renderer API exposure |
-| `renderer.js` | UI integration & modals |
+| `renderer.js` | UI integration & Pro modals |
 | `index.html` | Upgrade modal & tier badge UI |
 
 ---
 
-## 🆓 FREE TIER
+## 🆓 FREE TIER ("Taste of Power")
 
-### Fully Included (Forever)
+### Core Features (Unlimited)
 
 | Feature | Details |
 |---------|---------|
-| Playground execution | ✅ Unlimited runs |
-| Instant code running | ✅ Core magic moment |
-| Basic scratchpad/notes | ✅ Daily habit builder |
-| Projects | 3 projects |
-| Saved snippets | 10 snippets |
+| **Project Management** | ✅ Unlimited runs |
+| **JavaScript Playground** | ✅ Unlimited execution |
+| Projects | 10 projects |
+| Saved snippets | 5 snippets |
 | Execution history | 7 days |
-| Languages | JavaScript, Python, Shell |
+| Collections | 3 collections |
+| Todos | ✅ Unlimited (the "hook"!) |
 | Export | Clipboard only |
 | Themes | Light & Dark |
 | Offline mode | ✅ Always works |
 
-### Soft Limits (Not Hard Blocks)
+### 20-Minute Daily Pro Pass ⏱️
 
-- When limit reached → Calm modal with options
-- User can archive/delete to make room
-- Core features (execution) NEVER blocked
+Free users get **20 minutes of "Active Pro Time"** every 24 hours to use ANY Pro feature!
+
+| When Timer Is Active | Features Available |
+|---------------------|-------------------|
+| Blueprints open | Full editing |
+| TypeScript/Python running | Unlimited execution |
+| SSH connected | Full terminal access |
+
+**What happens at 0:00?**
+- Switch to **View-Only Mode** (work is SAFE)
+- Beautiful blur overlay with upgrade prompt
+- Can still VIEW everything, just can't edit
+- Resets at midnight
+
+### Blueprint Module Gating
+
+| Tier | Modules per Blueprint |
+|------|----------------------|
+| Free | 1 module (Kanban OR Diagram OR Notes) |
+| Pro | Unlimited modules |
+
+### Time Travel
+
+| Tier | Variable History |
+|------|-----------------|
+| Free | Last 3 states |
+| Pro | Full history |
 
 ---
 
@@ -53,14 +77,17 @@ A psychologically intelligent Free vs Pro system that:
 
 | Feature | Details |
 |---------|---------|
+| **SSH Terminal** | 🔐 Full remote server access |
+| **Blueprints** | 📋 Kanban, diagrams, notes |
+| **Time Travel** | ⏱️ Variable history debugging |
 | Projects | ♾️ Unlimited |
 | Snippets | ♾️ Unlimited |
 | History | Forever |
-| Languages | 15+ (TypeScript, Go, Rust, etc.) |
+| Languages | 15+ (TypeScript, Python, Go, Rust, etc.) |
+| Collections | ♾️ Unlimited |
 | Export | Markdown, Gist, PDF |
 | Cloud sync | ✅ Enabled |
 | Custom themes | ✅ Full customization |
-| Batch execution | ✅ Run multiple at once |
 | Priority support | ✅ Fast responses |
 
 ---
@@ -178,33 +205,51 @@ showFeatureComparisonModal();
 
 | Feature | Free | Pro | Reasoning |
 |---------|:----:|:---:|-----------|
-| Playground execution | ✅ Unlimited | ✅ | Core value. Never limit. |
-| Run code instantly | ✅ | ✅ | The magic moment. |
-| Basic scratchpad | ✅ | ✅ | Daily habit. |
-| Projects | 3 | ♾️ | Scale limit, not function limit |
-| Saved snippets | 10 | ♾️ | Scale limit |
-| Execution history | 7 days | ♾️ | Depth limit |
-| Languages | JS, Python, Shell | +12 | Growth path |
+| **Project Management** | ✅ | ✅ | Core value. Never limit. |
+| **Playground (JavaScript)** | ✅ | ✅ | The magic moment. |
+| Projects | 5 | ♾️ | Scale limit |
+| Saved snippets | 3 | ♾️ | Creates desire for more |
+| Execution history | 3 days | ♾️ | Depth limit |
+| Collections | 2 | ♾️ | Organization limit |
+| Languages | JS only | +15 | Clear upgrade path |
+| **SSH Terminal** | 🔒 | ✅ | High-value Pro feature |
+| **Blueprints** | 🔒 | ✅ | Advanced planning |
+| **Time Travel** | 🔒 | ✅ | Pro debugging |
+| **TypeScript** | 🔒 | ✅ | Power user language |
+| **Python** | 🔒 | ✅ | Power user language |
 | Offline mode | ✅ | ✅ | Trust. Never gate. |
 | Export: Clipboard | ✅ | ✅ | Basic data portability |
 | Export: MD/Gist/PDF | ❌ | ✅ | Convenience/power |
 | Cloud sync | ❌ | ✅ | Multi-device power |
-| Custom themes | ❌ | ✅ | Comfort/personalization |
-| Batch execution | ❌ | ✅ | Automation |
+| Custom themes | ❌ | ✅ | Personalization |
 
 ---
 
 ## 🚀 Testing Checklist
 
-- [ ] Create 3 projects → Should show limit modal on 4th
-- [ ] Save 10 snippets → Should show limit modal on 11th
-- [ ] Try TypeScript → Should show language limit modal
-- [ ] Try export to Markdown → Should show export limit modal
-- [ ] Click tier badge (FREE) → Should show comparison
-- [ ] Click tier badge (PRO) → Should show "All unlocked" toast
-- [ ] Verify execution NEVER blocked
-- [ ] Verify clipboard export ALWAYS works
-- [ ] Check nudge only shown once per session
+### Pro Feature Locks
+- [ ] Click SSH tab → Should show Pro upgrade modal
+- [ ] Click Blueprints → Should show Pro upgrade modal
+- [ ] Try TypeScript in Playground → Should show Pro modal
+- [ ] Try Python in Playground → Should show Pro modal
+- [ ] Click Time Travel (history count) → Should show Pro modal
+
+### Limits
+- [ ] Save 4th snippet → Should show upgrade modal
+- [ ] Create 3rd collection → Should show upgrade modal
+- [ ] Create 6th project → Should show limit modal
+
+### Free Features (Must Always Work)
+- [ ] Run JavaScript in Playground → ✅ Works
+- [ ] Run/Stop projects → ✅ Works
+- [ ] Copy to clipboard → ✅ Works
+- [ ] Light/Dark themes → ✅ Works
+- [ ] Offline mode → ✅ Works
+
+### UI Indicators
+- [ ] SSH tab shows PRO badge
+- [ ] Tier badge shows FREE/PRO correctly
+- [ ] Language selector shows 🔒 on TS/Python
 
 ---
 

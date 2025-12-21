@@ -14,33 +14,81 @@ const { getLicenseStatus, silentCheck } = require('./featureGuard');
 // FEATURE LIMITS CONFIGURATION
 // =====================================================
 
+/**
+ * "Free-to-Run, Pay-to-Save" Monetization Model (VS Code Strategy)
+ * 
+ * Core Philosophy:
+ * - FREE: Unlimited project running + all language execution (hook them!)
+ * - PRO: Saving (snippets) + Power workflows (SSH, Blueprints)
+ * 
+ * This builds massive user base while monetizing "Power Users"
+ */
+
 const LIMITS = {
-  // FREE TIER
+  // FREE TIER - "Free-to-Run" approach
   free: {
-    projects: 3,              // 3 projects (enough for learning + experimenting)
-    snippets: 10,             // 10 saved snippets
-    historyDays: 7,           // 7 days of execution history
-    languages: ['javascript', 'python', 'shell'], // Core languages
-    export: ['clipboard'],    // Copy to clipboard only
+    projects: Infinity,        // UNLIMITED projects (VS Code strategy)
+    snippets: 0,               // NO saving - this is the gate!
+    historyDays: 7,            // 7 days of execution history
+    languages: 'all',          // ALL languages FREE (hook them!)
+    export: ['clipboard'],     // Copy to clipboard only
     themes: ['dark', 'light'], // Basic themes
-    templates: 5,             // 5 basic templates
-    canSync: false,           // No cloud sync
-    canBatchRun: false,       // No batch execution
-    canCustomTheme: false,    // No custom themes
+    templates: 'all',          // All templates free
+    canSync: false,            // No cloud sync
+    canBatchRun: false,        // No batch execution
+    canCustomTheme: false,     // No custom themes
+    
+    // FREE EXECUTION - Hook users by letting them run everything
+    canAccessSSH: true,        // SSH available (20-min daily pass)
+    canAccessBlueprints: true, // Blueprints available (20-min daily pass)
+    canSaveSnippets: false,    // BLOCKED - Pay to save!
+    maxTodos: Infinity,        // Unlimited todos
+    maxCollections: 0,         // No snippet collections (Pro)
+    canUseTimeTravel: true,    // Time Travel shows last 3 states
+    canUseInlineResults: true, // Inline results always work
+    canUsePythonExec: true,    // Python FREE - no limits
+    canUseTypeScriptExec: true, // TypeScript FREE - no limits
+    
+    // NO execution quotas - all languages run unlimited!
+    dailyTypescriptRuns: Infinity,  // UNLIMITED TS runs
+    dailyPythonRuns: Infinity,      // UNLIMITED Python runs
+    dailySshSessions: Infinity,     // SSH sessions managed by 20-min pass
+    sshSessionMinutes: 20,          // 20-min daily Pro Pass
+    maxActiveBlueprints: 1,         // 1 active blueprint module
+    timeTravelStates: 3,            // Show last 3 variable states
   },
   
-  // PRO TIER
+  // PRO TIER - Unlimited everything
   pro: {
-    projects: Infinity,       // Unlimited projects
-    snippets: Infinity,       // Unlimited snippets
-    historyDays: Infinity,    // Forever history
-    languages: 'all',         // All languages (15+)
-    export: ['clipboard', 'markdown', 'gist', 'pdf'], // Full export
-    themes: 'all',            // All themes + custom
-    templates: 'all',         // All templates
-    canSync: true,            // Cloud sync
-    canBatchRun: true,        // Batch execution
-    canCustomTheme: true,     // Custom themes
+    projects: Infinity,
+    snippets: Infinity,
+    historyDays: Infinity,
+    languages: 'all',
+    export: ['clipboard', 'markdown', 'gist', 'pdf'],
+    themes: 'all',
+    templates: 'all',
+    canSync: true,
+    canBatchRun: true,
+    canCustomTheme: true,
+    
+    // Unlimited Access
+    canAccessSSH: true,
+    canAccessBlueprints: true,
+    canSaveSnippets: true,
+    maxTodos: Infinity,
+    maxCollections: Infinity,
+    canUseTimeTravel: true,
+    canUseInlineResults: true,
+    canUsePythonExec: true,
+    canUseTypeScriptExec: true,
+    
+    // No Quotas
+    dailyTypescriptRuns: Infinity,
+    dailyPythonRuns: Infinity,
+    dailySshSessions: Infinity,
+    sshSessionMinutes: Infinity,
+    maxActiveBlueprints: Infinity,
+    timeTravelStates: Infinity,
   },
 };
 
@@ -145,24 +193,27 @@ function getProjectLimitInfo(currentCount) {
 
 /**
  * Check if user can save a new snippet
- * @param {number} currentSnippetCount - Current number of saved snippets
+ * FREE-TO-RUN, PAY-TO-SAVE: Snippets are a Pro feature
+ * @param {number} currentSnippetCount - Current number of saved snippets (ignored now)
  */
 function canSaveSnippet(currentSnippetCount) {
   const limits = getCurrentLimits();
   const tier = getCurrentTier();
   
+  // Pro users can save unlimited snippets
   if (tier === 'pro') {
     return { allowed: true };
   }
   
-  if (currentSnippetCount >= limits.snippets) {
+  // FREE-TO-RUN, PAY-TO-SAVE: Free users cannot save snippets
+  if (!limits.canSaveSnippets) {
     return {
       allowed: false,
-      reason: `Nice library! You've saved ${limits.snippets} snippets.`,
-      limit: limits.snippets,
+      reason: 'Snippets are a Pro feature',
+      limit: 0,
       current: currentSnippetCount,
-      upgradeHint: 'Pro lets you save unlimited snippets — build your personal code library.',
-      softAction: 'delete_old', // Suggest deleting old snippets
+      upgradeHint: 'Upgrade to Pro to save your code snippets forever and build your personal code library.',
+      softAction: null,
     };
   }
   
@@ -344,6 +395,358 @@ function canCustomTheme() {
 }
 
 // =====================================================
+// SSH ACCESS (Quota-Based)
+// =====================================================
+
+/**
+ * Check if user can start an SSH session
+ * Free users get 1 session per day (max 10 mins)
+ */
+function canAccessSSH() {
+  // SSH is always accessible - quota checked separately
+  return { allowed: true };
+}
+
+/**
+ * Check SSH session quota
+ * @param {number} sessionsUsedToday - Sessions used today
+ */
+function canStartSshSession(sessionsUsedToday = 0) {
+  const tier = getCurrentTier();
+  const limits = getCurrentLimits();
+  
+  if (tier === 'pro') {
+    return { allowed: true, unlimited: true };
+  }
+  
+  const remaining = limits.dailySshSessions - sessionsUsedToday;
+  
+  if (remaining <= 0) {
+    return {
+      allowed: false,
+      quotaType: 'sshSessions',
+      reason: "You've used your daily SSH session",
+      remaining: 0,
+      limit: limits.dailySshSessions,
+      upgradeHint: 'Pro unlocks unlimited SSH sessions',
+      resetTime: getTimeUntilMidnight(),
+    };
+  }
+  
+  return {
+    allowed: true,
+    remaining,
+    limit: limits.dailySshSessions,
+    sessionMinutes: limits.sshSessionMinutes,
+  };
+}
+
+/**
+ * Check if SSH session time limit is exceeded
+ * @param {number} minutesUsed - Minutes used in current session
+ */
+function isSshSessionExpired(minutesUsed) {
+  const tier = getCurrentTier();
+  if (tier === 'pro') return { expired: false, unlimited: true };
+  
+  const limits = getCurrentLimits();
+  const remaining = limits.sshSessionMinutes - minutesUsed;
+  
+  return {
+    expired: remaining <= 0,
+    remaining: Math.max(0, remaining),
+    limit: limits.sshSessionMinutes,
+    minutesUsed,
+  };
+}
+
+/**
+ * Get time until midnight (quota reset)
+ */
+function getTimeUntilMidnight() {
+  const now = new Date();
+  const midnight = new Date(now);
+  midnight.setDate(midnight.getDate() + 1);
+  midnight.setHours(0, 0, 0, 0);
+  
+  const diff = midnight - now;
+  const hours = Math.floor(diff / 3600000);
+  const minutes = Math.floor((diff % 3600000) / 60000);
+  
+  return { hours, minutes, display: `${hours}h ${minutes}m` };
+}
+
+// =====================================================
+// BLUEPRINTS ACCESS (1 Active Blueprint Free)
+// =====================================================
+
+/**
+ * Check if user can access Blueprints
+ * Free users can access Blueprints (with 1 active limit)
+ */
+function canAccessBlueprints() {
+  // Blueprints always accessible
+  return { allowed: true };
+}
+
+/**
+ * Check if user can create a new blueprint
+ * Free users can have 1 active blueprint at a time
+ * @param {number} activeBlueprints - Current active blueprints count
+ */
+function canCreateBlueprint(activeBlueprints = 0) {
+  const tier = getCurrentTier();
+  const limits = getCurrentLimits();
+  
+  if (tier === 'pro') {
+    return { allowed: true, unlimited: true };
+  }
+  
+  if (activeBlueprints >= limits.maxActiveBlueprints) {
+    return {
+      allowed: false,
+      quotaType: 'blueprints',
+      reason: `You're using your free blueprint slot`,
+      limit: limits.maxActiveBlueprints,
+      current: activeBlueprints,
+      upgradeHint: 'Pro unlocks unlimited blueprints for all your projects',
+    };
+  }
+  
+  return {
+    allowed: true,
+    remaining: limits.maxActiveBlueprints - activeBlueprints,
+    limit: limits.maxActiveBlueprints,
+  };
+}
+
+/**
+ * Check if user can create/edit todos
+ * Free users have unlimited todos (hook them!)
+ */
+function canCreateTodo(currentTodoCount) {
+  // Todos are always allowed - this is the "hook"
+  return { allowed: true };
+}
+
+// =====================================================
+// COLLECTIONS LIMIT
+// =====================================================
+
+/**
+ * Check if user can create a new collection
+ * @param {number} currentCollectionCount - Current number of collections
+ */
+function canCreateCollection(currentCollectionCount) {
+  const limits = getCurrentLimits();
+  const tier = getCurrentTier();
+  
+  if (tier === 'pro') {
+    return { allowed: true };
+  }
+  
+  if (currentCollectionCount >= limits.maxCollections) {
+    return {
+      allowed: false,
+      reason: `You've reached the free limit of ${limits.maxCollections} collections.`,
+      limit: limits.maxCollections,
+      current: currentCollectionCount,
+      upgradeHint: 'Pro unlocks unlimited collections to organize your projects.',
+    };
+  }
+  
+  return { allowed: true };
+}
+
+/**
+ * Get collection limit info
+ */
+function getCollectionLimitInfo(currentCount) {
+  const limits = getCurrentLimits();
+  const tier = getCurrentTier();
+  
+  return {
+    tier,
+    limit: tier === 'pro' ? '∞' : limits.maxCollections,
+    current: currentCount,
+    remaining: tier === 'pro' ? '∞' : Math.max(0, limits.maxCollections - currentCount),
+    isAtLimit: tier === 'free' && currentCount >= limits.maxCollections,
+  };
+}
+
+// =====================================================
+// TIME TRAVEL (Taste of Power - Last 3 States Free)
+// =====================================================
+
+/**
+ * Check Time Travel access
+ * Free users see last 3 states, Pro sees unlimited
+ */
+function canUseTimeTravel() {
+  // Time Travel is always available (with state limit)
+  return { allowed: true };
+}
+
+/**
+ * Get Time Travel state limit
+ * Free = 3 states, Pro = unlimited
+ */
+function getTimeTravelLimit() {
+  const tier = getCurrentTier();
+  const limits = getCurrentLimits();
+  
+  if (tier === 'pro') {
+    return {
+      unlimited: true,
+      limit: Infinity,
+      message: 'Full history available',
+    };
+  }
+  
+  return {
+    unlimited: false,
+    limit: limits.timeTravelStates,
+    message: `Showing last ${limits.timeTravelStates} states`,
+    upgradeHint: 'Pro shows complete variable history',
+  };
+}
+
+/**
+ * Filter value history based on tier
+ * @param {Array} history - Full value history
+ */
+function filterValueHistory(history) {
+  if (!Array.isArray(history)) return history;
+  
+  const tier = getCurrentTier();
+  if (tier === 'pro') return history;
+  
+  const limits = getCurrentLimits();
+  const limit = limits.timeTravelStates || 3;
+  
+  // Return last N states
+  return history.slice(-limit);
+}
+
+// =====================================================
+// LANGUAGE EXECUTION (Quota-Based)
+// =====================================================
+
+/**
+ * Check if user can execute TypeScript
+ * Free users get 15 runs per day
+ * @param {number} runsToday - TypeScript runs today
+ */
+function canExecuteTypeScript(runsToday = 0) {
+  const tier = getCurrentTier();
+  const limits = getCurrentLimits();
+  
+  if (tier === 'pro') {
+    return { allowed: true, unlimited: true, remaining: Infinity };
+  }
+  
+  const remaining = limits.dailyTypescriptRuns - runsToday;
+  
+  if (remaining <= 0) {
+    return {
+      allowed: false,
+      quotaType: 'typescriptExecutions',
+      reason: `You've used your daily ${limits.dailyTypescriptRuns} TypeScript runs`,
+      remaining: 0,
+      limit: limits.dailyTypescriptRuns,
+      used: runsToday,
+      upgradeHint: 'Pro unlocks unlimited TypeScript execution',
+      resetTime: getTimeUntilMidnight(),
+    };
+  }
+  
+  return {
+    allowed: true,
+    remaining,
+    limit: limits.dailyTypescriptRuns,
+    used: runsToday,
+    percentUsed: Math.round((runsToday / limits.dailyTypescriptRuns) * 100),
+  };
+}
+
+/**
+ * Check if user can execute Python
+ * Free users get 15 runs per day
+ * @param {number} runsToday - Python runs today
+ */
+function canExecutePython(runsToday = 0) {
+  const tier = getCurrentTier();
+  const limits = getCurrentLimits();
+  
+  if (tier === 'pro') {
+    return { allowed: true, unlimited: true, remaining: Infinity };
+  }
+  
+  const remaining = limits.dailyPythonRuns - runsToday;
+  
+  if (remaining <= 0) {
+    return {
+      allowed: false,
+      quotaType: 'pythonExecutions',
+      reason: `You've used your daily ${limits.dailyPythonRuns} Python runs`,
+      remaining: 0,
+      limit: limits.dailyPythonRuns,
+      used: runsToday,
+      upgradeHint: 'Pro unlocks unlimited Python execution',
+      resetTime: getTimeUntilMidnight(),
+    };
+  }
+  
+  return {
+    allowed: true,
+    remaining,
+    limit: limits.dailyPythonRuns,
+    used: runsToday,
+    percentUsed: Math.round((runsToday / limits.dailyPythonRuns) * 100),
+  };
+}
+
+/**
+ * Get language quota status for UI display
+ */
+function getLanguageQuotaStatus(language, runsToday = 0) {
+  const tier = getCurrentTier();
+  const limits = getCurrentLimits();
+  
+  if (tier === 'pro') {
+    return {
+      unlimited: true,
+      display: 'Unlimited',
+      canRun: true,
+    };
+  }
+  
+  let limit = 0;
+  switch (language) {
+    case 'typescript':
+      limit = limits.dailyTypescriptRuns;
+      break;
+    case 'python':
+      limit = limits.dailyPythonRuns;
+      break;
+    default:
+      return { unlimited: true, display: 'Unlimited', canRun: true };
+  }
+  
+  const remaining = Math.max(0, limit - runsToday);
+  
+  return {
+    unlimited: false,
+    remaining,
+    limit,
+    used: runsToday,
+    display: `${remaining}/${limit} today`,
+    canRun: remaining > 0,
+    percentUsed: Math.round((runsToday / limit) * 100),
+  };
+}
+
+// =====================================================
 // UPGRADE NUDGE TRACKING
 // =====================================================
 
@@ -389,6 +792,50 @@ function getFeatureSummary() {
     tier,
     isPro: tier === 'pro',
     
+    // Feature Access
+    features: {
+      playground: {
+        label: 'Playground',
+        free: 'JavaScript only, 3 snippets',
+        pro: 'All languages, unlimited snippets',
+        icon: '⚡',
+        freeAccess: true,
+        proOnly: false,
+      },
+      ssh: {
+        label: 'SSH Terminal',
+        free: '🔒 Locked',
+        pro: 'Full access',
+        icon: '🔐',
+        freeAccess: false,
+        proOnly: true,
+      },
+      blueprints: {
+        label: 'Blueprints',
+        free: '🔒 Locked',
+        pro: 'Full access with Kanban & diagrams',
+        icon: '📋',
+        freeAccess: false,
+        proOnly: true,
+      },
+      timeTravel: {
+        label: 'Time Travel',
+        free: '🔒 Locked',
+        pro: 'Full variable history',
+        icon: '⏱️',
+        freeAccess: false,
+        proOnly: true,
+      },
+      collections: {
+        label: 'Collections',
+        free: `${limits.maxCollections} collections`,
+        pro: 'Unlimited',
+        icon: '📁',
+        freeAccess: true,
+        proOnly: false,
+      },
+    },
+    
     // Limits
     projects: {
       label: 'Projects',
@@ -407,7 +854,7 @@ function getFeatureSummary() {
     },
     languages: {
       label: 'Languages',
-      limit: tier === 'pro' ? 'All (15+)' : `${limits.languages.length} (JS, Python, Shell)`,
+      limit: tier === 'pro' ? 'All (15+)' : 'JavaScript only',
       icon: '🌐',
     },
     export: {
@@ -428,15 +875,26 @@ function getFeatureSummary() {
     
     // Pro benefits summary
     proBenefits: [
-      'Unlimited projects',
-      'Unlimited snippets',
-      'Full execution history (forever)',
-      '15+ programming languages',
-      'Export to Markdown, Gist, PDF',
-      'Cloud sync across devices',
-      'Custom themes',
-      'Batch execution',
-      'Priority support',
+      '🔐 SSH Terminal for remote servers',
+      '📋 Blueprints with Kanban & diagrams',
+      '⏱️ Time Travel debugging',
+      '📘 TypeScript & Python execution',
+      '💾 Unlimited snippets',
+      '📁 Unlimited collections',
+      '📜 Forever execution history',
+      '📤 Export to Markdown, Gist, PDF',
+      '☁️ Cloud sync across devices',
+      '🎨 Custom themes',
+      '⚡ Priority support',
+    ],
+    
+    // What's locked in Free
+    freeLockedFeatures: [
+      { name: 'SSH Terminal', icon: '🔐', description: 'Secure remote server access' },
+      { name: 'Blueprints', icon: '📋', description: 'Project planning with Kanban & diagrams' },
+      { name: 'Time Travel', icon: '⏱️', description: 'See variable changes during execution' },
+      { name: 'TypeScript', icon: '📘', description: 'Run TypeScript with type checking' },
+      { name: 'Python', icon: '🐍', description: 'Run Python scripts' },
     ],
     
     // Price
@@ -451,41 +909,41 @@ function getFeatureSummary() {
 
 const UPGRADE_MESSAGES = {
   projects: {
-    title: "🎉 You've filled up 3 projects!",
+    title: "🎉 You've filled up 5 projects!",
     message: "That means you're getting real work done.",
-    action: "Free includes 3 projects.",
+    action: "Free includes 5 projects.",
     options: [
       { label: 'Archive a project', action: 'archive' },
       { label: 'Maybe later', action: 'dismiss' },
-      { label: 'See Pro', action: 'upgrade' },
+      { label: 'Upgrade to Pro', action: 'upgrade' },
     ],
   },
   snippets: {
-    title: "💾 Nice library! You've saved 10 snippets.",
-    message: "You're building something useful.",
-    action: "Free includes 10 snippets.",
+    title: "💾 You've saved 3 snippets!",
+    message: "You're building a useful code library.",
+    action: "Free includes 3 snippets. Pro gives you unlimited.",
     options: [
       { label: 'Delete an old snippet', action: 'delete' },
       { label: 'Maybe later', action: 'dismiss' },
-      { label: 'See Pro', action: 'upgrade' },
+      { label: 'Upgrade to Pro', action: 'upgrade' },
     ],
   },
   history: {
     title: "📜 Looking for older history?",
-    message: "Free keeps 7 days of execution history.",
+    message: "Free keeps 3 days of execution history.",
     action: "Pro keeps your full history forever — so you never lose an experiment.",
     options: [
       { label: 'That\'s okay', action: 'dismiss' },
-      { label: 'Learn about Pro', action: 'upgrade' },
+      { label: 'Upgrade to Pro', action: 'upgrade' },
     ],
   },
   language: {
-    title: "✨ {language} is a Pro language",
-    message: "Free includes JavaScript, Python, and Shell.",
-    action: "Pro unlocks 15+ languages for all your experiments.",
+    title: "✨ {language} is a Pro feature",
+    message: "Free includes JavaScript only.",
+    action: "Pro unlocks TypeScript, Python, and 15+ languages.",
     options: [
-      { label: 'Use a free language', action: 'dismiss' },
-      { label: 'Learn about Pro', action: 'upgrade' },
+      { label: 'Use JavaScript', action: 'dismiss' },
+      { label: 'Upgrade to Pro', action: 'upgrade' },
     ],
   },
   export: {
@@ -494,8 +952,90 @@ const UPGRADE_MESSAGES = {
     action: "Pro adds one-click export to Gist, Markdown, and PDF.",
     options: [
       { label: 'Copy to clipboard', action: 'clipboard' },
-      { label: 'Learn about Pro', action: 'upgrade' },
+      { label: 'Upgrade to Pro', action: 'upgrade' },
     ],
+  },
+  ssh: {
+    title: "🔐 SSH Terminal is a Pro feature",
+    message: "Connect to remote servers securely.",
+    action: "Pro unlocks SSH Terminal for remote server management.",
+    options: [
+      { label: 'Maybe later', action: 'dismiss' },
+      { label: 'Upgrade to Pro', action: 'upgrade' },
+    ],
+    icon: '🔐',
+    featureHighlights: [
+      'Secure SSH connections',
+      'Save unlimited hosts',
+      'Full terminal emulator',
+      'Session management',
+    ],
+  },
+  blueprints: {
+    title: "📋 Blueprints is a Pro feature",
+    message: "Plan and organize your projects like a pro.",
+    action: "Pro unlocks Blueprints with Kanban boards, diagrams, and notes.",
+    options: [
+      { label: 'Maybe later', action: 'dismiss' },
+      { label: 'Upgrade to Pro', action: 'upgrade' },
+    ],
+    icon: '📋',
+    featureHighlights: [
+      'Kanban boards for tasks',
+      'Excalidraw diagrams',
+      'Markdown notes',
+      'Project modules',
+    ],
+  },
+  timeTravel: {
+    title: "⏱️ Time Travel is a Pro feature",
+    message: "See how variables change during execution.",
+    action: "Pro unlocks Time Travel to debug like a pro.",
+    options: [
+      { label: 'Maybe later', action: 'dismiss' },
+      { label: 'Upgrade to Pro', action: 'upgrade' },
+    ],
+    icon: '⏱️',
+  },
+  collections: {
+    title: "📁 You've reached 2 collections!",
+    message: "Organize your projects your way.",
+    action: "Free includes 2 collections. Pro gives you unlimited.",
+    options: [
+      { label: 'Delete a collection', action: 'delete' },
+      { label: 'Maybe later', action: 'dismiss' },
+      { label: 'Upgrade to Pro', action: 'upgrade' },
+    ],
+  },
+  todos: {
+    title: "✅ You've created 5 todos!",
+    message: "Stay on top of your tasks.",
+    action: "Free includes 5 todos. Pro gives you unlimited.",
+    options: [
+      { label: 'Complete a todo', action: 'complete' },
+      { label: 'Maybe later', action: 'dismiss' },
+      { label: 'Upgrade to Pro', action: 'upgrade' },
+    ],
+  },
+  typescript: {
+    title: "✨ TypeScript is a Pro feature",
+    message: "Run TypeScript with full type checking.",
+    action: "Pro unlocks TypeScript, Python, and more.",
+    options: [
+      { label: 'Use JavaScript', action: 'javascript' },
+      { label: 'Upgrade to Pro', action: 'upgrade' },
+    ],
+    icon: '📘',
+  },
+  python: {
+    title: "🐍 Python is a Pro feature",
+    message: "Run Python scripts directly in the playground.",
+    action: "Pro unlocks Python, TypeScript, and more.",
+    options: [
+      { label: 'Use JavaScript', action: 'javascript' },
+      { label: 'Upgrade to Pro', action: 'upgrade' },
+    ],
+    icon: '🐍',
   },
   generic: {
     title: "✨ This is a Pro feature",
@@ -503,7 +1043,7 @@ const UPGRADE_MESSAGES = {
     action: "Pro unlocks power, speed, and unlimited capacity.",
     options: [
       { label: 'Maybe later', action: 'dismiss' },
-      { label: 'Learn about Pro', action: 'upgrade' },
+      { label: 'Upgrade to Pro', action: 'upgrade' },
     ],
   },
 };
@@ -560,6 +1100,31 @@ module.exports = {
   canSync,
   canBatchRun,
   canCustomTheme,
+  
+  // SSH Access (Quota-Based)
+  canAccessSSH,
+  canStartSshSession,
+  isSshSessionExpired,
+  getTimeUntilMidnight,
+  
+  // Blueprints Access
+  canAccessBlueprints,
+  canCreateBlueprint,
+  canCreateTodo,
+  
+  // Collections
+  canCreateCollection,
+  getCollectionLimitInfo,
+  
+  // Time Travel (Taste of Power)
+  canUseTimeTravel,
+  getTimeTravelLimit,
+  filterValueHistory,
+  
+  // Language Execution (Quota-Based)
+  canExecuteTypeScript,
+  canExecutePython,
+  getLanguageQuotaStatus,
   
   // Upgrade nudging
   shouldShowUpgradeNudge,

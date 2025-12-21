@@ -13,6 +13,7 @@
     "build-canvas": "node build-canvas.js",
     "build-goal-editor": "node build-goal-editor.js",
     "watch-css": "tailwindcss -i ./styles.css -o ./dist/output.css --watch",
+    "remove-license": "node remove-license.js",
     "build": "npm run build-css && npm run build-canvas && npm run build-goal-editor && electron-builder --config",
     "build:mac": "npm run build-css && electron-builder --mac --config",
     "build:mac-universal": "npm run build-css && electron-builder --mac --universal --config",

@@ -44,6 +44,8 @@ async function build() {
       },
       jsx: 'automatic',
       jsxImportSource: 'react',
+      // External packages that are not needed for basic canvas functionality
+      external: ['d3-sankey', 'mermaid'],
       // Banner to inject CSS
       banner: {
         js: `

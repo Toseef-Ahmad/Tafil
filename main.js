@@ -1363,6 +1363,261 @@ ipcMain.handle('limits:getUpgradeMessage', async (_event, type, params) => {
   }
 });
 
+// =====================================================
+// "20-MINUTE DAILY PRO PASS" System
+// =====================================================
+
+// Usage tracker for daily quotas
+const usageTracker = require('./licensing/usageTracker');
+const proTimer = require('./licensing/proTimer');
+
+// Pro Timer IPC Handlers
+ipcMain.handle('proTimer:getStatus', async () => {
+  try {
+    const isPro = licensing.featureLimits.isPro();
+    if (isPro) {
+      return { isPro: true, isExpired: false, unlimited: true };
+    }
+    return { isPro: false, ...proTimer.getTimerStatus() };
+  } catch (e) {
+    return { isPro: false, isExpired: false, secondsRemaining: 1200 };
+  }
+});
+
+ipcMain.handle('proTimer:start', async () => {
+  try {
+    const isPro = licensing.featureLimits.isPro();
+    if (isPro) return { success: true, unlimited: true };
+    
+    const started = proTimer.startTimer();
+    return { success: started, ...proTimer.getTimerStatus() };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+});
+
+ipcMain.handle('proTimer:stop', async () => {
+  try {
+    proTimer.stopTimer();
+    return { success: true, ...proTimer.getTimerStatus() };
+  } catch (e) {
+    return { success: false };
+  }
+});
+
+ipcMain.handle('proTimer:canUse', async () => {
+  try {
+    const isPro = licensing.featureLimits.isPro();
+    if (isPro) return { allowed: true, unlimited: true };
+    
+    return { 
+      allowed: proTimer.canUseProFeatures(),
+      ...proTimer.getTimerStatus(),
+    };
+  } catch (e) {
+    return { allowed: true }; // Fail open
+  }
+});
+
+ipcMain.handle('proTimer:getExpiredMessage', async () => {
+  try {
+    return proTimer.getExpiredMessage();
+  } catch (e) {
+    return { title: 'Pro Time Expired', subtitle: 'Upgrade to continue' };
+  }
+});
+
+// SSH Access Check
+ipcMain.handle('limits:canAccessSSH', async () => {
+  try {
+    return licensing.featureLimits.canAccessSSH();
+  } catch (e) {
+    return { allowed: true }; // Fail open
+  }
+});
+
+// SSH Session Start (with quota check)
+ipcMain.handle('limits:canStartSshSession', async () => {
+  try {
+    const isPro = licensing.featureLimits.isPro();
+    const usage = usageTracker.getDailyUsage();
+    return licensing.featureLimits.canStartSshSession(usage.sshSessions);
+  } catch (e) {
+    return { allowed: true }; // Fail open
+  }
+});
+
+// Record SSH Session Start
+ipcMain.handle('usage:startSshSession', async () => {
+  try {
+    return usageTracker.startSshSession();
+  } catch (e) {
+    return 0;
+  }
+});
+
+// Get SSH Session Time
+ipcMain.handle('usage:getSshSessionMinutes', async () => {
+  try {
+    return usageTracker.getSshSessionMinutes();
+  } catch (e) {
+    return 0;
+  }
+});
+
+// Check SSH Session Expired
+ipcMain.handle('limits:isSshSessionExpired', async () => {
+  try {
+    const minutes = usageTracker.getSshSessionMinutes();
+    return licensing.featureLimits.isSshSessionExpired(minutes);
+  } catch (e) {
+    return { expired: false };
+  }
+});
+
+// End SSH Session
+ipcMain.handle('usage:endSshSession', async () => {
+  try {
+    usageTracker.endSshSession();
+    return true;
+  } catch (e) {
+    return false;
+  }
+});
+
+// Blueprints Access Check
+ipcMain.handle('limits:canAccessBlueprints', async () => {
+  try {
+    return licensing.featureLimits.canAccessBlueprints();
+  } catch (e) {
+    return { allowed: true }; // Fail open
+  }
+});
+
+// Blueprint Creation Check (with active count)
+ipcMain.handle('limits:canCreateBlueprint', async (_event, activeCount) => {
+  try {
+    return licensing.featureLimits.canCreateBlueprint(activeCount || 0);
+  } catch (e) {
+    return { allowed: true };
+  }
+});
+
+// Todo Creation Check (always allowed - the "hook")
+ipcMain.handle('limits:canCreateTodo', async (_event, count) => {
+  try {
+    return licensing.featureLimits.canCreateTodo(count);
+  } catch (e) {
+    return { allowed: true };
+  }
+});
+
+// Collection Creation Check
+ipcMain.handle('limits:canCreateCollection', async (_event, count) => {
+  try {
+    return licensing.featureLimits.canCreateCollection(count);
+  } catch (e) {
+    return { allowed: true };
+  }
+});
+
+// Collection Limit Info
+ipcMain.handle('limits:getCollectionLimitInfo', async (_event, count) => {
+  try {
+    return licensing.featureLimits.getCollectionLimitInfo(count);
+  } catch (e) {
+    return { tier: 'free', limit: 3, current: count };
+  }
+});
+
+// Time Travel Check
+ipcMain.handle('limits:canUseTimeTravel', async () => {
+  try {
+    return licensing.featureLimits.canUseTimeTravel();
+  } catch (e) {
+    return { allowed: true };
+  }
+});
+
+// Get Time Travel Limit
+ipcMain.handle('limits:getTimeTravelLimit', async () => {
+  try {
+    return licensing.featureLimits.getTimeTravelLimit();
+  } catch (e) {
+    return { unlimited: false, limit: 3 };
+  }
+});
+
+// TypeScript Execution Check (with quota)
+ipcMain.handle('limits:canExecuteTypeScript', async () => {
+  try {
+    const usage = usageTracker.getDailyUsage();
+    return licensing.featureLimits.canExecuteTypeScript(usage.typescriptExecutions);
+  } catch (e) {
+    return { allowed: true };
+  }
+});
+
+// Record TypeScript Execution
+ipcMain.handle('usage:recordTypescriptExecution', async () => {
+  try {
+    return usageTracker.recordTypescriptExecution();
+  } catch (e) {
+    return 0;
+  }
+});
+
+// Python Execution Check (with quota)
+ipcMain.handle('limits:canExecutePython', async () => {
+  try {
+    const usage = usageTracker.getDailyUsage();
+    return licensing.featureLimits.canExecutePython(usage.pythonExecutions);
+  } catch (e) {
+    return { allowed: true };
+  }
+});
+
+// Record Python Execution
+ipcMain.handle('usage:recordPythonExecution', async () => {
+  try {
+    return usageTracker.recordPythonExecution();
+  } catch (e) {
+    return 0;
+  }
+});
+
+// Get Language Quota Status
+ipcMain.handle('limits:getLanguageQuotaStatus', async (_event, language) => {
+  try {
+    const usage = usageTracker.getDailyUsage();
+    const runsToday = language === 'typescript' 
+      ? usage.typescriptExecutions 
+      : usage.pythonExecutions;
+    return licensing.featureLimits.getLanguageQuotaStatus(language, runsToday);
+  } catch (e) {
+    return { unlimited: true, canRun: true };
+  }
+});
+
+// Get Usage Summary (for UI)
+ipcMain.handle('usage:getSummary', async () => {
+  try {
+    const isPro = licensing.featureLimits.isPro();
+    return usageTracker.getUsageSummary(isPro);
+  } catch (e) {
+    return { isPro: false, daily: {} };
+  }
+});
+
+// Get Quota Hit Message
+ipcMain.handle('usage:getQuotaHitMessage', async (_event, feature) => {
+  try {
+    return usageTracker.getQuotaHitMessage(feature);
+  } catch (e) {
+    return { title: 'Daily Limit Reached', subtitle: 'Upgrade to Pro for unlimited access' };
+  }
+});
+
 // -------------------------------------------------
 // IPC Handlers
 // -------------------------------------------------

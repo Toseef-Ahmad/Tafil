@@ -162,5 +162,40 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getAvailableExports: () => ipcRenderer.invoke('limits:getAvailableExports'),
     getFeatureSummary: () => ipcRenderer.invoke('limits:getFeatureSummary'),
     getUpgradeMessage: (type, params) => ipcRenderer.invoke('limits:getUpgradeMessage', type, params),
+    
+    // Quota-Based Feature Checks ("Taste of Power" Model)
+    canAccessSSH: () => ipcRenderer.invoke('limits:canAccessSSH'),
+    canStartSshSession: () => ipcRenderer.invoke('limits:canStartSshSession'),
+    isSshSessionExpired: () => ipcRenderer.invoke('limits:isSshSessionExpired'),
+    canAccessBlueprints: () => ipcRenderer.invoke('limits:canAccessBlueprints'),
+    canCreateBlueprint: (count) => ipcRenderer.invoke('limits:canCreateBlueprint', count),
+    canCreateTodo: (count) => ipcRenderer.invoke('limits:canCreateTodo', count),
+    canCreateCollection: (count) => ipcRenderer.invoke('limits:canCreateCollection', count),
+    getCollectionLimitInfo: (count) => ipcRenderer.invoke('limits:getCollectionLimitInfo', count),
+    canUseTimeTravel: () => ipcRenderer.invoke('limits:canUseTimeTravel'),
+    getTimeTravelLimit: () => ipcRenderer.invoke('limits:getTimeTravelLimit'),
+    canExecuteTypeScript: () => ipcRenderer.invoke('limits:canExecuteTypeScript'),
+    canExecutePython: () => ipcRenderer.invoke('limits:canExecutePython'),
+    getLanguageQuotaStatus: (lang) => ipcRenderer.invoke('limits:getLanguageQuotaStatus', lang),
+  },
+  
+  // ~~~~~~~~~~~~~~ Usage Tracking ~~~~~~~~~~~~~~
+  usage: {
+    getSummary: () => ipcRenderer.invoke('usage:getSummary'),
+    getQuotaHitMessage: (feature) => ipcRenderer.invoke('usage:getQuotaHitMessage', feature),
+    recordTypescriptExecution: () => ipcRenderer.invoke('usage:recordTypescriptExecution'),
+    recordPythonExecution: () => ipcRenderer.invoke('usage:recordPythonExecution'),
+    startSshSession: () => ipcRenderer.invoke('usage:startSshSession'),
+    endSshSession: () => ipcRenderer.invoke('usage:endSshSession'),
+    getSshSessionMinutes: () => ipcRenderer.invoke('usage:getSshSessionMinutes'),
+  },
+  
+  // ~~~~~~~~~~~~~~ Pro Timer (20-Min Daily Pass) ~~~~~~~~~~~~~~
+  proTimer: {
+    getStatus: () => ipcRenderer.invoke('proTimer:getStatus'),
+    start: () => ipcRenderer.invoke('proTimer:start'),
+    stop: () => ipcRenderer.invoke('proTimer:stop'),
+    canUse: () => ipcRenderer.invoke('proTimer:canUse'),
+    getExpiredMessage: () => ipcRenderer.invoke('proTimer:getExpiredMessage'),
   },
 });
