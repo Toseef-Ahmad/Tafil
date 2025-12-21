@@ -429,13 +429,13 @@
       display: flex; 
       flex-direction: column; 
       height: 100%; 
-      background: #0a0a0b;
+      background: var(--bg-primary, #0a0a0b);
       overflow: hidden;
       position: relative;
     }
     .playground-editor {
       flex: 1; min-height: 200px; font-family: 'JetBrains Mono', monospace;
-      background: #111113; color: #e4e4e7; padding: 16px;
+      background: var(--bg-secondary, #111113); color: var(--text-primary, #e4e4e7); padding: 16px;
       border: none; outline: none; resize: none;
       font-size: 13px; line-height: 1.6;
     }
@@ -445,16 +445,16 @@
       overflow-y: auto; 
       overflow-x: hidden;
       font-family: 'JetBrains Mono', monospace;
-      background: #0a0a0b; 
-      color: #a1a1aa; 
+      background: var(--bg-primary, #0a0a0b); 
+      color: var(--text-secondary, #a1a1aa); 
       padding: 16px;
-      border-top: 1px solid rgba(255,255,255,0.06);
+      border-top: 1px solid var(--border-subtle, rgba(255,255,255,0.06));
       font-size: 13px; 
       line-height: 1.6;
       scroll-behavior: smooth;
     }
     .playground-output p { margin: 4px 0; padding: 2px 0; }
-    .playground-output .log { color: #e4e4e7; }
+    .playground-output .log { color: var(--text-primary, #e4e4e7); }
     .playground-output .error { color: #f43f5e; }
     .playground-output .warn { color: #f59e0b; }
     .playground-output .info { color: #0ea5e9; }
@@ -467,11 +467,11 @@
       position: relative;
     }
     .monaco-editor { 
-      background: #111113 !important; 
+      background: var(--bg-secondary, #111113) !important; 
       overflow: hidden !important;
     }
-    .monaco-editor .margin { background: #0a0a0b !important; }
-    .monaco-editor .monaco-editor-background { background: #111113 !important; }
+    .monaco-editor .margin { background: var(--bg-primary, #0a0a0b) !important; }
+    .monaco-editor .monaco-editor-background { background: var(--bg-secondary, #111113) !important; }
     
     /* Prevent any scroll behavior in playground */
     #playgroundPanel, #playgroundPanel * {
@@ -492,7 +492,7 @@
       letter-spacing: 0.5px;
     }
     .monaco-editor .inline-result {
-      color: #10b981 !important;
+      color: var(--accent-emerald, #10b981) !important;
       background: rgba(16, 185, 129, 0.1) !important;
       padding: 2px 6px !important;
       border-radius: 3px !important;
@@ -510,17 +510,25 @@
       font-family: 'JetBrains Mono', monospace;
       font-size: 12px;
       font-weight: 700;
-      color: #10b981;
+      color: var(--accent-emerald, #10b981);
       background: rgba(16, 185, 129, 0.12);
       border: 1px solid rgba(16, 185, 129, 0.22);
       white-space: nowrap;
       pointer-events: none;
       opacity: 0.95;
     }
+    /* Light theme adjustments for inline results */
+    body[data-theme="light"] .inline-result-widget,
+    body[data-theme="github-light"] .inline-result-widget,
+    body[data-theme="catppuccin-latte"] .inline-result-widget,
+    body[data-theme="solarized-light"] .inline-result-widget {
+      background: rgba(16, 185, 129, 0.15);
+      border-color: rgba(16, 185, 129, 0.3);
+    }
     
     /* SSH Host Cards */
     .ssh-host-card {
-      background: #111113; border: 1px solid rgba(255,255,255,0.06);
+      background: var(--bg-secondary, #111113); border: 1px solid var(--border-subtle, rgba(255,255,255,0.06));
       border-radius: 12px; padding: 16px;
       transition: all 0.15s ease; position: relative;
     }
@@ -537,17 +545,17 @@
     /* Terminal Panel */
     .terminal-panel {
       display: none; flex-direction: column; height: 100%;
-      background: #0a0a0b;
+      background: var(--bg-primary, #0a0a0b);
     }
     .terminal-panel.active { display: flex; }
     .terminal-header {
       display: flex; align-items: center; justify-content: space-between;
-      padding: 12px 16px; border-bottom: 1px solid rgba(255,255,255,0.06);
-      background: #111113;
+      padding: 12px 16px; border-bottom: 1px solid var(--border-subtle, rgba(255,255,255,0.06));
+      background: var(--bg-secondary, #111113);
     }
     .terminal-container {
       flex: 1; overflow: hidden; position: relative;
-      background: #0a0a0b; padding: 8px;
+      background: var(--bg-primary, #0a0a0b); padding: 8px;
     }
     #terminal { width: 100%; height: 100%; }
     
@@ -909,10 +917,10 @@
     }
   </style>
 </head>
-<body class="min-h-screen flex" style="font-family: 'Inter', -apple-system, sans-serif; background-color: #0a0a0b; color: #fafafa;">
+<body class="min-h-screen flex" style="font-family: 'Inter', -apple-system, sans-serif; background-color: var(--bg-primary, #0a0a0b); color: var(--text-primary, #fafafa);">
   
   <!-- Sidebar -->
-  <aside id="sidebar" class="sidebar flex flex-col h-screen sticky top-0" style="background: #111113; border-right: 1px solid rgba(255,255,255,0.06);">
+  <aside id="sidebar" class="sidebar flex flex-col h-screen sticky top-0" style="background: var(--bg-secondary, #111113); border-right: 1px solid var(--border-subtle, rgba(255,255,255,0.06));">
     <!-- Sidebar Header -->
     <div class="flex items-center justify-between p-3 border-b" style="border-color: rgba(255,255,255,0.06);">
       <div class="flex items-center gap-2">
@@ -1095,7 +1103,7 @@
       <!-- View Title -->
       <div class="flex items-center justify-between mb-5">
         <div>
-          <h1 id="viewTitle" class="text-lg font-semibold" style="color: #fafafa;">All Projects</h1>
+          <h1 id="viewTitle" class="text-lg font-semibold" style="color: var(--text-primary, #fafafa);">All Projects</h1>
           <p id="viewSubtitle" class="text-xs" style="color: #71717a;">Click "Scan Home" to find Node.js projects</p>
         </div>
         <div class="flex items-center gap-2">
@@ -1108,7 +1116,7 @@
       <!-- Insights Panel (hidden by default) -->
       <div id="insightsPanel" class="hidden">
         <div class="insights-panel mb-4">
-          <h3 class="text-sm font-semibold mb-3" style="color: #fafafa;">Project Health</h3>
+          <h3 class="text-sm font-semibold mb-3" style="color: var(--text-primary, #fafafa);">Project Health</h3>
           <div id="insightsList">
             <!-- Insights will be inserted here -->
           </div>
@@ -1125,7 +1133,7 @@
         <div class="w-16 h-16 rounded-2xl bg-violet-500/20 flex items-center justify-center mb-4">
           <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/></svg>
         </div>
-        <h3 class="text-base font-semibold mb-1" style="color: #fafafa;">No projects found</h3>
+        <h3 class="text-base font-semibold mb-1" style="color: var(--text-primary, #fafafa);">No projects found</h3>
         <p class="text-sm mb-4" style="color: #71717a;">Create a new project or scan your folders to get started</p>
         <div class="flex gap-2 flex-wrap justify-center">
           <button id="emptyStateCreateProject" class="px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2" style="background: #8b5cf6; color: white;">
@@ -1135,7 +1143,7 @@
           <button id="emptyStateScanHome" class="px-4 py-2 rounded-lg text-sm font-medium transition-all" style="background: rgba(139, 92, 246, 0.15); color: #a78bfa; border: 1px solid rgba(139, 92, 246, 0.3);">
             Scan Home
           </button>
-          <button id="emptyStateScanFolder" class="px-4 py-2 rounded-lg text-sm font-medium transition-all" style="background: rgba(255,255,255,0.05); color: #fafafa; border: 1px solid rgba(255,255,255,0.1);">
+          <button id="emptyStateScanFolder" class="px-4 py-2 rounded-lg text-sm font-medium transition-all" style="background: var(--bg-hover, rgba(255,255,255,0.05)); color: var(--text-primary, #fafafa); border: 1px solid var(--border-subtle, rgba(255,255,255,0.1));">
             Scan Folder
           </button>
         </div>
@@ -1146,9 +1154,9 @@
     <main id="playgroundPanel" class="module-panel flex-1" style="position: relative; overflow: hidden !important; height: 100%;">
       <div class="playground-container" style="height: 100%; display: flex; flex-direction: column; overflow: hidden;">
         <!-- Toolbar -->
-        <div class="flex items-center justify-between px-4 py-3" style="border-bottom: 1px solid rgba(255,255,255,0.06);">
+        <div class="flex items-center justify-between px-4 py-3" style="border-bottom: 1px solid var(--border-subtle, rgba(255,255,255,0.06)); background: var(--bg-secondary, #111113);">
           <div class="flex items-center gap-3">
-            <h2 class="text-sm font-semibold" style="color: #fafafa;">JavaScript Playground</h2>
+            <h2 class="text-sm font-semibold" style="color: var(--text-primary, #fafafa);">JavaScript Playground</h2>
             <span class="text-xs px-2 py-1 rounded flex items-center gap-1" style="color: #10b981; background: rgba(16,185,129,0.1); border: 1px solid rgba(16,185,129,0.2);">
               <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z"/></svg>
               Node.js
@@ -1195,14 +1203,14 @@
     </main>
 
     <!-- ==================== SSH MODULE ==================== -->
-    <main id="sshPanel" class="module-panel flex-1 flex flex-col overflow-hidden" style="background: #0a0a0b;">
+    <main id="sshPanel" class="module-panel flex-1 flex flex-col overflow-hidden" style="background: var(--bg-primary, #0a0a0b);">
       <!-- SSH Hosts View -->
       <div id="sshHostsView" class="flex-1 overflow-y-auto p-5">
         <!-- View Title -->
         <div class="flex items-center justify-between mb-5">
           <div>
-            <h1 class="text-lg font-semibold" style="color: #fafafa;">SSH Hosts</h1>
-            <p class="text-xs" style="color: #71717a;">Connect to your servers with one click</p>
+            <h1 class="text-lg font-semibold" style="color: var(--text-primary, #fafafa);">SSH Hosts</h1>
+            <p class="text-xs" style="color: var(--text-tertiary, #71717a);">Connect to your servers with one click</p>
           </div>
           <button id="addHostBtn" class="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all" style="background: #8b5cf6; color: white;">
             <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
@@ -1220,8 +1228,8 @@
           <div class="w-16 h-16 rounded-2xl bg-violet-500/20 flex items-center justify-center mb-4">
             <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
           </div>
-          <h3 class="text-base font-semibold mb-1" style="color: #fafafa;">No SSH hosts configured</h3>
-          <p class="text-sm mb-4 text-center max-w-sm" style="color: #71717a;">Add your first host to connect to servers with one click</p>
+          <h3 class="text-base font-semibold mb-1" style="color: var(--text-primary, #fafafa);">No SSH hosts configured</h3>
+          <p class="text-sm mb-4 text-center max-w-sm" style="color: var(--text-tertiary, #71717a);">Add your first host to connect to servers with one click</p>
           <button id="sshEmptyAddBtn" class="px-4 py-2 rounded-lg text-sm font-medium transition-all" style="background: #8b5cf6; color: white;">
             Add Your First Host
           </button>
@@ -1237,7 +1245,7 @@
               </button>
               <div class="flex items-center gap-2">
                 <span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-                <span id="terminalHostName" class="text-sm font-medium" style="color: #fafafa;">Connected</span>
+                <span id="terminalHostName" class="text-sm font-medium" style="color: var(--text-primary, #fafafa);">Connected</span>
               </div>
               <span class="text-xs px-2 py-1 rounded flex items-center gap-1.5" style="background: rgba(16, 185, 129, 0.1); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.2);">
                 <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" x2="20" y1="19" y2="19"/></svg>

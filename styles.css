@@ -1537,6 +1537,318 @@ body[data-theme] ::-webkit-scrollbar-thumb:hover {
   background: var(--border-hover);
 }
 
+/* Playground Section */
+body[data-theme] .playground-container {
+  background: var(--bg-primary) !important;
+}
+
+body[data-theme] .playground-output {
+  background: var(--bg-primary) !important;
+  color: var(--text-secondary) !important;
+  border-top-color: var(--border-subtle) !important;
+}
+
+body[data-theme] .playground-output .log {
+  color: var(--text-primary) !important;
+}
+
+/* Playground toolbar */
+body[data-theme] #playgroundPanel .flex.items-center.justify-between {
+  background: var(--bg-secondary) !important;
+  border-bottom-color: var(--border-subtle) !important;
+}
+
+body[data-theme] #playgroundPanel h2 {
+  color: var(--text-primary) !important;
+}
+
+/* ============================================
+   LIGHT THEME SPECIFIC OVERRIDES
+   Ensure proper contrast and visibility
+   ============================================ */
+
+/* Light themes: all text should be dark */
+body[data-theme="light"] *,
+body[data-theme="github-light"] *,
+body[data-theme="catppuccin-latte"] *,
+body[data-theme="solarized-light"] * {
+  --text-fallback: #0f172a;
+}
+
+/* Light theme headings and titles */
+body[data-theme="light"] h1, body[data-theme="light"] h2, body[data-theme="light"] h3, body[data-theme="light"] h4,
+body[data-theme="github-light"] h1, body[data-theme="github-light"] h2, body[data-theme="github-light"] h3, body[data-theme="github-light"] h4,
+body[data-theme="catppuccin-latte"] h1, body[data-theme="catppuccin-latte"] h2, body[data-theme="catppuccin-latte"] h3, body[data-theme="catppuccin-latte"] h4,
+body[data-theme="solarized-light"] h1, body[data-theme="solarized-light"] h2, body[data-theme="solarized-light"] h3, body[data-theme="solarized-light"] h4 {
+  color: var(--text-primary) !important;
+}
+
+/* Light theme text that was hardcoded white */
+body[data-theme="light"] [style*="color: #fafafa"],
+body[data-theme="light"] [style*="color: #e4e4e7"],
+body[data-theme="light"] [style*="color:#fafafa"],
+body[data-theme="light"] [style*="color:#e4e4e7"],
+body[data-theme="github-light"] [style*="color: #fafafa"],
+body[data-theme="github-light"] [style*="color: #e4e4e7"],
+body[data-theme="github-light"] [style*="color:#fafafa"],
+body[data-theme="github-light"] [style*="color:#e4e4e7"],
+body[data-theme="catppuccin-latte"] [style*="color: #fafafa"],
+body[data-theme="catppuccin-latte"] [style*="color: #e4e4e7"],
+body[data-theme="catppuccin-latte"] [style*="color:#fafafa"],
+body[data-theme="catppuccin-latte"] [style*="color:#e4e4e7"],
+body[data-theme="solarized-light"] [style*="color: #fafafa"],
+body[data-theme="solarized-light"] [style*="color: #e4e4e7"],
+body[data-theme="solarized-light"] [style*="color:#fafafa"],
+body[data-theme="solarized-light"] [style*="color:#e4e4e7"] {
+  color: var(--text-primary) !important;
+}
+
+/* Light theme Monaco editor overrides */
+body[data-theme="light"] .monaco-editor,
+body[data-theme="github-light"] .monaco-editor,
+body[data-theme="catppuccin-latte"] .monaco-editor,
+body[data-theme="solarized-light"] .monaco-editor {
+  background: var(--bg-secondary) !important;
+  color: var(--text-primary) !important;
+}
+
+body[data-theme="light"] .monaco-editor .view-line,
+body[data-theme="github-light"] .monaco-editor .view-line,
+body[data-theme="catppuccin-latte"] .monaco-editor .view-line,
+body[data-theme="solarized-light"] .monaco-editor .view-line {
+  color: var(--text-primary) !important;
+}
+
+body[data-theme="light"] .monaco-editor .margin,
+body[data-theme="github-light"] .monaco-editor .margin,
+body[data-theme="catppuccin-latte"] .monaco-editor .margin,
+body[data-theme="solarized-light"] .monaco-editor .margin {
+  background: var(--bg-tertiary) !important;
+}
+
+body[data-theme="light"] .monaco-editor .current-line,
+body[data-theme="github-light"] .monaco-editor .current-line,
+body[data-theme="catppuccin-latte"] .monaco-editor .current-line,
+body[data-theme="solarized-light"] .monaco-editor .current-line {
+  background: var(--bg-hover) !important;
+  border-color: var(--border-default) !important;
+}
+
+/* Light theme playground */
+body[data-theme="light"] .playground-container,
+body[data-theme="github-light"] .playground-container,
+body[data-theme="catppuccin-latte"] .playground-container,
+body[data-theme="solarized-light"] .playground-container {
+  background: var(--bg-primary) !important;
+}
+
+body[data-theme="light"] .playground-editor,
+body[data-theme="github-light"] .playground-editor,
+body[data-theme="catppuccin-latte"] .playground-editor,
+body[data-theme="solarized-light"] .playground-editor {
+  background: var(--bg-secondary) !important;
+  color: var(--text-primary) !important;
+}
+
+/* Light theme inline results */
+body[data-theme="light"] .inline-result-widget,
+body[data-theme="github-light"] .inline-result-widget,
+body[data-theme="catppuccin-latte"] .inline-result-widget,
+body[data-theme="solarized-light"] .inline-result-widget {
+  background: rgba(16, 185, 129, 0.15) !important;
+  border-color: rgba(16, 185, 129, 0.35) !important;
+  color: #059669 !important;
+}
+
+/* Light theme buttons and action buttons */
+body[data-theme="light"] .action-btn,
+body[data-theme="github-light"] .action-btn,
+body[data-theme="catppuccin-latte"] .action-btn,
+body[data-theme="solarized-light"] .action-btn {
+  color: var(--text-secondary) !important;
+  background: var(--bg-hover) !important;
+}
+
+body[data-theme="light"] .action-btn:hover,
+body[data-theme="github-light"] .action-btn:hover,
+body[data-theme="catppuccin-latte"] .action-btn:hover,
+body[data-theme="solarized-light"] .action-btn:hover {
+  color: var(--text-primary) !important;
+  background: var(--bg-elevated) !important;
+}
+
+/* Light theme body and main containers */
+body[data-theme="light"],
+body[data-theme="github-light"],
+body[data-theme="catppuccin-latte"],
+body[data-theme="solarized-light"] {
+  background-color: var(--bg-primary) !important;
+  color: var(--text-primary) !important;
+}
+
+body[data-theme="light"] main,
+body[data-theme="github-light"] main,
+body[data-theme="catppuccin-latte"] main,
+body[data-theme="solarized-light"] main {
+  background-color: var(--bg-primary) !important;
+}
+
+/* Light theme sidebar */
+body[data-theme="light"] .sidebar,
+body[data-theme="github-light"] .sidebar,
+body[data-theme="catppuccin-latte"] .sidebar,
+body[data-theme="solarized-light"] .sidebar {
+  background-color: var(--bg-secondary) !important;
+  border-color: var(--border-subtle) !important;
+}
+
+body[data-theme="light"] .sidebar-item,
+body[data-theme="github-light"] .sidebar-item,
+body[data-theme="catppuccin-latte"] .sidebar-item,
+body[data-theme="solarized-light"] .sidebar-item {
+  color: var(--text-secondary) !important;
+}
+
+body[data-theme="light"] .sidebar-item:hover,
+body[data-theme="github-light"] .sidebar-item:hover,
+body[data-theme="catppuccin-latte"] .sidebar-item:hover,
+body[data-theme="solarized-light"] .sidebar-item:hover {
+  background: var(--bg-hover) !important;
+  color: var(--text-primary) !important;
+}
+
+/* Light theme module tabs */
+body[data-theme="light"] .module-tab,
+body[data-theme="github-light"] .module-tab,
+body[data-theme="catppuccin-latte"] .module-tab,
+body[data-theme="solarized-light"] .module-tab {
+  color: var(--text-secondary) !important;
+}
+
+body[data-theme="light"] .module-tab:hover,
+body[data-theme="github-light"] .module-tab:hover,
+body[data-theme="catppuccin-latte"] .module-tab:hover,
+body[data-theme="solarized-light"] .module-tab:hover {
+  color: var(--text-primary) !important;
+  background: var(--bg-hover) !important;
+}
+
+/* Light theme command palette */
+body[data-theme="light"] .command-palette-box,
+body[data-theme="github-light"] .command-palette-box,
+body[data-theme="catppuccin-latte"] .command-palette-box,
+body[data-theme="solarized-light"] .command-palette-box {
+  background: var(--bg-secondary) !important;
+  border-color: var(--border-default) !important;
+}
+
+body[data-theme="light"] .command-input,
+body[data-theme="github-light"] .command-input,
+body[data-theme="catppuccin-latte"] .command-input,
+body[data-theme="solarized-light"] .command-input {
+  background: var(--bg-tertiary) !important;
+  color: var(--text-primary) !important;
+  border-color: var(--border-subtle) !important;
+}
+
+body[data-theme="light"] .command-item-title,
+body[data-theme="github-light"] .command-item-title,
+body[data-theme="catppuccin-latte"] .command-item-title,
+body[data-theme="solarized-light"] .command-item-title {
+  color: var(--text-primary) !important;
+}
+
+/* Light theme modals */
+body[data-theme="light"] .modal,
+body[data-theme="github-light"] .modal,
+body[data-theme="catppuccin-latte"] .modal,
+body[data-theme="solarized-light"] .modal {
+  background: var(--bg-secondary) !important;
+  border-color: var(--border-default) !important;
+  color: var(--text-primary) !important;
+}
+
+/* Light theme SSH panel */
+body[data-theme="light"] #sshPanel,
+body[data-theme="github-light"] #sshPanel,
+body[data-theme="catppuccin-latte"] #sshPanel,
+body[data-theme="solarized-light"] #sshPanel {
+  background: var(--bg-primary) !important;
+}
+
+/* Light theme input fields */
+body[data-theme="light"] input,
+body[data-theme="light"] textarea,
+body[data-theme="github-light"] input,
+body[data-theme="github-light"] textarea,
+body[data-theme="catppuccin-latte"] input,
+body[data-theme="catppuccin-latte"] textarea,
+body[data-theme="solarized-light"] input,
+body[data-theme="solarized-light"] textarea {
+  background: var(--bg-tertiary) !important;
+  color: var(--text-primary) !important;
+  border-color: var(--border-default) !important;
+}
+
+/* Light theme collection items */
+body[data-theme="light"] .collection-item,
+body[data-theme="github-light"] .collection-item,
+body[data-theme="catppuccin-latte"] .collection-item,
+body[data-theme="solarized-light"] .collection-item {
+  color: var(--text-secondary) !important;
+}
+
+body[data-theme="light"] .collection-item:hover,
+body[data-theme="github-light"] .collection-item:hover,
+body[data-theme="catppuccin-latte"] .collection-item:hover,
+body[data-theme="solarized-light"] .collection-item:hover {
+  background: var(--bg-hover) !important;
+  color: var(--text-primary) !important;
+}
+
+/* Monaco Editor */
+body[data-theme] .monaco-editor {
+  background: var(--bg-secondary) !important;
+}
+
+body[data-theme] .monaco-editor .margin {
+  background: var(--bg-primary) !important;
+}
+
+body[data-theme] .monaco-editor .monaco-editor-background {
+  background: var(--bg-secondary) !important;
+}
+
+/* SSH Section */
+body[data-theme] .ssh-host-card {
+  background: var(--bg-secondary) !important;
+  border-color: var(--border-subtle) !important;
+  color: var(--text-primary) !important;
+}
+
+body[data-theme] .ssh-host-card h3 {
+  color: var(--text-primary) !important;
+}
+
+body[data-theme] .ssh-host-card p {
+  color: var(--text-tertiary) !important;
+}
+
+/* Terminal Panel */
+body[data-theme] .terminal-panel {
+  background: var(--bg-primary) !important;
+}
+
+body[data-theme] .terminal-header {
+  background: var(--bg-secondary) !important;
+  border-bottom-color: var(--border-subtle) !important;
+  color: var(--text-primary) !important;
+}
+
+body[data-theme] .terminal-container {
+  background: var(--bg-primary) !important;
+}
+
 /* Info panel */
 body[data-theme] .info-panel {
   background: var(--bg-secondary) !important;

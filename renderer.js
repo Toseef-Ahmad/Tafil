@@ -1011,7 +1011,7 @@ function applyInlineResults(inlineResults, version) {
       animation: fadeInResult 0.15s ease;
       ${isError 
         ? 'color: #f59e0b; background: rgba(245, 158, 11, 0.12); border: 1px solid rgba(245, 158, 11, 0.2);'
-        : 'color: #10b981; background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.2);'
+        : `color: ${getCSSVariable('--accent-emerald') || '#10b981'}; background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.2);`
       }
     `;
 
@@ -3125,6 +3125,208 @@ function toggleDarkMode() {
   }
 }
 
+// Helper function to get CSS variable value
+function getCSSVariable(variable) {
+  return getComputedStyle(document.documentElement).getPropertyValue(variable).trim() || 
+         getComputedStyle(document.body).getPropertyValue(variable).trim();
+}
+
+// Helper function to convert hex/rgba to hex
+function colorToHex(color) {
+  if (color.startsWith('#')) return color;
+  if (color.startsWith('rgb')) {
+    const match = color.match(/\d+/g);
+    if (match && match.length >= 3) {
+      const r = parseInt(match[0]).toString(16).padStart(2, '0');
+      const g = parseInt(match[1]).toString(16).padStart(2, '0');
+      const b = parseInt(match[2]).toString(16).padStart(2, '0');
+      return `#${r}${g}${b}`;
+    }
+  }
+  return color;
+}
+
+// Update Monaco editor theme based on current theme
+function updateMonacoTheme() {
+  if (!monacoInstance || !monacoEditor) return;
+  
+  try {
+    // Use THEMES object for accurate color values based on current theme
+    const theme = THEMES[currentTheme] || THEMES['midnight'];
+    const isLight = theme.type === 'light';
+    
+    // For light themes, use specific light-friendly colors
+    // For dark themes, use dark-friendly colors
+    let bgPrimary, bgSecondary, bgTertiary, bgHover, textPrimary, textSecondary, textMuted, accentPrimary;
+    
+    if (isLight) {
+      // Light theme defaults
+      bgPrimary = '#ffffff';
+      bgSecondary = '#f8fafc';
+      bgTertiary = '#f1f5f9';
+      bgHover = '#e2e8f0';
+      textPrimary = '#0f172a';  // Dark text for light background
+      textSecondary = '#475569';
+      textMuted = '#94a3b8';
+      accentPrimary = '#8b5cf6';
+      
+      // Try to get actual CSS values
+      const cssTextPrimary = getCSSVariable('--text-primary');
+      if (cssTextPrimary && !cssTextPrimary.includes('fafa') && !cssTextPrimary.includes('e4e4')) {
+        textPrimary = colorToHex(cssTextPrimary) || textPrimary;
+      }
+      const cssBgSecondary = getCSSVariable('--bg-secondary');
+      if (cssBgSecondary && !cssBgSecondary.includes('111') && !cssBgSecondary.includes('0a0')) {
+        bgSecondary = colorToHex(cssBgSecondary) || bgSecondary;
+      }
+      const cssBgHover = getCSSVariable('--bg-hover');
+      if (cssBgHover) {
+        bgHover = colorToHex(cssBgHover) || bgHover;
+      }
+      const cssAccent = getCSSVariable('--accent-primary');
+      if (cssAccent) {
+        accentPrimary = colorToHex(cssAccent) || accentPrimary;
+      }
+    } else {
+      // Dark theme defaults
+      bgPrimary = getCSSVariable('--bg-primary') || '#0a0a0b';
+      bgSecondary = getCSSVariable('--bg-secondary') || '#111113';
+      bgTertiary = getCSSVariable('--bg-tertiary') || '#18181b';
+      bgHover = getCSSVariable('--bg-hover') || '#27272a';
+      textPrimary = getCSSVariable('--text-primary') || '#e4e4e7';
+      textSecondary = getCSSVariable('--text-secondary') || '#a1a1aa';
+      textMuted = getCSSVariable('--text-muted') || '#52525b';
+      accentPrimary = getCSSVariable('--accent-primary') || '#8b5cf6';
+      
+      // Convert to hex
+      bgPrimary = colorToHex(bgPrimary);
+      bgSecondary = colorToHex(bgSecondary);
+      bgTertiary = colorToHex(bgTertiary);
+      bgHover = colorToHex(bgHover);
+      textPrimary = colorToHex(textPrimary);
+      textSecondary = colorToHex(textSecondary);
+      textMuted = colorToHex(textMuted);
+      accentPrimary = colorToHex(accentPrimary);
+    }
+    
+    // Line highlight color - visible in both light and dark
+    const lineHighlight = isLight ? bgHover : bgTertiary;
+    
+    // Remove # for Monaco token colors
+    const fg = textPrimary.replace('#', '');
+    const muted = textMuted.replace('#', '');
+    const accent = accentPrimary.replace('#', '');
+    
+    // Define theme with proper colors
+    monacoInstance.editor.defineTheme('tafil-theme', {
+      base: isLight ? 'vs' : 'vs-dark',
+      inherit: true, // Inherit base theme for proper defaults
+      rules: [
+        // Override base colors
+        { token: '', foreground: fg },
+        { token: 'comment', foreground: muted, fontStyle: 'italic' },
+        { token: 'keyword', foreground: accent, fontStyle: 'bold' },
+        { token: 'keyword.control', foreground: accent, fontStyle: 'bold' },
+        { token: 'string', foreground: '10b981' },
+        { token: 'string.quoted', foreground: '10b981' },
+        { token: 'number', foreground: 'f59e0b' },
+        { token: 'number.float', foreground: 'f59e0b' },
+        { token: 'operator', foreground: accent },
+        // Variables must be visible
+        { token: 'identifier', foreground: fg },
+        { token: 'variable', foreground: fg },
+        { token: 'variable.name', foreground: fg },
+        { token: 'variable.other', foreground: fg },
+        { token: 'variable.parameter', foreground: fg },
+        { token: 'variable.predefined', foreground: accent },
+        // Functions
+        { token: 'entity.name.function', foreground: fg },
+        { token: 'support.function', foreground: fg },
+        // Types and classes
+        { token: 'entity.name.type', foreground: fg },
+        { token: 'entity.name.class', foreground: fg },
+        { token: 'support.type', foreground: fg },
+        // Properties
+        { token: 'variable.other.property', foreground: fg },
+        { token: 'meta.property-name', foreground: fg },
+        // Punctuation
+        { token: 'punctuation', foreground: fg },
+        { token: 'delimiter', foreground: fg },
+        { token: 'delimiter.bracket', foreground: fg },
+      ],
+      colors: {
+        'editor.background': bgSecondary,
+        'editor.foreground': textPrimary,
+        'editor.lineHighlightBackground': lineHighlight,
+        'editor.lineHighlightBorder': isLight ? '#e2e8f0' : '#27272a',
+        'editor.selectionBackground': accentPrimary + '40',
+        'editorCursor.foreground': accentPrimary,
+        'editorWhitespace.foreground': textMuted + '60',
+        'editorIndentGuide.background': textMuted + '30',
+        'editorIndentGuide.activeBackground': textMuted + '60',
+        'editorLineNumber.foreground': textMuted,
+        'editorLineNumber.activeForeground': textSecondary,
+        'editor.wordHighlightBackground': accentPrimary + '20',
+      }
+    });
+    
+    // Apply theme
+    monacoEditor.updateOptions({ theme: 'tafil-theme' });
+    
+    // Also update blueprint editors if they exist
+    if (blueprintCodeMonacoEditor) {
+      blueprintCodeMonacoEditor.updateOptions({ theme: 'tafil-theme' });
+    }
+    if (blueprintGoalMonacoEditor) {
+      blueprintGoalMonacoEditor.updateOptions({ theme: 'tafil-theme' });
+    }
+  } catch (err) {
+    console.warn('Failed to update Monaco theme:', err);
+  }
+}
+
+// Update Terminal theme based on current theme
+function updateTerminalTheme() {
+  if (!terminal) return;
+  
+  try {
+    const bgPrimary = getCSSVariable('--bg-primary') || '#0a0a0b';
+    const textPrimary = getCSSVariable('--text-primary') || '#e4e4e7';
+    const textSecondary = getCSSVariable('--text-secondary') || '#a1a1aa';
+    const textMuted = getCSSVariable('--text-muted') || '#52525b';
+    const accentPrimary = getCSSVariable('--accent-primary') || '#8b5cf6';
+    
+    const bgPrimaryHex = colorToHex(bgPrimary);
+    const textPrimaryHex = colorToHex(textPrimary);
+    const textMutedHex = colorToHex(textMuted);
+    const accentPrimaryHex = colorToHex(accentPrimary);
+    
+    terminal.options.theme = {
+      background: bgPrimaryHex,
+      foreground: textPrimaryHex,
+      cursor: accentPrimaryHex,
+      black: '#000000',
+      red: '#f43f5e',
+      green: '#10b981',
+      yellow: '#f59e0b',
+      blue: '#0ea5e9',
+      magenta: accentPrimaryHex,
+      cyan: '#06b6d4',
+      white: textPrimaryHex,
+      brightBlack: textMutedHex,
+      brightRed: '#fb7185',
+      brightGreen: '#34d399',
+      brightYellow: '#fbbf24',
+      brightBlue: '#38bdf8',
+      brightMagenta: accentPrimaryHex,
+      brightCyan: '#22d3ee',
+      brightWhite: textPrimaryHex
+    };
+  } catch (err) {
+    console.warn('Failed to update Terminal theme:', err);
+  }
+}
+
 function setTheme(themeName) {
   if (!THEMES[themeName]) {
     themeName = 'midnight';
@@ -3173,6 +3375,12 @@ function setTheme(themeName) {
   
   // Update theme selector if open
   updateThemeSelector();
+  
+  // Update Monaco editor theme
+  updateMonacoTheme();
+  
+  // Update Terminal theme
+  updateTerminalTheme();
   
   // Show notification
   showNotification(`Theme changed to ${THEMES[themeName].name}`, 'success');
@@ -4313,8 +4521,8 @@ console.log('Ready to code!')
 `;
     }
 
-    // Define custom theme
-    monaco.editor.defineTheme('tafil-dark', {
+    // Define custom theme (will be updated dynamically)
+    monaco.editor.defineTheme('tafil-theme', {
       base: 'vs-dark',
       inherit: true,
       rules: [
@@ -4360,7 +4568,7 @@ console.log('Ready to code!')
     monacoEditor = monaco.editor.create(codeEditor, {
       value: savedCode,
       language: 'javascript',
-      theme: 'tafil-dark',
+      theme: 'tafil-theme',
       fontSize: 14,
       fontFamily: "'JetBrains Mono', 'Fira Code', 'Courier New', monospace",
       fontLigatures: true,
@@ -4443,6 +4651,9 @@ console.log('Ready to code!')
       autoIndent: 'full',
     });
 
+    // Apply theme
+    updateMonacoTheme();
+    
     // CRITICAL: Prevent Monaco from scrolling on init
     setTimeout(() => {
       if (monacoEditor) {
@@ -4887,6 +5098,9 @@ function initSSH() {
 
   terminal.open(document.getElementById('terminal'));
   terminalFitAddon.fit();
+  
+  // Apply theme
+  updateTerminalTheme();
 
   terminal.writeln('\x1b[90m╭───────────────────────────────────────────────────────────╮\x1b[0m');
   terminal.writeln('\x1b[90m│\x1b[0m \x1b[1;36m🖥️  Tafil SSH Terminal\x1b[0m                                 \x1b[90m│\x1b[0m');
