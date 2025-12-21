@@ -1513,6 +1513,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (cancelSettingsBtn) cancelSettingsBtn.addEventListener("click", hideSettingsModal);
   if (saveSettingsBtn) saveSettingsBtn.addEventListener("click", saveSettings);
   
+  // Settings Tab Switching
+  initSettingsTabs();
+  
   // Event listeners - Modals
   if (modalCancelBtn) modalCancelBtn.addEventListener("click", hideModals);
   if (modalInstallBtn) modalInstallBtn.addEventListener("click", handleModalInstall);
@@ -3160,29 +3163,63 @@ function loadSettings() {
 
 function saveSettings() {
   try {
-    const selectedIdeRadio = document.querySelector('input[name="defaultIDE"]:checked');
-    if (selectedIdeRadio) {
-      const ideIndex = parseInt(selectedIdeRadio.value);
-      if (ideIndex >= 0 && ideIndex < installedIDEs.length) {
-        defaultIDE = installedIDEs[ideIndex];
-        localStorage.setItem('defaultIDE', JSON.stringify(defaultIDE));
+    // Save from dropdowns (new style)
+    const ideSelect = document.getElementById('defaultIdeSelect');
+    if (ideSelect) {
+      const ideCommand = ideSelect.value;
+      if (ideCommand) {
+        const ide = installedIDEs.find(i => i.command === ideCommand);
+        if (ide) {
+          defaultIDE = ide;
+          localStorage.setItem('defaultIDE', JSON.stringify(defaultIDE));
+        }
       } else {
         defaultIDE = null;
         localStorage.removeItem('defaultIDE');
       }
+    } else {
+      // Legacy radio fallback
+      const selectedIdeRadio = document.querySelector('input[name="defaultIDE"]:checked');
+      if (selectedIdeRadio) {
+        const ideIndex = parseInt(selectedIdeRadio.value);
+        if (ideIndex >= 0 && ideIndex < installedIDEs.length) {
+          defaultIDE = installedIDEs[ideIndex];
+          localStorage.setItem('defaultIDE', JSON.stringify(defaultIDE));
+        } else {
+          defaultIDE = null;
+          localStorage.removeItem('defaultIDE');
+        }
+      }
     }
     
-    const selectedTerminalRadio = document.querySelector('input[name="defaultTerminal"]:checked');
-    if (selectedTerminalRadio) {
-      const terminalCommand = selectedTerminalRadio.value;
-      if (terminalCommand === 'system-default') {
-        defaultTerminal = null;
-        localStorage.removeItem('defaultTerminal');
-      } else {
+    // Save terminal from dropdown (new style)
+    const terminalSelect = document.getElementById('defaultTerminalSelect');
+    if (terminalSelect) {
+      const terminalCommand = terminalSelect.value;
+      if (terminalCommand) {
         const terminal = installedTerminals.find(t => t.command === terminalCommand);
         if (terminal) {
           defaultTerminal = { name: terminal.name, command: terminal.command };
           localStorage.setItem('defaultTerminal', JSON.stringify(defaultTerminal));
+        }
+      } else {
+        defaultTerminal = null;
+        localStorage.removeItem('defaultTerminal');
+      }
+    } else {
+      // Legacy radio fallback
+      const selectedTerminalRadio = document.querySelector('input[name="defaultTerminal"]:checked');
+      if (selectedTerminalRadio) {
+        const terminalCommand = selectedTerminalRadio.value;
+        if (terminalCommand === 'system-default') {
+          defaultTerminal = null;
+          localStorage.removeItem('defaultTerminal');
+        } else {
+          const terminal = installedTerminals.find(t => t.command === terminalCommand);
+          if (terminal) {
+            defaultTerminal = { name: terminal.name, command: terminal.command };
+            localStorage.setItem('defaultTerminal', JSON.stringify(defaultTerminal));
+          }
         }
       }
     }
@@ -3194,7 +3231,46 @@ function saveSettings() {
   }
 }
 
+// Settings Tab Switching
+function initSettingsTabs() {
+  const tabs = document.querySelectorAll('.settings-icon-tab');
+  const panels = document.querySelectorAll('.settings-panel');
+  const titleEl = document.getElementById('settingsCurrentTabTitle');
+  
+  tabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      const targetPanel = tab.dataset.tab;
+      
+      // Update active tab
+      tabs.forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      
+      // Update title bar
+      if (titleEl) {
+        const tabName = tab.querySelector('span')?.textContent || targetPanel;
+        titleEl.textContent = tabName.charAt(0).toUpperCase() + tabName.slice(1);
+      }
+      
+      // Update active panel
+      panels.forEach(p => p.classList.remove('active'));
+      const panel = document.querySelector(`.settings-panel[data-panel="${targetPanel}"]`);
+      if (panel) panel.classList.add('active');
+    });
+  });
+}
+
 async function showSettingsModal() {
+  // Reset to first tab
+  const firstTab = document.querySelector('.settings-icon-tab[data-tab="appearance"]');
+  const firstPanel = document.querySelector('.settings-panel[data-panel="appearance"]');
+  const titleEl = document.getElementById('settingsCurrentTabTitle');
+  
+  document.querySelectorAll('.settings-icon-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.settings-panel').forEach(p => p.classList.remove('active'));
+  if (firstTab) firstTab.classList.add('active');
+  if (firstPanel) firstPanel.classList.add('active');
+  if (titleEl) titleEl.textContent = 'Appearance';
+  
   // Refresh lists
   try {
     installedIDEs = await window.electronAPI.getInstalledIDEs();
@@ -3203,42 +3279,79 @@ async function showSettingsModal() {
     console.error('Error refreshing:', err);
   }
   
-  // Add theme selector at the top of settings
-  const themeSelectorContainer = document.getElementById('themeSelectorContainer');
-  if (themeSelectorContainer) {
-    themeSelectorContainer.innerHTML = createThemeSelector();
-    setupThemeSelectorListeners();
-  }
-  
-  // Populate IDE list
-  defaultIdeList.innerHTML = '';
-  if (installedIDEs.length === 0) {
-    noIdeMessage?.classList.remove('hidden');
-  } else {
-    noIdeMessage?.classList.add('hidden');
-    
-    // None option
-    const noneOption = createSettingsOption(-1, 'defaultIDE', '❓', 'None (Always ask)', !defaultIDE);
-    defaultIdeList.appendChild(noneOption);
-    
-    installedIDEs.forEach((ide, index) => {
-      const isSelected = defaultIDE && defaultIDE.command === ide.command;
-      const option = createSettingsOption(index, 'defaultIDE', ide.icon, ide.name, isSelected);
-      defaultIdeList.appendChild(option);
+  // Setup theme dropdown
+  const themeDropdown = document.getElementById('themeDropdown');
+  if (themeDropdown) {
+    themeDropdown.value = currentTheme || 'dark';
+    themeDropdown.addEventListener('change', (e) => {
+      setTheme(e.target.value);
     });
   }
   
-  // Populate Terminal list
-  defaultTerminalList.innerHTML = '';
-  const isSystemDefault = !defaultTerminal;
-  const systemOption = createSettingsOption('system-default', 'defaultTerminal', '🖥️', 'System Default', isSystemDefault);
-  defaultTerminalList.appendChild(systemOption);
+  // Populate IDE dropdown
+  const ideSelect = document.getElementById('defaultIdeSelect');
+  if (ideSelect && installedIDEs.length > 0) {
+    ideSelect.innerHTML = '<option value="">Always ask</option>';
+    installedIDEs.forEach((ide) => {
+      const option = document.createElement('option');
+      option.value = ide.command;
+      option.textContent = `${ide.icon} ${ide.name}`;
+      if (defaultIDE && defaultIDE.command === ide.command) {
+        option.selected = true;
+      }
+      ideSelect.appendChild(option);
+    });
+  }
   
-  installedTerminals.forEach((terminal) => {
-    const isSelected = defaultTerminal && defaultTerminal.command === terminal.command;
-    const option = createSettingsOption(terminal.command, 'defaultTerminal', terminal.icon, terminal.name, isSelected);
-    defaultTerminalList.appendChild(option);
-  });
+  // Populate Terminal dropdown
+  const terminalSelect = document.getElementById('defaultTerminalSelect');
+  if (terminalSelect) {
+    terminalSelect.innerHTML = '<option value="">System Default</option>';
+    installedTerminals.forEach((terminal) => {
+      const option = document.createElement('option');
+      option.value = terminal.command;
+      option.textContent = `${terminal.icon} ${terminal.name}`;
+      if (defaultTerminal && defaultTerminal.command === terminal.command) {
+        option.selected = true;
+      }
+      terminalSelect.appendChild(option);
+    });
+  }
+  
+  // Legacy compatibility - keep populating hidden lists
+  // Populate IDE list
+  if (defaultIdeList) {
+    defaultIdeList.innerHTML = '';
+    if (installedIDEs.length === 0) {
+      noIdeMessage?.classList.remove('hidden');
+    } else {
+      noIdeMessage?.classList.add('hidden');
+      
+      // None option
+      const noneOption = createSettingsOption(-1, 'defaultIDE', '❓', 'None (Always ask)', !defaultIDE);
+      defaultIdeList.appendChild(noneOption);
+      
+      installedIDEs.forEach((ide, index) => {
+        const isSelected = defaultIDE && defaultIDE.command === ide.command;
+        const option = createSettingsOption(index, 'defaultIDE', ide.icon, ide.name, isSelected);
+        defaultIdeList.appendChild(option);
+      });
+    }
+  }
+  
+  // Populate Terminal list
+  if (defaultTerminalList) {
+    defaultTerminalList.innerHTML = '';
+    const isSystemDefault = !defaultTerminal;
+    const systemOption = createSettingsOption('system-default', 'defaultTerminal', '🖥️', 'System Default', isSystemDefault);
+    defaultTerminalList.appendChild(systemOption);
+    
+    installedTerminals.forEach((terminal) => {
+      const isSelected = defaultTerminal && defaultTerminal.command === terminal.command;
+      const option = createSettingsOption(terminal.command, 'defaultTerminal', terminal.icon, terminal.name, isSelected);
+      defaultTerminalList.appendChild(option);
+    });
+  }
   
   // Load license details
   loadLicenseDetails();
@@ -3254,43 +3367,48 @@ async function loadLicenseDetails() {
   if (!container) return;
   
   try {
-    const status = await window.electronAPI.license.getStatus();
+    // Use the correct API - licenseGetStatus (not license.getStatus)
+    const status = await window.electronAPI.licenseGetStatus();
+    console.log('License status in settings:', status);
     
-    if (status.isPro) {
-      // Pro license - minimal list
-      const licenseKey = status.licenseKey || 'N/A';
-      const email = status.email || 'N/A';
-      const activatedAt = status.activatedAt ? new Date(status.activatedAt).toLocaleDateString() : 'N/A';
-      const devicesUsed = status.devicesUsed || 1;
-      const maxDevices = status.maxDevices || 3;
+    // Check if Pro: either isPro flag or status === 'active'
+    const isProLicense = status.isPro === true || status.status === 'active';
+    
+    if (isProLicense) {
+      // Pro license - show active status
+      const licenseKey = status.licenseKey || status.key || '••••••••';
+      const email = status.email || 'Registered User';
       
       container.innerHTML = `
-        <div style="display: flex; flex-direction: column; gap: 10px; font-size: 13px; padding-bottom: 12px; border-bottom: 1px solid var(--border-subtle, rgba(255,255,255,0.04));">
-          <div style="display: flex; justify-content: space-between; align-items: center;">
-            <span style="color: var(--text-muted, #71717a);">Status</span>
-            <span style="color: #22c55e; font-size: 12px;">Pro — Active</span>
+        <div class="settings-form" style="padding: 0;">
+          <div class="settings-row">
+            <label class="settings-row-label">Status</label>
+            <div class="settings-row-control">
+              <span style="color: #22c55e; font-size: 12px; font-weight: 500;">✓ Pro — Active</span>
+            </div>
           </div>
-          <div style="display: flex; justify-content: space-between; align-items: center;">
-            <span style="color: var(--text-muted, #71717a);">Key</span>
-            <span style="color: var(--text-secondary, #a1a1aa); font-family: ui-monospace, monospace; font-size: 11px;">${licenseKey}</span>
+          <div class="settings-row">
+            <label class="settings-row-label">License</label>
+            <div class="settings-row-control">
+              <span style="color: var(--text-secondary); font-family: ui-monospace, monospace; font-size: 11px;">${licenseKey.substring(0, 8)}••••</span>
+            </div>
           </div>
-          <div style="display: flex; justify-content: space-between; align-items: center;">
-            <span style="color: var(--text-muted, #71717a);">Email</span>
-            <span style="color: var(--text-secondary, #a1a1aa); font-size: 12px;">${email}</span>
+          <div class="settings-row">
+            <label class="settings-row-label">Email</label>
+            <div class="settings-row-control">
+              <span style="color: var(--text-secondary); font-size: 12px;">${email}</span>
+            </div>
           </div>
-          <div style="display: flex; justify-content: space-between; align-items: center;">
-            <span style="color: var(--text-muted, #71717a);">Activated</span>
-            <span style="color: var(--text-secondary, #a1a1aa); font-size: 12px;">${activatedAt}</span>
-          </div>
-          <div style="display: flex; justify-content: space-between; align-items: center;">
-            <span style="color: var(--text-muted, #71717a);">Devices</span>
-            <span style="color: var(--text-secondary, #a1a1aa); font-size: 12px;">${devicesUsed} of ${maxDevices}</span>
+          <div class="settings-divider"></div>
+          <div class="settings-row">
+            <label class="settings-row-label"></label>
+            <div class="settings-row-control">
+              <button id="deactivateLicenseBtn" style="padding: 5px 12px; background: transparent; border: 1px solid var(--border-default); border-radius: 4px; color: var(--text-muted); font-size: 11px; cursor: pointer;">
+                Deactivate License
+              </button>
+            </div>
           </div>
         </div>
-        
-        <button id="deactivateLicenseBtn" style="margin-top: 12px; padding: 7px 0; background: transparent; border: none; color: var(--text-muted, #71717a); font-size: 12px; cursor: pointer; text-align: left;">
-          → Deactivate this device
-        </button>
       `;
       
       // Add deactivate handler
@@ -3299,36 +3417,42 @@ async function loadLicenseDetails() {
         deactivateBtn.addEventListener('click', async () => {
           if (confirm('Are you sure you want to deactivate your license on this device?')) {
             try {
-              await window.electronAPI.license.deactivate();
-              showToast('License deactivated', 'success');
+              await window.electronAPI.licenseDeactivate(licenseKey, email);
+              showNotification('License deactivated', 'info');
               loadLicenseDetails(); // Refresh
             } catch (err) {
-              showToast('Failed to deactivate: ' + err.message, 'error');
+              showNotification('Failed to deactivate: ' + err.message, 'error');
             }
           }
         });
       }
     } else {
-      // Free version - minimal
+      // Free version
       container.innerHTML = `
-        <div style="display: flex; flex-direction: column; gap: 10px; font-size: 13px; padding-bottom: 12px; border-bottom: 1px solid var(--border-subtle, rgba(255,255,255,0.04));">
-          <div style="display: flex; justify-content: space-between; align-items: center;">
-            <span style="color: var(--text-muted, #71717a);">Status</span>
-            <span style="color: var(--text-muted, #71717a); font-size: 12px;">Free — Limited</span>
+        <div class="settings-form" style="padding: 0;">
+          <div class="settings-row">
+            <label class="settings-row-label">Status</label>
+            <div class="settings-row-control">
+              <span style="color: var(--text-muted); font-size: 12px;">Free Version</span>
+            </div>
           </div>
-        </div>
-        
-        <p style="font-size: 12px; color: var(--text-muted, #71717a); margin: 12px 0; line-height: 1.5;">
-          Unlock unlimited projects, canvas, and all Pro features.
-        </p>
-        
-        <div style="display: flex; gap: 8px; margin-top: 12px;">
-          <button id="upgradeLicenseBtn" style="padding: 7px 14px; background: var(--accent-primary, #8b5cf6); border: none; border-radius: 5px; color: white; font-size: 12px; font-weight: 400; cursor: pointer;">
-            Upgrade to Pro
-          </button>
-          <button id="enterLicenseKeyBtn" style="padding: 7px 14px; background: transparent; border: 1px solid var(--border-subtle, rgba(255,255,255,0.15)); border-radius: 5px; color: var(--text-secondary, #a1a1aa); font-size: 12px; cursor: pointer;">
-            Enter Key
-          </button>
+          <div class="settings-divider"></div>
+          <div class="settings-row">
+            <label class="settings-row-label"></label>
+            <div class="settings-row-control" style="flex-direction: column; align-items: flex-start; gap: 8px;">
+              <p style="font-size: 11px; color: var(--text-muted); margin: 0; line-height: 1.4;">
+                Unlock unlimited projects, canvas, and all Pro features.
+              </p>
+              <div style="display: flex; gap: 8px; margin-top: 4px;">
+                <button id="upgradeLicenseBtn" style="padding: 5px 12px; background: #3b82f6; border: none; border-radius: 4px; color: white; font-size: 11px; font-weight: 500; cursor: pointer;">
+                  Upgrade to Pro
+                </button>
+                <button id="enterLicenseKeyBtn" style="padding: 5px 12px; background: transparent; border: 1px solid var(--border-default); border-radius: 4px; color: var(--text-secondary); font-size: 11px; cursor: pointer;">
+                  Enter Key
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       `;
       
@@ -3345,7 +3469,6 @@ async function loadLicenseDetails() {
       if (enterKeyBtn) {
         enterKeyBtn.addEventListener('click', () => {
           settingsModal.classList.add('hidden');
-          // Trigger license activation UI
           showLicenseModal();
         });
       }
@@ -3353,38 +3476,44 @@ async function loadLicenseDetails() {
   } catch (err) {
     console.error('Error loading license details:', err);
     container.innerHTML = `
-      <div style="text-align: center; color: var(--text-tertiary); font-size: 13px;">
-        <p>Unable to load license info</p>
-        <button onclick="loadLicenseDetails()" style="margin-top: 8px; padding: 6px 12px; background: var(--bg-hover); border: 1px solid var(--border-subtle); border-radius: 6px; color: var(--text-secondary); font-size: 12px; cursor: pointer;">
-          Retry
-        </button>
+      <div class="settings-form" style="padding: 0;">
+        <div class="settings-row">
+          <label class="settings-row-label">Status</label>
+          <div class="settings-row-control">
+            <span style="color: var(--text-muted); font-size: 12px;">Unable to load</span>
+            <button onclick="loadLicenseDetails()" style="margin-left: 8px; padding: 4px 10px; background: var(--bg-hover); border: 1px solid var(--border-default); border-radius: 4px; color: var(--text-secondary); font-size: 11px; cursor: pointer;">
+              Retry
+            </button>
+          </div>
+        </div>
       </div>
     `;
   }
 }
 
-function createSettingsOption(value, name, icon, label, isSelected) {
+function createSettingsOption(value, name, icon, label, isSelected, description = '') {
   const option = document.createElement('label');
-  option.className = `settings-row ${isSelected ? 'active' : ''}`;
+  option.className = `settings-option-item ${isSelected ? 'selected' : ''}`;
   option.dataset.value = value;
   option.dataset.name = name;
   
   option.innerHTML = `
     <input type="radio" name="${name}" value="${value}" ${isSelected ? 'checked' : ''} style="display: none;" />
-    <span class="settings-row-icon">${icon}</span>
-    <span class="settings-row-label">${escapeHtml(label)}</span>
-    <div class="settings-row-radio">
-      <div class="settings-row-radio-inner"></div>
+    <div class="option-icon">${icon}</div>
+    <div class="option-info">
+      <div class="option-name">${escapeHtml(label)}</div>
+      ${description ? `<div class="option-path">${escapeHtml(description)}</div>` : ''}
     </div>
+    <div class="option-check"></div>
   `;
   
   option.addEventListener('click', () => {
     // Update all options in this group
-    const allOptions = option.parentElement.querySelectorAll('.settings-row');
+    const allOptions = option.parentElement.querySelectorAll('.settings-option-item');
     allOptions.forEach(opt => {
-      opt.classList.remove('active');
+      opt.classList.remove('selected');
     });
-    option.classList.add('active');
+    option.classList.add('selected');
   });
   
   return option;

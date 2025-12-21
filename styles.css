@@ -2749,6 +2749,411 @@ body[data-theme] .framework-badge {
   letter-spacing: 0.3px;
 }
 
+/* ============================================
+   SETTINGS MODAL - RunJS Style
+   ============================================ */
+
+.settings-window {
+  width: 480px;
+  max-width: 95vw;
+  background: var(--bg-tertiary, #1a1a1d);
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.4);
+  display: flex;
+  flex-direction: column;
+}
+
+/* Title Bar */
+.settings-titlebar {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  background: var(--bg-secondary, #151517);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.settings-titlebar-buttons {
+  display: flex;
+  gap: 6px;
+  width: 50px;
+}
+
+.titlebar-btn {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+}
+
+.titlebar-btn.close {
+  background: #ff5f57;
+}
+
+.titlebar-btn.close:hover {
+  background: #ff3b30;
+}
+
+.settings-titlebar-title {
+  flex: 1;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.titlebar-spacer {
+  width: 50px;
+}
+
+/* Top Tabs Bar */
+.settings-tabs-bar {
+  display: flex;
+  justify-content: center;
+  gap: 2px;
+  padding: 8px 12px 10px;
+  background: var(--bg-secondary, #151517);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.settings-icon-tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 6px 12px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  min-width: 58px;
+}
+
+.settings-icon-tab svg {
+  width: 18px;
+  height: 18px;
+  color: var(--text-muted);
+  transition: color 0.15s ease;
+}
+
+.settings-icon-tab span {
+  font-size: 9px;
+  font-weight: 500;
+  color: var(--text-muted);
+  transition: color 0.15s ease;
+}
+
+.settings-icon-tab:hover {
+  background: var(--bg-hover);
+}
+
+.settings-icon-tab:hover svg,
+.settings-icon-tab:hover span {
+  color: var(--text-secondary);
+}
+
+.settings-icon-tab.active {
+  background: rgba(59, 130, 246, 0.1);
+  border-color: rgba(59, 130, 246, 0.3);
+}
+
+.settings-icon-tab.active svg {
+  color: #3b82f6;
+}
+
+.settings-icon-tab.active span {
+  color: #3b82f6;
+}
+
+/* Content Area */
+.settings-content-area {
+  flex: 1;
+  overflow-y: auto;
+  max-height: 280px;
+}
+
+.settings-panel {
+  display: none;
+  padding: 0;
+}
+
+.settings-panel.active {
+  display: block;
+}
+
+/* Form Layout */
+.settings-form {
+  padding: 4px 0;
+}
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  padding: 8px 16px;
+  min-height: 32px;
+}
+
+.settings-row-label {
+  width: 110px;
+  flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-primary);
+  text-align: right;
+  padding-right: 16px;
+}
+
+.settings-row-control {
+  flex: 1;
+  display: flex;
+  align-items: center;
+}
+
+.settings-divider {
+  height: 1px;
+  background: var(--border-subtle);
+  margin: 6px 16px 6px 126px;
+}
+
+/* Form Controls */
+.settings-select {
+  min-width: 180px;
+  padding: 5px 28px 5px 10px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-default);
+  border-radius: 4px;
+  font-size: 12px;
+  color: var(--text-primary);
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%2371717a' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+}
+
+.settings-select:focus {
+  outline: none;
+  border-color: #3b82f6;
+}
+
+.settings-input-number {
+  width: 54px;
+  padding: 5px 8px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-default);
+  border-radius: 4px;
+  font-size: 12px;
+  color: var(--text-primary);
+  text-align: center;
+}
+
+.settings-input-number:focus {
+  outline: none;
+  border-color: #3b82f6;
+}
+
+/* Checkbox */
+.settings-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.settings-checkbox input {
+  display: none;
+}
+
+.settings-checkbox .checkmark {
+  width: 14px;
+  height: 14px;
+  border: 1.5px solid var(--border-default);
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.settings-checkbox input:checked + .checkmark {
+  background: #ec4899;
+  border-color: #ec4899;
+}
+
+.settings-checkbox input:checked + .checkmark::after {
+  content: '';
+  width: 4px;
+  height: 7px;
+  border: solid white;
+  border-width: 0 1.5px 1.5px 0;
+  transform: rotate(45deg);
+  margin-bottom: 1px;
+}
+
+.settings-checkbox .checkbox-label {
+  font-size: 12px;
+  color: var(--text-primary);
+}
+
+/* Loading State */
+.settings-loading-state {
+  padding: 30px 16px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+/* Footer */
+.settings-window-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 10px 14px;
+  background: var(--bg-secondary);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.settings-btn-cancel {
+  padding: 5px 14px;
+  background: transparent;
+  border: 1px solid var(--border-default);
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.settings-btn-cancel:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-hover);
+}
+
+.settings-btn-save {
+  padding: 5px 14px;
+  background: #3b82f6;
+  border: none;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  color: white;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.settings-btn-save:hover {
+  background: #2563eb;
+}
+
+/* Settings Modal - Light Theme */
+body[data-theme="light"] .settings-window,
+body[data-theme="github-light"] .settings-window,
+body[data-theme="catppuccin-latte"] .settings-window,
+body[data-theme="solarized-light"] .settings-window {
+  background: #f5f5f7;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+}
+
+body[data-theme="light"] .settings-titlebar,
+body[data-theme="github-light"] .settings-titlebar,
+body[data-theme="catppuccin-latte"] .settings-titlebar,
+body[data-theme="solarized-light"] .settings-titlebar,
+body[data-theme="light"] .settings-tabs-bar,
+body[data-theme="github-light"] .settings-tabs-bar,
+body[data-theme="catppuccin-latte"] .settings-tabs-bar,
+body[data-theme="solarized-light"] .settings-tabs-bar {
+  background: #e8e8eb;
+  border-color: rgba(0,0,0,0.08);
+}
+
+body[data-theme="light"] .settings-titlebar-title,
+body[data-theme="github-light"] .settings-titlebar-title,
+body[data-theme="catppuccin-latte"] .settings-titlebar-title,
+body[data-theme="solarized-light"] .settings-titlebar-title {
+  color: #1f2937;
+}
+
+body[data-theme="light"] .settings-icon-tab svg,
+body[data-theme="github-light"] .settings-icon-tab svg,
+body[data-theme="catppuccin-latte"] .settings-icon-tab svg,
+body[data-theme="solarized-light"] .settings-icon-tab svg,
+body[data-theme="light"] .settings-icon-tab span,
+body[data-theme="github-light"] .settings-icon-tab span,
+body[data-theme="catppuccin-latte"] .settings-icon-tab span,
+body[data-theme="solarized-light"] .settings-icon-tab span {
+  color: #6b7280;
+}
+
+body[data-theme="light"] .settings-icon-tab.active,
+body[data-theme="github-light"] .settings-icon-tab.active,
+body[data-theme="catppuccin-latte"] .settings-icon-tab.active,
+body[data-theme="solarized-light"] .settings-icon-tab.active {
+  background: rgba(59, 130, 246, 0.12);
+}
+
+body[data-theme="light"] .settings-row-label,
+body[data-theme="github-light"] .settings-row-label,
+body[data-theme="catppuccin-latte"] .settings-row-label,
+body[data-theme="solarized-light"] .settings-row-label {
+  color: #374151;
+}
+
+body[data-theme="light"] .settings-select,
+body[data-theme="github-light"] .settings-select,
+body[data-theme="catppuccin-latte"] .settings-select,
+body[data-theme="solarized-light"] .settings-select,
+body[data-theme="light"] .settings-input-number,
+body[data-theme="github-light"] .settings-input-number,
+body[data-theme="catppuccin-latte"] .settings-input-number,
+body[data-theme="solarized-light"] .settings-input-number {
+  background: #ffffff;
+  border-color: rgba(0,0,0,0.15);
+  color: #1f2937;
+}
+
+body[data-theme="light"] .settings-checkbox .checkmark,
+body[data-theme="github-light"] .settings-checkbox .checkmark,
+body[data-theme="catppuccin-latte"] .settings-checkbox .checkmark,
+body[data-theme="solarized-light"] .settings-checkbox .checkmark {
+  border-color: rgba(0,0,0,0.2);
+  background: #ffffff;
+}
+
+body[data-theme="light"] .settings-checkbox .checkbox-label,
+body[data-theme="github-light"] .settings-checkbox .checkbox-label,
+body[data-theme="catppuccin-latte"] .settings-checkbox .checkbox-label,
+body[data-theme="solarized-light"] .settings-checkbox .checkbox-label {
+  color: #374151;
+}
+
+body[data-theme="light"] .settings-divider,
+body[data-theme="github-light"] .settings-divider,
+body[data-theme="catppuccin-latte"] .settings-divider,
+body[data-theme="solarized-light"] .settings-divider {
+  background: rgba(0,0,0,0.08);
+}
+
+body[data-theme="light"] .settings-window-footer,
+body[data-theme="github-light"] .settings-window-footer,
+body[data-theme="catppuccin-latte"] .settings-window-footer,
+body[data-theme="solarized-light"] .settings-window-footer {
+  background: #e8e8eb;
+  border-color: rgba(0,0,0,0.08);
+}
+
+body[data-theme="light"] .settings-btn-cancel,
+body[data-theme="github-light"] .settings-btn-cancel,
+body[data-theme="catppuccin-latte"] .settings-btn-cancel,
+body[data-theme="solarized-light"] .settings-btn-cancel {
+  color: #374151;
+  border-color: rgba(0,0,0,0.15);
+}
+
 /* Light theme adjustments for specific elements */
 body[data-theme="light"] .project-card,
 body[data-theme="github-light"] .project-card,
