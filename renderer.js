@@ -8068,47 +8068,87 @@ function setBlueprintReadOnlyMode(readOnly) {
     blueprintGoalMonacoEditor.updateOptions({ readOnly: readOnly });
   }
   
-  // Disable/enable "Add Module" button
+  // Helper function to disable/enable a button
+  const setButtonState = (btn, disabled) => {
+    if (!btn) return;
+    btn.disabled = disabled;
+    btn.style.opacity = disabled ? '0.5' : '1';
+    btn.style.cursor = disabled ? 'not-allowed' : 'pointer';
+    btn.style.pointerEvents = disabled ? 'none' : 'auto';
+  };
+  
+  // ========================================
+  // DISABLE ALL MODULE CREATION BUTTONS
+  // ========================================
+  
+  // Main "Add Module" button (header)
   const addModuleBtn = document.getElementById('addModuleBtn');
-  if (addModuleBtn) {
-    addModuleBtn.disabled = readOnly;
-    addModuleBtn.style.opacity = readOnly ? '0.5' : '1';
-    addModuleBtn.style.cursor = readOnly ? 'not-allowed' : 'pointer';
-    addModuleBtn.title = readOnly ? 'Upgrade to Pro to add modules' : 'Add Module';
-  }
+  setButtonState(addModuleBtn, readOnly);
+  if (addModuleBtn) addModuleBtn.title = readOnly ? 'Upgrade to Pro to add modules' : 'Add Module';
   
-  // Disable/enable "Create First Module" button
+  // "Create First Module" button (empty state)
   const createFirstModuleBtn = document.getElementById('createFirstModuleBtn');
-  if (createFirstModuleBtn) {
-    createFirstModuleBtn.disabled = readOnly;
-    createFirstModuleBtn.style.opacity = readOnly ? '0.5' : '1';
-  }
+  setButtonState(createFirstModuleBtn, readOnly);
+  if (createFirstModuleBtn) createFirstModuleBtn.title = readOnly ? 'Upgrade to Pro to create modules' : 'Create your first module';
   
-  // Disable/enable delete module button
+  // "Create Module" confirm button (inside modal)
+  const confirmAddModuleBtn = document.getElementById('confirmAddModuleBtn');
+  setButtonState(confirmAddModuleBtn, readOnly);
+  
+  // Delete module button
   const deleteModuleBtn = document.getElementById('deleteModuleBtn');
-  if (deleteModuleBtn) {
-    deleteModuleBtn.disabled = readOnly;
-    deleteModuleBtn.style.opacity = readOnly ? '0.5' : '1';
-  }
+  setButtonState(deleteModuleBtn, readOnly);
   
-  // Disable/enable task add button
+  // ========================================
+  // DISABLE TASK/TODO OPERATIONS
+  // ========================================
+  
+  // Add task button
   const addTaskBtn = document.getElementById('addTaskBtn');
-  if (addTaskBtn) {
-    addTaskBtn.disabled = readOnly;
-    addTaskBtn.style.opacity = readOnly ? '0.5' : '1';
-  }
+  setButtonState(addTaskBtn, readOnly);
+  if (addTaskBtn) addTaskBtn.title = readOnly ? 'Upgrade to Pro to add tasks' : 'Add Task';
   
-  // Disable/enable resource add buttons
+  // Confirm add task button (inside modal)
+  const confirmAddTaskBtn = document.getElementById('confirmAddTaskBtn');
+  setButtonState(confirmAddTaskBtn, readOnly);
+  
+  // Make all existing task items non-draggable and hide edit/delete buttons
+  const kanbanTasks = document.querySelectorAll('.kanban-task');
+  kanbanTasks.forEach(task => {
+    task.setAttribute('draggable', readOnly ? 'false' : 'true');
+    task.style.cursor = readOnly ? 'default' : 'grab';
+    
+    // Hide edit/delete buttons
+    const editBtn = task.querySelector('.task-edit-btn');
+    const deleteBtn = task.querySelector('.task-delete-btn');
+    if (editBtn) editBtn.style.display = readOnly ? 'none' : '';
+    if (deleteBtn) deleteBtn.style.display = readOnly ? 'none' : '';
+  });
+  
+  // ========================================
+  // DISABLE RESOURCE OPERATIONS
+  // ========================================
+  
   const addLinkBtn = document.getElementById('addLinkBtn');
   const addFileRefBtn = document.getElementById('addFileRefBtn');
-  if (addLinkBtn) {
-    addLinkBtn.disabled = readOnly;
-    addLinkBtn.style.opacity = readOnly ? '0.5' : '1';
-  }
-  if (addFileRefBtn) {
-    addFileRefBtn.disabled = readOnly;
-    addFileRefBtn.style.opacity = readOnly ? '0.5' : '1';
-  }
+  setButtonState(addLinkBtn, readOnly);
+  setButtonState(addFileRefBtn, readOnly);
+  if (addLinkBtn) addLinkBtn.title = readOnly ? 'Upgrade to Pro to add links' : 'Add Link';
+  if (addFileRefBtn) addFileRefBtn.title = readOnly ? 'Upgrade to Pro to add files' : 'Add File Reference';
+  
+  // Hide delete buttons on resource items
+  const resourceDeleteBtns = document.querySelectorAll('.resource-delete-btn');
+  resourceDeleteBtns.forEach(btn => {
+    btn.style.display = readOnly ? 'none' : '';
+  });
+  
+  // ========================================
+  // DISABLE CANVAS/EXCALIDRAW OPERATIONS
+  // ========================================
+  
+  // Canvas action buttons
+  const canvasClearBtn = document.getElementById('canvasClearBtn');
+  setButtonState(canvasClearBtn, readOnly);
   
   // Send read-only state to Excalidraw iframe
   const excalidrawFrame = document.getElementById('excalidrawFrame');
@@ -8118,6 +8158,19 @@ function setBlueprintReadOnlyMode(readOnly) {
       readOnly: readOnly
     }, '*');
   }
+  
+  // ========================================
+  // DISABLE CODE EDITOR OPERATIONS
+  // ========================================
+  
+  // Run code button
+  const runEditorBtn = document.getElementById('runEditorBtn');
+  // Note: Keep run button enabled so they can test code, just can't save
+  // setButtonState(runEditorBtn, readOnly);
+  
+  // ========================================
+  // VIEW-ONLY INDICATOR
+  // ========================================
   
   // Show/hide read-only indicator
   let readOnlyIndicator = document.getElementById('blueprintReadOnlyIndicator');
@@ -9183,22 +9236,28 @@ function renderKanbanBoard(tasksData) {
 }
 
 function renderKanbanTask(task) {
+  const isReadOnly = isBlueprintReadOnly;
+  const actionsHtml = isReadOnly ? '' : `
+    <div class="kanban-task-actions">
+      <button class="action-btn task-edit-btn" title="Edit" style="width: 22px; height: 22px;">
+        <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
+      </button>
+      <button class="action-btn task-delete-btn" title="Delete" style="width: 22px; height: 22px; color: #f43f5e;">
+        <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/></svg>
+      </button>
+    </div>
+  `;
+  
   return `
     <div class="kanban-task" 
          data-task-id="${task.id}"
-         draggable="true">
+         draggable="${isReadOnly ? 'false' : 'true'}"
+         style="${isReadOnly ? 'cursor: default;' : ''}">
       <div class="kanban-task-title">${escapeHtml(task.title)}</div>
       ${task.description ? `<div class="kanban-task-desc">${escapeHtml(task.description)}</div>` : ''}
       <div class="kanban-task-meta">
         <span class="kanban-task-priority ${task.priority}">${task.priority}</span>
-        <div class="kanban-task-actions">
-          <button class="action-btn task-edit-btn" title="Edit" style="width: 22px; height: 22px;">
-            <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
-          </button>
-          <button class="action-btn task-delete-btn" title="Delete" style="width: 22px; height: 22px; color: #f43f5e;">
-            <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/></svg>
-          </button>
-        </div>
+        ${actionsHtml}
       </div>
     </div>
   `;
@@ -9264,6 +9323,12 @@ async function onTaskDrop(event, columnId) {
 }
 
 async function deleteTaskItem(taskId) {
+  // Block in read-only mode
+  if (isBlueprintReadOnly) {
+    showNotification('Upgrade to Pro to delete tasks', 'warning');
+    return;
+  }
+  
   if (!selectedModule || !blueprintProjectPath) return;
   
   try {
@@ -9278,6 +9343,12 @@ async function deleteTaskItem(taskId) {
 }
 
 function editTask(taskId) {
+  // Block in read-only mode
+  if (isBlueprintReadOnly) {
+    showNotification('Upgrade to Pro to edit tasks', 'warning');
+    return;
+  }
+  
   // For now, show a simple prompt to edit the task title
   // TODO: Create a proper edit modal in the future
   if (!selectedModule || !blueprintProjectPath) return;
@@ -9466,6 +9537,12 @@ function exportCanvasAsSvg() {
 }
 
 function clearCanvas() {
+  // Block in read-only mode
+  if (isBlueprintReadOnly) {
+    showNotification('Upgrade to Pro to clear canvas', 'warning');
+    return;
+  }
+  
   if (!confirm('Clear the entire canvas? This cannot be undone.')) return;
   
   if (excalidrawFrame && excalidrawFrame.contentWindow) {
@@ -9596,6 +9673,7 @@ function renderResources(resourcesData) {
   
   const links = resourcesData?.links || [];
   const files = resourcesData?.files || [];
+  const isReadOnly = isBlueprintReadOnly;
   
   if (links.length === 0 && files.length === 0) {
     resourcesList.innerHTML = `
@@ -9633,9 +9711,9 @@ function renderResources(resourcesData) {
             <button class="action-btn resource-open-btn" title="Open" style="width: 24px; height: 24px;">
               <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" x2="21" y1="14" y2="3"/></svg>
             </button>
-            <button class="action-btn resource-remove-btn" title="Remove" style="width: 24px; height: 24px; color: #f43f5e;">
+            ${isReadOnly ? '' : `<button class="action-btn resource-remove-btn" title="Remove" style="width: 24px; height: 24px; color: #f43f5e;">
               <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/></svg>
-            </button>
+            </button>`}
           </div>
         </div>
       `;
@@ -9659,9 +9737,9 @@ function renderResources(resourcesData) {
             <div class="resource-url">${escapeHtml(file.path)}</div>
           </div>
           <div class="resource-actions">
-            <button class="action-btn resource-remove-btn" title="Remove" style="width: 24px; height: 24px; color: #f43f5e;">
+            ${isReadOnly ? '' : `<button class="action-btn resource-remove-btn" title="Remove" style="width: 24px; height: 24px; color: #f43f5e;">
               <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/></svg>
-            </button>
+            </button>`}
           </div>
         </div>
       `;
@@ -9734,6 +9812,12 @@ async function openFileInIDE(filePath) {
 }
 
 async function removeResourceItem(resourceId, type) {
+  // Block in read-only mode
+  if (isBlueprintReadOnly) {
+    showNotification('Upgrade to Pro to remove resources', 'warning');
+    return;
+  }
+  
   if (!selectedModule || !blueprintProjectPath) return;
   
   try {
@@ -9758,6 +9842,12 @@ async function removeResourceItem(resourceId, type) {
 // =====================================================
 
 async function showAddModuleModal() {
+  // Block in read-only mode
+  if (isBlueprintReadOnly) {
+    showNotification('Upgrade to Pro to add modules', 'warning');
+    return;
+  }
+  
   if (!addModuleModal) return;
   
   // Check module limit for free users (1 module per blueprint)
@@ -10082,6 +10172,12 @@ async function onModuleDrop(event, targetModuleId) {
 // =====================================================
 
 function showAddTaskModal() {
+  // Block in read-only mode
+  if (isBlueprintReadOnly) {
+    showNotification('Upgrade to Pro to add tasks', 'warning');
+    return;
+  }
+  
   if (!addTaskModal) return;
   
   // Reset form
@@ -10099,6 +10195,12 @@ function hideAddTaskModal() {
 }
 
 async function addNewTask() {
+  // Block in read-only mode
+  if (isBlueprintReadOnly) {
+    showNotification('Upgrade to Pro to add tasks', 'warning');
+    return;
+  }
+  
   if (!selectedModule || !blueprintProjectPath || !newTaskTitle) return;
   
   const title = newTaskTitle.value.trim();
@@ -10135,6 +10237,12 @@ async function addNewTask() {
 // =====================================================
 
 function showAddLinkModal() {
+  // Block in read-only mode
+  if (isBlueprintReadOnly) {
+    showNotification('Upgrade to Pro to add resources', 'warning');
+    return;
+  }
+  
   if (!addLinkModal) return;
   
   // Reset form
@@ -10182,6 +10290,12 @@ async function addNewLink() {
 }
 
 async function browseAndAddFile() {
+  // Block in read-only mode
+  if (isBlueprintReadOnly) {
+    showNotification('Upgrade to Pro to add files', 'warning');
+    return;
+  }
+  
   if (!selectedModule || !blueprintProjectPath) return;
   
   try {
