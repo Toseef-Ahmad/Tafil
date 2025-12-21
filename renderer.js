@@ -2956,7 +2956,7 @@ async function loadLicenseDetails() {
     const status = await window.electronAPI.license.getStatus();
     
     if (status.isPro) {
-      // Pro license - show details
+      // Pro license - show details (calm, list-based)
       const licenseKey = status.licenseKey || 'N/A';
       const email = status.email || 'N/A';
       const activatedAt = status.activatedAt ? new Date(status.activatedAt).toLocaleDateString() : 'N/A';
@@ -2964,39 +2964,33 @@ async function loadLicenseDetails() {
       const maxDevices = status.maxDevices || 3;
       
       container.innerHTML = `
-        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
-          <div style="width: 32px; height: 32px; border-radius: 8px; background: linear-gradient(135deg, #8b5cf6, #7c3aed); display: flex; align-items: center; justify-content: center;">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/><path d="m9 12 2 2 4-4"/></svg>
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid var(--border-subtle, rgba(255,255,255,0.06));">
+          <div style="width: 10px; height: 10px; border-radius: 50%; background: #22c55e; flex-shrink: 0;"></div>
+          <span style="font-size: 13px; font-weight: 500; color: var(--text-primary);">TAFIL Pro</span>
+          <span style="font-size: 12px; color: #22c55e; margin-left: auto;">Active</span>
+        </div>
+        
+        <div style="display: flex; flex-direction: column; gap: 6px; font-size: 13px;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span style="color: var(--text-muted);">Key</span>
+            <span style="color: var(--text-secondary); font-family: ui-monospace, monospace; font-size: 11px;">${licenseKey}</span>
           </div>
-          <div>
-            <div style="font-size: 14px; font-weight: 600; color: var(--text-primary);">TAFIL Pro</div>
-            <div style="font-size: 11px; color: #22c55e;">✓ Licensed</div>
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span style="color: var(--text-muted);">Email</span>
+            <span style="color: var(--text-secondary); font-size: 12px;">${email}</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span style="color: var(--text-muted);">Activated</span>
+            <span style="color: var(--text-secondary);">${activatedAt}</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span style="color: var(--text-muted);">Devices</span>
+            <span style="color: var(--text-secondary);">${devicesUsed} of ${maxDevices}</span>
           </div>
         </div>
         
-        <div style="display: grid; gap: 10px; font-size: 13px;">
-          <div style="display: flex; justify-content: space-between; padding: 8px 10px; background: rgba(255,255,255,0.02); border-radius: 6px;">
-            <span style="color: var(--text-tertiary);">License Key</span>
-            <span style="color: var(--text-primary); font-family: monospace; font-size: 12px;">${licenseKey}</span>
-          </div>
-          <div style="display: flex; justify-content: space-between; padding: 8px 10px; background: rgba(255,255,255,0.02); border-radius: 6px;">
-            <span style="color: var(--text-tertiary);">Email</span>
-            <span style="color: var(--text-primary);">${email}</span>
-          </div>
-          <div style="display: flex; justify-content: space-between; padding: 8px 10px; background: rgba(255,255,255,0.02); border-radius: 6px;">
-            <span style="color: var(--text-tertiary);">Activated</span>
-            <span style="color: var(--text-primary);">${activatedAt}</span>
-          </div>
-          <div style="display: flex; justify-content: space-between; padding: 8px 10px; background: rgba(255,255,255,0.02); border-radius: 6px;">
-            <span style="color: var(--text-tertiary);">Devices</span>
-            <span style="color: var(--text-primary);">${devicesUsed} / ${maxDevices}</span>
-          </div>
-        </div>
-        
-        <button id="deactivateLicenseBtn" style="margin-top: 12px; width: 100%; padding: 10px; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.2); border-radius: 8px; color: #ef4444; font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.15s ease;"
-          onmouseover="this.style.background='rgba(239, 68, 68, 0.2)'"
-          onmouseout="this.style.background='rgba(239, 68, 68, 0.1)'">
-          Deactivate License
+        <button id="deactivateLicenseBtn" style="margin-top: 12px; width: 100%; padding: 8px; background: transparent; border: 1px solid var(--border-subtle, rgba(255,255,255,0.1)); border-radius: 6px; color: var(--text-muted); font-size: 12px; cursor: pointer; transition: all 0.1s ease;">
+          Deactivate this device
         </button>
       `;
       
@@ -3016,31 +3010,24 @@ async function loadLicenseDetails() {
         });
       }
     } else {
-      // Free version
+      // Free version (calm, minimal)
       container.innerHTML = `
-        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
-          <div style="width: 32px; height: 32px; border-radius: 8px; background: rgba(255,255,255,0.1); display: flex; align-items: center; justify-content: center;">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
-          </div>
-          <div>
-            <div style="font-size: 14px; font-weight: 600; color: var(--text-primary);">TAFIL Free</div>
-            <div style="font-size: 11px; color: var(--text-tertiary);">Limited features</div>
-          </div>
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid var(--border-subtle, rgba(255,255,255,0.06));">
+          <div style="width: 10px; height: 10px; border-radius: 50%; background: var(--text-muted, #52525b); flex-shrink: 0;"></div>
+          <span style="font-size: 13px; font-weight: 500; color: var(--text-primary);">TAFIL Free</span>
+          <span style="font-size: 12px; color: var(--text-muted); margin-left: auto;">Limited</span>
         </div>
         
-        <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 12px;">
-          Upgrade to Pro to unlock all features including unlimited projects, canvas, and more.
+        <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px; line-height: 1.5;">
+          Unlock unlimited projects, canvas, and all Pro features.
         </p>
         
-        <button id="upgradeLicenseBtn" style="width: 100%; padding: 10px; background: linear-gradient(135deg, #8b5cf6, #7c3aed); border: none; border-radius: 8px; color: white; font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.15s ease;"
-          onmouseover="this.style.opacity='0.9'"
-          onmouseout="this.style.opacity='1'">
-          Upgrade to Pro
-        </button>
-        
-        <div style="margin-top: 12px; text-align: center;">
-          <button id="enterLicenseKeyBtn" style="background: none; border: none; color: var(--accent-primary); font-size: 12px; cursor: pointer; text-decoration: underline;">
-            I have a license key
+        <div style="display: flex; gap: 8px;">
+          <button id="upgradeLicenseBtn" style="flex: 1; padding: 8px 12px; background: var(--accent-primary, #8b5cf6); border: none; border-radius: 6px; color: white; font-size: 12px; font-weight: 500; cursor: pointer; transition: opacity 0.1s ease;">
+            Upgrade to Pro
+          </button>
+          <button id="enterLicenseKeyBtn" style="padding: 8px 12px; background: transparent; border: 1px solid var(--border-subtle, rgba(255,255,255,0.1)); border-radius: 6px; color: var(--text-secondary); font-size: 12px; cursor: pointer; transition: background 0.1s ease;">
+            Enter Key
           </button>
         </div>
       `;
@@ -3078,37 +3065,26 @@ async function loadLicenseDetails() {
 
 function createSettingsOption(value, name, icon, label, isSelected) {
   const option = document.createElement('label');
-  option.style.cssText = `
-    display: flex; align-items: center; gap: 10px; padding: 10px 12px;
-    background: ${isSelected ? 'rgba(139, 92, 246, 0.15)' : 'rgba(255,255,255,0.03)'};
-    border: 1px solid ${isSelected ? 'rgba(139, 92, 246, 0.3)' : 'rgba(255,255,255,0.06)'};
-    border-radius: 8px; cursor: pointer; transition: all 0.15s ease;
-  `;
+  option.className = `settings-row ${isSelected ? 'active' : ''}`;
+  option.dataset.value = value;
+  option.dataset.name = name;
+  
   option.innerHTML = `
     <input type="radio" name="${name}" value="${value}" ${isSelected ? 'checked' : ''} style="display: none;" />
-    <span style="font-size: 16px;">${icon}</span>
-    <span style="flex: 1; font-size: 13px; color: #fafafa;">${escapeHtml(label)}</span>
-    ${isSelected ? `<span style="color: #a78bfa;">${Icons.check}</span>` : ''}
+    <span class="settings-row-icon">${icon}</span>
+    <span class="settings-row-label">${escapeHtml(label)}</span>
+    <div class="settings-row-radio">
+      <div class="settings-row-radio-inner"></div>
+    </div>
   `;
   
   option.addEventListener('click', () => {
     // Update all options in this group
-    const allOptions = option.parentElement.querySelectorAll('label');
+    const allOptions = option.parentElement.querySelectorAll('.settings-row');
     allOptions.forEach(opt => {
-      opt.style.background = 'rgba(255,255,255,0.03)';
-      opt.style.borderColor = 'rgba(255,255,255,0.06)';
-      const checkIcon = opt.querySelector('span:last-child');
-      if (checkIcon && checkIcon.innerHTML.includes('svg')) {
-        checkIcon.remove();
-      }
+      opt.classList.remove('active');
     });
-    
-    option.style.background = 'rgba(139, 92, 246, 0.15)';
-    option.style.borderColor = 'rgba(139, 92, 246, 0.3)';
-    const checkSpan = document.createElement('span');
-    checkSpan.style.color = '#a78bfa';
-    checkSpan.innerHTML = Icons.check;
-    option.appendChild(checkSpan);
+    option.classList.add('active');
   });
   
   return option;
@@ -3243,52 +3219,35 @@ function createThemeSelector() {
   const darkThemes = Object.entries(THEMES).filter(([_, t]) => t.type === 'dark');
   const lightThemes = Object.entries(THEMES).filter(([_, t]) => t.type === 'light');
   
-  // Theme icons for visual appeal
-  const themeIcons = {
-    midnight: '🌑', dracula: '🧛', 'tokyo-night': '🗼', nord: '❄️',
-    catppuccin: '☕', 'one-dark': '⚛️', synthwave: '🌆', 'ayu-dark': '🌙',
-    'github-dark': '🐙', 'rose-pine': '🌹', monokai: '🎨', vesper: '🌅',
-    light: '☀️', 'github-light': '🐱', 'catppuccin-latte': '🥛', 'solarized-light': '🌤️'
+  // Theme accent colors for the dot preview
+  const themeAccents = {
+    midnight: '#8b5cf6', dracula: '#bd93f9', 'tokyo-night': '#7aa2f7', nord: '#88c0d0',
+    catppuccin: '#cba6f7', 'one-dark': '#61afef', synthwave: '#f97583', 'ayu-dark': '#ffb454',
+    'github-dark': '#58a6ff', 'rose-pine': '#ebbcba', monokai: '#a6e22e', vesper: '#ffa657',
+    light: '#0969da', 'github-light': '#0969da', 'catppuccin-latte': '#8839ef', 'solarized-light': '#268bd2'
   };
   
+  const createThemeRow = (id, theme) => `
+    <button class="theme-card ${currentTheme === id ? 'active' : ''}" data-theme="${id}" type="button">
+      <div class="theme-card-preview" style="background: ${themeAccents[id] || '#8b5cf6'};"></div>
+      <div class="theme-card-info">
+        <span class="theme-card-name">${theme.name}</span>
+        <span class="theme-card-desc">— ${theme.description}</span>
+      </div>
+      <div class="theme-card-radio">
+        <div class="theme-card-radio-inner"></div>
+      </div>
+    </button>
+  `;
+  
   return `
-    <div class="theme-section-title">
-      <span style="display: inline-flex; align-items: center; gap: 6px;">
-        🌙 Dark Themes
-      </span>
-    </div>
+    <div class="theme-section-title">Dark</div>
     <div class="theme-grid-new">
-      ${darkThemes.map(([id, theme]) => `
-        <button class="theme-card ${currentTheme === id ? 'active' : ''}" data-theme="${id}" type="button">
-          <div class="theme-card-preview theme-preview-${id}">
-            <span class="theme-card-icon">${themeIcons[id] || '🎨'}</span>
-          </div>
-          <div class="theme-card-info">
-            <div class="theme-card-name">${theme.name}</div>
-            <div class="theme-card-desc">${theme.description}</div>
-          </div>
-          ${currentTheme === id ? '<div class="theme-card-check">✓</div>' : ''}
-        </button>
-      `).join('')}
+      ${darkThemes.map(([id, theme]) => createThemeRow(id, theme)).join('')}
     </div>
-    <div class="theme-section-title" style="margin-top: 16px;">
-      <span style="display: inline-flex; align-items: center; gap: 6px;">
-        ☀️ Light Themes
-      </span>
-    </div>
+    <div class="theme-section-title">Light</div>
     <div class="theme-grid-new">
-      ${lightThemes.map(([id, theme]) => `
-        <button class="theme-card ${currentTheme === id ? 'active' : ''}" data-theme="${id}" type="button">
-          <div class="theme-card-preview theme-preview-${id}">
-            <span class="theme-card-icon">${themeIcons[id] || '🎨'}</span>
-          </div>
-          <div class="theme-card-info">
-            <div class="theme-card-name">${theme.name}</div>
-            <div class="theme-card-desc">${theme.description}</div>
-          </div>
-          ${currentTheme === id ? '<div class="theme-card-check">✓</div>' : ''}
-        </button>
-      `).join('')}
+      ${lightThemes.map(([id, theme]) => createThemeRow(id, theme)).join('')}
     </div>
   `;
 }

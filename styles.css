@@ -1672,10 +1672,14 @@ body[data-theme] .framework-badge {
 }
 
 /* New Theme Card Styles */
+/* =====================================================
+   RunJS-Style Settings UI - Calm, intentional, professional
+   ===================================================== */
+
 .theme-grid-new {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
   margin-bottom: 8px;
 }
 
@@ -1683,80 +1687,195 @@ body[data-theme] .framework-badge {
   position: relative;
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 10px 12px;
-  border-radius: 10px;
-  border: 2px solid var(--border-subtle, rgba(255, 255, 255, 0.06));
-  background: var(--bg-secondary, rgba(255, 255, 255, 0.03));
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: transparent;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: background 0.1s ease;
   text-align: left;
   width: 100%;
 }
 
+/* Subtle hover - no layout shift, just background */
 .theme-card:hover {
-  border-color: var(--border-hover, rgba(255, 255, 255, 0.15));
-  background: var(--bg-hover, rgba(255, 255, 255, 0.05));
-  transform: translateY(-1px);
+  background: var(--bg-hover, rgba(255, 255, 255, 0.04));
 }
 
+/* Active state - clear but calm */
 .theme-card.active {
-  border-color: var(--accent-primary, #8b5cf6);
-  background: var(--accent-primary-muted, rgba(139, 92, 246, 0.1));
-  box-shadow: 0 0 0 3px var(--accent-primary-muted, rgba(139, 92, 246, 0.15));
+  background: var(--accent-primary-muted, rgba(139, 92, 246, 0.08));
 }
 
+/* Theme color dot - small, static indicator */
 .theme-card-preview {
-  width: 44px;
-  height: 44px;
-  border-radius: 10px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
   flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
+/* No icon needed in RunJS style */
 .theme-card-icon {
-  font-size: 18px;
-  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3));
+  display: none;
 }
 
 .theme-card-info {
   flex: 1;
   min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .theme-card-name {
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 500;
   color: var(--text-primary, #fafafa);
-  margin-bottom: 2px;
 }
 
 .theme-card-desc {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text-muted, #52525b);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
+/* Active name gets accent color */
 .theme-card.active .theme-card-name {
   color: var(--accent-primary, #8b5cf6);
 }
 
 .theme-card.active .theme-card-desc {
-  color: var(--text-secondary, #a1a1aa);
+  color: var(--text-tertiary, #71717a);
 }
 
+/* Radio indicator - always visible */
+.theme-card-radio {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid var(--border-default, rgba(255, 255, 255, 0.15));
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 0.1s ease;
+}
+
+.theme-card.active .theme-card-radio {
+  border-color: var(--accent-primary, #8b5cf6);
+}
+
+.theme-card-radio-inner {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent-primary, #8b5cf6);
+  opacity: 0;
+  transform: scale(0);
+  transition: all 0.1s ease;
+}
+
+.theme-card.active .theme-card-radio-inner {
+  opacity: 1;
+  transform: scale(1);
+}
+
+/* Hide old checkmark */
 .theme-card-check {
-  position: absolute;
-  top: 6px;
-  right: 8px;
-  font-size: 12px;
+  display: none;
+}
+
+/* Section titles - subtle */
+.theme-section-title {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted, #52525b);
+  margin-bottom: 6px;
+  margin-top: 12px;
+  padding-left: 2px;
+}
+
+.theme-section-title:first-child {
+  margin-top: 0;
+}
+
+/* Settings row - RunJS list style */
+.settings-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.1s ease;
+  border: 1px solid transparent;
+}
+
+.settings-row:hover {
+  background: var(--bg-hover, rgba(255, 255, 255, 0.04));
+}
+
+.settings-row.active {
+  background: var(--accent-primary-muted, rgba(139, 92, 246, 0.08));
+}
+
+.settings-row-icon {
+  font-size: 16px;
+  width: 20px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.settings-row-label {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary, #fafafa);
+}
+
+.settings-row.active .settings-row-label {
   color: var(--accent-primary, #8b5cf6);
-  font-weight: bold;
+}
+
+.settings-row-radio {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid var(--border-default, rgba(255, 255, 255, 0.15));
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.settings-row.active .settings-row-radio {
+  border-color: var(--accent-primary, #8b5cf6);
+}
+
+.settings-row-radio-inner {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent-primary, #8b5cf6);
+  opacity: 0;
+  transform: scale(0);
+  transition: all 0.1s ease;
+}
+
+.settings-row.active .settings-row-radio-inner {
+  opacity: 1;
+  transform: scale(1);
+}
+
+/* Settings list container */
+.settings-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 /* Light theme adjustments for specific elements */

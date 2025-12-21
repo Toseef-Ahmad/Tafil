@@ -1398,68 +1398,52 @@
       </div>
       <div class="modal-body" style="padding: 16px; max-height: 70vh; overflow-y: auto;">
         <!-- Theme Selector Section -->
-        <div class="mb-5">
-          <h4 class="text-sm font-medium mb-1" style="color: var(--text-primary);">
-            <span style="display: inline-flex; align-items: center; gap: 6px;">
-              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
-              Theme
-            </span>
-          </h4>
-          <p class="text-xs mb-3" style="color: var(--text-tertiary);">Choose your preferred color theme</p>
-          <div id="themeSelectorContainer">
+        <div class="settings-section" style="margin-bottom: 20px;">
+          <div class="settings-section-header" style="margin-bottom: 8px;">
+            <h4 style="font-size: 13px; font-weight: 600; color: var(--text-primary); margin: 0;">Theme</h4>
+          </div>
+          <div id="themeSelectorContainer" style="background: var(--bg-secondary, rgba(255,255,255,0.02)); border: 1px solid var(--border-subtle, rgba(255,255,255,0.06)); border-radius: 8px; padding: 8px;">
             <!-- Theme options will be inserted here by JavaScript -->
           </div>
         </div>
 
         <!-- Default IDE Section -->
-        <div class="mb-4">
-          <h4 class="text-sm font-medium mb-1" style="color: var(--text-primary);">
-            <span style="display: inline-flex; align-items: center; gap: 6px;">
-              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
-              Default Editor
-            </span>
-          </h4>
-          <p class="text-xs mb-3" style="color: var(--text-tertiary);">Choose your preferred code editor</p>
-          <div id="defaultIdeList" class="space-y-2">
+        <div class="settings-section" style="margin-bottom: 20px;">
+          <div class="settings-section-header" style="margin-bottom: 8px;">
+            <h4 style="font-size: 13px; font-weight: 600; color: var(--text-primary); margin: 0;">Default Editor</h4>
+          </div>
+          <div id="defaultIdeList" class="settings-list" style="background: var(--bg-secondary, rgba(255,255,255,0.02)); border: 1px solid var(--border-subtle, rgba(255,255,255,0.06)); border-radius: 8px; padding: 4px;">
             <!-- IDE options will be inserted here -->
           </div>
-          <p id="noIdeMessage" class="hidden text-xs mt-2" style="color: #f59e0b;">No IDEs detected</p>
+          <p id="noIdeMessage" class="hidden" style="font-size: 12px; color: #f59e0b; margin-top: 8px; padding-left: 4px;">No IDEs detected</p>
         </div>
 
         <!-- Default Terminal Section -->
-        <div class="mb-5">
-          <h4 class="text-sm font-medium mb-1" style="color: var(--text-primary);">
-            <span style="display: inline-flex; align-items: center; gap: 6px;">
-              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" x2="20" y1="19" y2="19"/></svg>
-              Default Terminal
-            </span>
-          </h4>
-          <p class="text-xs mb-3" style="color: var(--text-tertiary);">Choose your preferred terminal app</p>
-          <div id="defaultTerminalList" class="space-y-2">
+        <div class="settings-section" style="margin-bottom: 20px;">
+          <div class="settings-section-header" style="margin-bottom: 8px;">
+            <h4 style="font-size: 13px; font-weight: 600; color: var(--text-primary); margin: 0;">Default Terminal</h4>
+          </div>
+          <div id="defaultTerminalList" class="settings-list" style="background: var(--bg-secondary, rgba(255,255,255,0.02)); border: 1px solid var(--border-subtle, rgba(255,255,255,0.06)); border-radius: 8px; padding: 4px;">
             <!-- Terminal options will be inserted here -->
           </div>
         </div>
 
         <!-- License Details Section -->
-        <div id="licenseSection" style="border-top: 1px solid var(--border-subtle, rgba(255,255,255,0.06)); padding-top: 16px;">
-          <h4 class="text-sm font-medium mb-1" style="color: var(--text-primary);">
-            <span style="display: inline-flex; align-items: center; gap: 6px;">
-              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" x2="3" y1="12" y2="12"/></svg>
-              License
-            </span>
-          </h4>
-          <p class="text-xs mb-3" style="color: var(--text-tertiary);">Your license details</p>
-          <div id="licenseDetailsContainer" style="background: var(--bg-hover, rgba(255,255,255,0.03)); border: 1px solid var(--border-subtle, rgba(255,255,255,0.06)); border-radius: 10px; padding: 14px;">
+        <div class="settings-section" id="licenseSection">
+          <div class="settings-section-header" style="margin-bottom: 8px;">
+            <h4 style="font-size: 13px; font-weight: 600; color: var(--text-primary); margin: 0;">License</h4>
+          </div>
+          <div id="licenseDetailsContainer" style="background: var(--bg-secondary, rgba(255,255,255,0.02)); border: 1px solid var(--border-subtle, rgba(255,255,255,0.06)); border-radius: 8px; padding: 12px;">
             <!-- License info will be inserted here by JavaScript -->
-            <div id="licenseLoading" style="text-align: center; color: var(--text-tertiary); font-size: 13px;">
-              <span>Loading license info...</span>
+            <div id="licenseLoading" style="text-align: center; color: var(--text-tertiary); font-size: 13px; padding: 8px 0;">
+              <span>Loading...</span>
             </div>
           </div>
         </div>
       </div>
-      <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 8px; padding: 16px; border-top: 1px solid var(--border-subtle, rgba(255,255,255,0.06));">
-        <button id="cancelSettingsBtn" class="px-4 py-2 rounded-lg text-sm font-medium" style="background: var(--bg-hover, rgba(255,255,255,0.05)); color: var(--text-secondary, #a1a1aa);">Cancel</button>
-        <button id="saveSettingsBtn" class="px-4 py-2 rounded-lg text-sm font-medium" style="background: var(--accent-primary, #8b5cf6); color: white;">Save Settings</button>
+      <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--border-subtle, rgba(255,255,255,0.06)); background: var(--bg-secondary, rgba(0,0,0,0.1));">
+        <button id="cancelSettingsBtn" style="padding: 8px 16px; border-radius: 6px; font-size: 13px; font-weight: 500; background: transparent; border: 1px solid var(--border-subtle, rgba(255,255,255,0.1)); color: var(--text-secondary, #a1a1aa); cursor: pointer; transition: background 0.1s ease;">Cancel</button>
+        <button id="saveSettingsBtn" style="padding: 8px 16px; border-radius: 6px; font-size: 13px; font-weight: 500; background: var(--accent-primary, #8b5cf6); border: none; color: white; cursor: pointer; transition: opacity 0.1s ease;">Save</button>
       </div>
     </div>
   </div>
