@@ -1850,14 +1850,16 @@ async function runPlaygroundInWorker(code, captureCode, timeoutMs = 2000) {
         const errors = [];
         const capturedValues = new Map();
         const capturedErrors = new Map();
+        const valueHistory = new Map(); // Time Travel: Track all values
+        let logLineCounter = 1;
 
         const customConsole = {
-          log: (...args) => logs.push({ type: 'log', message: args.map(a => formatPlaygroundValue(a)).join(' ') }),
-          error: (...args) => logs.push({ type: 'error', message: args.map(a => formatPlaygroundValue(a)).join(' ') }),
-          warn: (...args) => logs.push({ type: 'warn', message: args.map(a => formatPlaygroundValue(a)).join(' ') }),
-          info: (...args) => logs.push({ type: 'info', message: args.map(a => formatPlaygroundValue(a)).join(' ') }),
-          dir: (obj) => logs.push({ type: 'log', message: formatPlaygroundValue(obj) }),
-          table: (data) => logs.push({ type: 'log', message: formatPlaygroundValue(data) }),
+          log: (...args) => logs.push({ type: 'log', message: args.map(a => formatPlaygroundValue(a)).join(' '), line: logLineCounter++ }),
+          error: (...args) => logs.push({ type: 'error', message: args.map(a => formatPlaygroundValue(a)).join(' '), line: logLineCounter++ }),
+          warn: (...args) => logs.push({ type: 'warn', message: args.map(a => formatPlaygroundValue(a)).join(' '), line: logLineCounter++ }),
+          info: (...args) => logs.push({ type: 'info', message: args.map(a => formatPlaygroundValue(a)).join(' '), line: logLineCounter++ }),
+          dir: (obj) => logs.push({ type: 'log', message: formatPlaygroundValue(obj), rawValue: obj, line: logLineCounter++ }),
+          table: (data) => logs.push({ type: 'log', message: formatPlaygroundValue(data), rawValue: data, line: logLineCounter++ }),
           clear: () => logs.length = 0,
           time: () => {},
           timeEnd: () => {},
@@ -1879,7 +1881,13 @@ async function runPlaygroundInWorker(code, captureCode, timeoutMs = 2000) {
         const context = vm.createContext({
           __console: customConsole,
           __capture: (id, line, value) => {
-            capturedValues.set(id, { line, value: formatPlaygroundValue(value) });
+            const formatted = formatPlaygroundValue(value);
+            // Time Travel: Accumulate history
+            if (!valueHistory.has(id)) {
+              valueHistory.set(id, []);
+            }
+            valueHistory.get(id).push(formatted);
+            capturedValues.set(id, { line, value: formatted });
           },
           __captureError: (id, line, msg) => {
             capturedErrors.set(id, { line, error: msg });
@@ -1914,10 +1922,17 @@ async function runPlaygroundInWorker(code, captureCode, timeoutMs = 2000) {
         }
 
         capturedValues.forEach((data, id) => {
-          inlineResults.push({ id, line: data.line, value: data.value, type: 'value' });
+          const history = valueHistory.get(id) || [];
+          inlineResults.push({ 
+            id, 
+            line: data.line, 
+            value: data.value, 
+            type: 'value',
+            history: history.length > 1 ? history : null // Only include if multiple values
+          });
         });
         capturedErrors.forEach((data, id) => {
-          inlineResults.push({ id, line: data.line, value: \`⚠ \${data.error}\`, type: 'error' });
+          inlineResults.push({ id, line: data.line, value: \`\${data.error}\`, type: 'error' });
         });
         inlineResults.sort((a, b) => a.line - b.line);
 

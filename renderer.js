@@ -968,6 +968,149 @@ function clearInlineWidgets() {
   if (inlineDecorations.length > 0) {
     inlineDecorations = monacoEditor.deltaDecorations(inlineDecorations, []);
   }
+  
+  // Close any open history popover
+  closeValueHistoryPopover();
+}
+
+// Time Travel: Value History Popover
+let activeHistoryPopover = null;
+
+function showValueHistoryPopover(targetNode, history, line) {
+  // Close any existing popover
+  closeValueHistoryPopover();
+  
+  const popover = document.createElement('div');
+  popover.className = 'value-history-popover';
+  popover.innerHTML = `
+    <div class="history-header">
+      <span class="history-title">Value History</span>
+      <span class="history-line">Line ${line}</span>
+    </div>
+    <div class="history-list">
+      ${history.map((val, idx) => `
+        <div class="history-item">
+          <span class="history-index">#${idx + 1}</span>
+          <span class="history-value">${escapeHtml(String(val))}</span>
+        </div>
+      `).join('')}
+    </div>
+  `;
+  
+  // Position near the target
+  const rect = targetNode.getBoundingClientRect();
+  popover.style.cssText = `
+    position: fixed;
+    left: ${rect.left}px;
+    top: ${rect.bottom + 4}px;
+    z-index: 10000;
+  `;
+  
+  document.body.appendChild(popover);
+  activeHistoryPopover = popover;
+  
+  // Close on click outside
+  setTimeout(() => {
+    document.addEventListener('click', closeValueHistoryPopover, { once: true });
+  }, 0);
+}
+
+function closeValueHistoryPopover() {
+  if (activeHistoryPopover) {
+    activeHistoryPopover.remove();
+    activeHistoryPopover = null;
+  }
+}
+
+// Pro Console: Format value with collapsible tree for objects/arrays
+function formatConsoleValue(message, rawValue) {
+  // If we have a raw value that's an object, make it collapsible
+  if (rawValue && typeof rawValue === 'object' && rawValue !== null) {
+    return formatCollapsibleObject(rawValue);
+  }
+  
+  // Try to detect if message looks like an object/array string
+  const trimmed = message.trim();
+  if ((trimmed.startsWith('{') && trimmed.endsWith('}')) || 
+      (trimmed.startsWith('[') && trimmed.endsWith(']'))) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      return formatCollapsibleObject(parsed);
+    } catch (e) {
+      // Not valid JSON, just escape and return
+      return escapeHtml(message);
+    }
+  }
+  
+  return escapeHtml(message);
+}
+
+function formatCollapsibleObject(obj, depth = 0) {
+  if (depth > 5) return '<span class="console-prop-value">...</span>';
+  
+  const isArray = Array.isArray(obj);
+  const keys = Object.keys(obj);
+  const preview = isArray 
+    ? `Array(${keys.length})` 
+    : `{${keys.slice(0, 3).join(', ')}${keys.length > 3 ? ', ...' : ''}}`;
+  
+  if (keys.length === 0) {
+    return isArray ? '[]' : '{}';
+  }
+  
+  const childrenHtml = keys.map(key => {
+    const val = obj[key];
+    const valType = typeof val;
+    let valClass = '';
+    let valHtml = '';
+    
+    if (val === null) {
+      valHtml = 'null';
+      valClass = 'null';
+    } else if (val === undefined) {
+      valHtml = 'undefined';
+      valClass = 'undefined';
+    } else if (valType === 'string') {
+      valHtml = `"${escapeHtml(val.length > 50 ? val.slice(0, 47) + '...' : val)}"`;
+      valClass = 'string';
+    } else if (valType === 'number') {
+      valHtml = String(val);
+      valClass = 'number';
+    } else if (valType === 'boolean') {
+      valHtml = String(val);
+      valClass = 'boolean';
+    } else if (valType === 'object') {
+      valHtml = formatCollapsibleObject(val, depth + 1);
+    } else {
+      valHtml = escapeHtml(String(val));
+    }
+    
+    return `<div class="console-prop"><span class="console-prop-key">${isArray ? key : escapeHtml(key)}:</span> <span class="console-prop-value ${valClass}">${valHtml}</span></div>`;
+  }).join('');
+  
+  return `
+    <span class="console-object" data-depth="${depth}">
+      <span class="console-object-toggle">▶</span>
+      <span class="console-object-preview">${escapeHtml(preview)}</span>
+      <div class="console-object-children">${childrenHtml}</div>
+    </span>
+  `;
+}
+
+function initConsoleObjectToggles() {
+  document.querySelectorAll('.console-object').forEach(obj => {
+    const toggle = obj.querySelector('.console-object-toggle');
+    const preview = obj.querySelector('.console-object-preview');
+    
+    if (toggle && preview) {
+      const clickHandler = (e) => {
+        e.stopPropagation();
+        obj.classList.toggle('expanded');
+      };
+      toggle.addEventListener('click', clickHandler);
+      preview.addEventListener('click', clickHandler);
+    }
+  });
 }
 
 function applyInlineResults(inlineResults, version) {
@@ -997,30 +1140,55 @@ function applyInlineResults(inlineResults, version) {
     const line = item.line;
     const col = model.getLineMaxColumn(line);
     const raw = String(item.value ?? '');
-    const value = raw.length > 100 ? raw.slice(0, 97) + '…' : raw;
+    const value = raw.length > 80 ? raw.slice(0, 77) + '…' : raw;
     const isError = item.type === 'error' || raw.startsWith('⚠');
+    
+    // Time Travel: Check if this item has history
+    const historyCount = item.history ? item.history.length : 0;
+    const hasHistory = historyCount > 1;
 
-    // Create styled widget node
+    // Create Ghost Text styled widget (Pro look)
     const node = document.createElement('span');
-    node.className = `inline-result-widget ${isError ? 'error' : 'value'}`;
-    node.textContent = isError ? value : `⇒ ${value}`;
+    node.className = `inline-result-ghost ${isError ? 'error' : 'value'}`;
+    node.dataset.line = line;
+    node.dataset.itemId = item.id || `${line}-${idx}`;
+    
+    // Ghost text prefix
+    const prefix = isError ? '⚠ ' : '// ';
+    const historyBadge = hasHistory ? ` (${historyCount}×)` : '';
+    node.innerHTML = `<span class="ghost-prefix">${prefix}</span><span class="ghost-value">${escapeHtml(value)}</span>${hasHistory ? `<span class="ghost-history">${historyBadge}</span>` : ''}`;
+    
     node.style.cssText = `
-      display: inline-block;
-      margin-left: 16px;
-      padding: 2px 8px;
-      border-radius: 4px;
-      font-family: 'JetBrains Mono', monospace;
+      display: inline-flex;
+      align-items: center;
+      gap: 0;
+      margin-left: 24px;
+      font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', Consolas, monospace;
       font-size: 12px;
-      font-weight: 500;
+      font-weight: 400;
       white-space: nowrap;
-      pointer-events: none;
-      opacity: 0.95;
-      animation: fadeInResult 0.15s ease;
-      ${isError 
-        ? 'color: #f59e0b; background: rgba(245, 158, 11, 0.12); border: 1px solid rgba(245, 158, 11, 0.2);'
-        : `color: ${getCSSVariable('--accent-emerald') || '#10b981'}; background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.2);`
-      }
+      pointer-events: ${hasHistory ? 'auto' : 'none'};
+      cursor: ${hasHistory ? 'pointer' : 'default'};
+      opacity: 1;
+      animation: ghostFadeIn 0.2s ease;
+      color: ${isError ? '#ef4444' : '#6b7280'};
+      background: transparent;
+      border: none;
     `;
+    
+    // Time Travel: Click to show history popover
+    if (hasHistory) {
+      node.addEventListener('click', (e) => {
+        e.stopPropagation();
+        showValueHistoryPopover(node, item.history, line);
+      });
+      node.addEventListener('mouseenter', () => {
+        node.style.color = isError ? '#f87171' : '#9ca3af';
+      });
+      node.addEventListener('mouseleave', () => {
+        node.style.color = isError ? '#ef4444' : '#6b7280';
+      });
+    }
 
     const widgetId = `inline-${item.id || line}-${idx}`;
     const widget = {
@@ -4908,13 +5076,11 @@ function updateAutoRunStatus() {
   if (!autoRunStatus) return;
 
   if (isAutoRunEnabled) {
-    autoRunStatus.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse"></span> Auto-run ⚡';
-    autoRunStatus.style.color = '#a78bfa';
-    autoRunStatus.style.background = 'rgba(139, 92, 246, 0.15)';
+    autoRunStatus.innerHTML = '<span class="status-dot"></span><span class="status-text">Auto</span>';
+    autoRunStatus.classList.add('active');
   } else {
-    autoRunStatus.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-gray-500"></span> Manual';
-    autoRunStatus.style.color = '#71717a';
-    autoRunStatus.style.background = 'rgba(255,255,255,0.05)';
+    autoRunStatus.innerHTML = '<span class="status-dot"></span><span class="status-text">Manual</span>';
+    autoRunStatus.classList.remove('active');
   }
 }
 
@@ -5106,38 +5272,66 @@ async function runCode() {
         clearInlineWidgets();
       }
       
-      // Build console output
+      // Build Pro console output
       let outputHtml = '';
-      
-      // Show execution time in a subtle way
-      outputHtml += `<div style="font-size:10px;color:#52525b;margin-bottom:8px;">Executed in ${duration}ms</div>`;
 
       if (result.logs && result.logs.length > 0) {
-        result.logs.forEach(log => {
-          const typeClass = log.type === 'error' ? 'error' : log.type === 'warn' ? 'warn' : log.type === 'info' ? 'info' : 'log';
-          const icon = log.type === 'error' ? '❌' : log.type === 'warn' ? '⚠️' : log.type === 'info' ? 'ℹ️' : '';
-          outputHtml += `<p class="${typeClass}" style="margin:4px 0;">${icon} ${escapeHtml(log.message)}</p>`;
+        result.logs.forEach((log, idx) => {
+          const typeClass = log.type === 'error' ? 'error' : log.type === 'warn' ? 'warn' : log.type === 'info' ? 'info' : '';
+          const lineNum = log.line || '';
+          const content = formatConsoleValue(log.message, log.rawValue);
+          outputHtml += `
+            <div class="console-entry ${typeClass}" data-line="${lineNum}" data-idx="${idx}">
+              ${lineNum ? `<span class="console-entry-line">${lineNum}</span>` : ''}
+              <div class="console-entry-content">${content}</div>
+            </div>
+          `;
         });
       }
 
-      if (inlineCount > 0 && result.logs.length === 0) {
-        outputHtml += `<p style="color:#10b981;font-size:11px;">✓ ${inlineCount} inline values</p>`;
+      if (inlineCount > 0 && (!result.logs || result.logs.length === 0)) {
+        outputHtml = `<div class="console-empty" style="color: var(--accent-emerald);">✓ ${inlineCount} inline result${inlineCount > 1 ? 's' : ''}</div>`;
       }
 
-      if (!result.logs.length && !inlineCount) {
-        outputHtml += '<p style="color:#52525b;font-size:11px;">No output</p>';
+      if ((!result.logs || result.logs.length === 0) && inlineCount === 0) {
+        outputHtml = '<div class="console-empty">No output</div>';
       }
 
       codeOutput.innerHTML = outputHtml;
       
+      // Add click handlers for source line highlighting
+      codeOutput.querySelectorAll('.console-entry[data-line]').forEach(entry => {
+        entry.addEventListener('click', () => {
+          const line = parseInt(entry.dataset.line);
+          if (line && monacoEditor) {
+            // Highlight the line in the editor
+            monacoEditor.revealLineInCenter(line);
+            monacoEditor.setPosition({ lineNumber: line, column: 1 });
+            monacoEditor.focus();
+            
+            // Visual feedback
+            document.querySelectorAll('.console-entry.highlighted').forEach(e => e.classList.remove('highlighted'));
+            entry.classList.add('highlighted');
+          }
+        });
+      });
+      
+      // Initialize collapsible objects
+      initConsoleObjectToggles();
+      
+      // Update execution time
+      if (executionTimeEl) {
+        executionTimeEl.textContent = `${duration}ms`;
+      }
+      
       // Update status
       if (autoRunStatus && isAutoRunEnabled) {
-        autoRunStatus.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-green-400"></span> ✓';
-        autoRunStatus.style.color = '#10b981';
+        autoRunStatus.innerHTML = '<span class="status-dot"></span><span class="status-text">✓</span>';
+        autoRunStatus.classList.add('active');
       }
       
     } else {
-      // Handle execution error
+      // Handle execution error - Pro style
       clearInlineWidgets();
       
       // Show error inline if we have line info
@@ -5145,22 +5339,35 @@ async function runCode() {
         applyInlineResults([{
           id: 'error',
           line: result.errorLine,
-          value: `⚠ ${result.error}`,
+          value: `${result.error}`,
           type: 'error',
         }], thisVersion);
       }
       
+      const errorLine = result.errorLine || '';
       codeOutput.innerHTML = `
-        <div style="color:#f43f5e;">
-          <div style="font-weight:600;margin-bottom:4px;">❌ Error</div>
-          <div style="font-size:12px;opacity:0.9;">${escapeHtml(result.error || 'Execution failed')}</div>
-          ${result.errorLine ? `<div style="font-size:11px;margin-top:4px;opacity:0.7;">Line ${result.errorLine}</div>` : ''}
+        <div class="console-entry error" data-line="${errorLine}">
+          ${errorLine ? `<span class="console-entry-line">${errorLine}</span>` : ''}
+          <div class="console-entry-content">
+            <span style="opacity:0.7;">Error:</span> ${escapeHtml(result.error || 'Execution failed')}
+          </div>
         </div>
       `;
       
+      // Add click handler for error line
+      const errorEntry = codeOutput.querySelector('.console-entry');
+      if (errorEntry && errorLine && monacoEditor) {
+        errorEntry.style.cursor = 'pointer';
+        errorEntry.addEventListener('click', () => {
+          monacoEditor.revealLineInCenter(parseInt(errorLine));
+          monacoEditor.setPosition({ lineNumber: parseInt(errorLine), column: 1 });
+          monacoEditor.focus();
+        });
+      }
+      
       if (autoRunStatus) {
-        autoRunStatus.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-red-400"></span> ✗';
-        autoRunStatus.style.color = '#f43f5e';
+        autoRunStatus.innerHTML = '<span class="status-dot" style="background:#ef4444;"></span><span class="status-text">✗</span>';
+        autoRunStatus.classList.remove('active');
       }
     }
   } catch (err) {

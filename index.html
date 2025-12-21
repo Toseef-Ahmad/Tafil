@@ -1152,38 +1152,33 @@
     
     <!-- ==================== PLAYGROUND MODULE ==================== -->
     <main id="playgroundPanel" class="module-panel flex-1" style="position: relative; overflow: hidden !important; height: 100%;">
-      <div class="playground-container" style="height: 100%; display: flex; flex-direction: column; overflow: hidden;">
-        <!-- Toolbar -->
-        <div class="flex items-center justify-between px-4 py-3" style="border-bottom: 1px solid var(--border-subtle, rgba(255,255,255,0.06)); background: var(--bg-secondary, #111113);">
-          <div class="flex items-center gap-3">
-            <h2 class="text-sm font-semibold" style="color: var(--text-primary, #fafafa);">JavaScript Playground</h2>
-            <span class="text-xs px-2 py-1 rounded flex items-center gap-1" style="color: #10b981; background: rgba(16,185,129,0.1); border: 1px solid rgba(16,185,129,0.2);">
-              <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z"/></svg>
-              Node.js
-            </span>
-            <span id="autoRunStatus" class="text-xs px-2 py-1 rounded flex items-center gap-1.5 font-medium" style="color: #a78bfa; background: rgba(139, 92, 246, 0.15); border: 1px solid rgba(139, 92, 246, 0.3);">
-              <span class="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse"></span>
-              Auto-run ⚡
+      <div class="playground-container playground-pro" style="height: 100%; display: flex; flex-direction: column; overflow: hidden;">
+        <!-- Pro Toolbar - Minimal, integrated with title bar -->
+        <div class="playground-toolbar">
+          <div class="toolbar-left">
+            <span class="toolbar-title">Playground</span>
+            <span id="autoRunStatus" class="toolbar-status active">
+              <span class="status-dot"></span>
+              <span class="status-text">Auto</span>
             </span>
           </div>
-          <div class="flex items-center gap-2">
-            <button id="toggleLayoutBtn" class="action-btn" title="Toggle Layout (Side by Side)">
-              <svg id="layoutIconVertical" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="12" x2="21" y2="12"/></svg>
-              <svg id="layoutIconHorizontal" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: none;"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="12" y1="3" x2="12" y2="21"/></svg>
+          <div class="toolbar-right">
+            <button id="toggleLayoutBtn" class="ghost-btn" title="Toggle Layout">
+              <svg id="layoutIconVertical" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="12" x2="21" y2="12"/></svg>
+              <svg id="layoutIconHorizontal" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="display: none;"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="12" y1="3" x2="12" y2="21"/></svg>
             </button>
-            <button id="toggleAutoRunBtn" class="action-btn" title="Toggle Auto-run (⌘⇧R)">
-              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg>
+            <button id="toggleAutoRunBtn" class="ghost-btn" title="Toggle Auto-run (⌘⇧R)">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg>
             </button>
-            <button id="runCodeBtn" class="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all" style="background: #10b981; color: white;">
+            <div class="toolbar-divider"></div>
+            <button id="runCodeBtn" class="ghost-btn run-btn" title="Run (⌘↵)">
               <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-              Run
-              <span class="text-xs opacity-70">⌘↵</span>
             </button>
-            <button id="clearOutputBtn" class="action-btn" title="Clear Output">
-              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+            <button id="clearOutputBtn" class="ghost-btn" title="Clear Output">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
             </button>
-            <button id="saveSnippetBtn" class="action-btn" title="Save Snippet">
-              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+            <button id="saveSnippetBtn" class="ghost-btn" title="Save Snippet">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
             </button>
           </div>
         </div>
@@ -1195,14 +1190,14 @@
           <!-- Resizer -->
           <div id="playgroundResizer" class="playground-resizer"></div>
           
-          <!-- Output Panel -->
-          <div id="outputPanel" class="playground-output-panel" style="height: 200px; min-height: 60px;">
-            <div class="flex items-center justify-between px-3 py-1.5 output-header">
-              <span class="text-xs font-medium" style="color: var(--text-muted, #71717a);">Console</span>
-              <span id="executionTime" class="text-xs" style="color: var(--text-muted, #52525b);"></span>
+          <!-- Output Panel - Pro Console -->
+          <div id="outputPanel" class="playground-output-panel console-pro" style="height: 200px; min-height: 60px;">
+            <div class="console-header">
+              <span class="console-title">Console</span>
+              <span id="executionTime" class="console-time"></span>
             </div>
-            <div id="codeOutput" class="playground-output">
-              <p class="text-xs" style="color: var(--text-muted, #52525b);">Output will appear here...</p>
+            <div id="codeOutput" class="console-output">
+              <div class="console-empty">Ready to execute...</div>
             </div>
           </div>
         </div>
