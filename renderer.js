@@ -2939,7 +2939,141 @@ async function showSettingsModal() {
     defaultTerminalList.appendChild(option);
   });
   
+  // Load license details
+  loadLicenseDetails();
+  
   settingsModal.classList.remove("hidden");
+}
+
+/**
+ * Load and display license details in settings
+ */
+async function loadLicenseDetails() {
+  const container = document.getElementById('licenseDetailsContainer');
+  if (!container) return;
+  
+  try {
+    const status = await window.electronAPI.license.getStatus();
+    
+    if (status.isPro) {
+      // Pro license - show details
+      const licenseKey = status.licenseKey || 'N/A';
+      const email = status.email || 'N/A';
+      const activatedAt = status.activatedAt ? new Date(status.activatedAt).toLocaleDateString() : 'N/A';
+      const devicesUsed = status.devicesUsed || 1;
+      const maxDevices = status.maxDevices || 3;
+      
+      container.innerHTML = `
+        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+          <div style="width: 32px; height: 32px; border-radius: 8px; background: linear-gradient(135deg, #8b5cf6, #7c3aed); display: flex; align-items: center; justify-content: center;">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/><path d="m9 12 2 2 4-4"/></svg>
+          </div>
+          <div>
+            <div style="font-size: 14px; font-weight: 600; color: var(--text-primary);">TAFIL Pro</div>
+            <div style="font-size: 11px; color: #22c55e;">✓ Licensed</div>
+          </div>
+        </div>
+        
+        <div style="display: grid; gap: 10px; font-size: 13px;">
+          <div style="display: flex; justify-content: space-between; padding: 8px 10px; background: rgba(255,255,255,0.02); border-radius: 6px;">
+            <span style="color: var(--text-tertiary);">License Key</span>
+            <span style="color: var(--text-primary); font-family: monospace; font-size: 12px;">${licenseKey}</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; padding: 8px 10px; background: rgba(255,255,255,0.02); border-radius: 6px;">
+            <span style="color: var(--text-tertiary);">Email</span>
+            <span style="color: var(--text-primary);">${email}</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; padding: 8px 10px; background: rgba(255,255,255,0.02); border-radius: 6px;">
+            <span style="color: var(--text-tertiary);">Activated</span>
+            <span style="color: var(--text-primary);">${activatedAt}</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; padding: 8px 10px; background: rgba(255,255,255,0.02); border-radius: 6px;">
+            <span style="color: var(--text-tertiary);">Devices</span>
+            <span style="color: var(--text-primary);">${devicesUsed} / ${maxDevices}</span>
+          </div>
+        </div>
+        
+        <button id="deactivateLicenseBtn" style="margin-top: 12px; width: 100%; padding: 10px; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.2); border-radius: 8px; color: #ef4444; font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.15s ease;"
+          onmouseover="this.style.background='rgba(239, 68, 68, 0.2)'"
+          onmouseout="this.style.background='rgba(239, 68, 68, 0.1)'">
+          Deactivate License
+        </button>
+      `;
+      
+      // Add deactivate handler
+      const deactivateBtn = document.getElementById('deactivateLicenseBtn');
+      if (deactivateBtn) {
+        deactivateBtn.addEventListener('click', async () => {
+          if (confirm('Are you sure you want to deactivate your license on this device?')) {
+            try {
+              await window.electronAPI.license.deactivate();
+              showToast('License deactivated', 'success');
+              loadLicenseDetails(); // Refresh
+            } catch (err) {
+              showToast('Failed to deactivate: ' + err.message, 'error');
+            }
+          }
+        });
+      }
+    } else {
+      // Free version
+      container.innerHTML = `
+        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+          <div style="width: 32px; height: 32px; border-radius: 8px; background: rgba(255,255,255,0.1); display: flex; align-items: center; justify-content: center;">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+          </div>
+          <div>
+            <div style="font-size: 14px; font-weight: 600; color: var(--text-primary);">TAFIL Free</div>
+            <div style="font-size: 11px; color: var(--text-tertiary);">Limited features</div>
+          </div>
+        </div>
+        
+        <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 12px;">
+          Upgrade to Pro to unlock all features including unlimited projects, canvas, and more.
+        </p>
+        
+        <button id="upgradeLicenseBtn" style="width: 100%; padding: 10px; background: linear-gradient(135deg, #8b5cf6, #7c3aed); border: none; border-radius: 8px; color: white; font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.15s ease;"
+          onmouseover="this.style.opacity='0.9'"
+          onmouseout="this.style.opacity='1'">
+          Upgrade to Pro
+        </button>
+        
+        <div style="margin-top: 12px; text-align: center;">
+          <button id="enterLicenseKeyBtn" style="background: none; border: none; color: var(--accent-primary); font-size: 12px; cursor: pointer; text-decoration: underline;">
+            I have a license key
+          </button>
+        </div>
+      `;
+      
+      // Add upgrade handler
+      const upgradeBtn = document.getElementById('upgradeLicenseBtn');
+      if (upgradeBtn) {
+        upgradeBtn.addEventListener('click', () => {
+          window.electronAPI.openExternal('https://tafil.gumroad.com/l/tafil-license');
+        });
+      }
+      
+      // Add enter license key handler
+      const enterKeyBtn = document.getElementById('enterLicenseKeyBtn');
+      if (enterKeyBtn) {
+        enterKeyBtn.addEventListener('click', () => {
+          settingsModal.classList.add('hidden');
+          // Trigger license activation UI
+          showLicenseModal();
+        });
+      }
+    }
+  } catch (err) {
+    console.error('Error loading license details:', err);
+    container.innerHTML = `
+      <div style="text-align: center; color: var(--text-tertiary); font-size: 13px;">
+        <p>Unable to load license info</p>
+        <button onclick="loadLicenseDetails()" style="margin-top: 8px; padding: 6px 12px; background: var(--bg-hover); border: 1px solid var(--border-subtle); border-radius: 6px; color: var(--text-secondary); font-size: 12px; cursor: pointer;">
+          Retry
+        </button>
+      </div>
+    `;
+  }
 }
 
 function createSettingsOption(value, name, icon, label, isSelected) {
