@@ -243,6 +243,7 @@ let monacoEditor = null;
 let monacoInstance = null;
 let isAutoRunEnabled = true;
 let isHorizontalLayout = localStorage.getItem('playgroundLayout') === 'horizontal';
+let isBlueprintHorizontalLayout = localStorage.getItem('blueprintLayout') === 'horizontal';
 let autoRunTimeout = null;
 let autoSaveTimeout = null;
 let lastRunTime = 0;
@@ -1020,6 +1021,107 @@ function closeValueHistoryPopover() {
     activeHistoryPopover.remove();
     activeHistoryPopover = null;
   }
+}
+
+// Blueprint Editor Inline Results
+function clearBlueprintInlineWidgets() {
+  if (!blueprintCodeMonacoEditor) return;
+  
+  blueprintInlineWidgets.forEach(w => {
+    try { 
+      blueprintCodeMonacoEditor.removeContentWidget(w); 
+    } catch (e) {}
+  });
+  blueprintInlineWidgets = [];
+  
+  if (blueprintInlineDecorations.length > 0) {
+    blueprintInlineDecorations = blueprintCodeMonacoEditor.deltaDecorations(blueprintInlineDecorations, []);
+  }
+}
+
+function applyBlueprintInlineResults(inlineResults) {
+  if (!blueprintCodeMonacoEditor || !monacoInstance) return 0;
+  const model = blueprintCodeMonacoEditor.getModel();
+  if (!model) return 0;
+
+  clearBlueprintInlineWidgets();
+
+  const byLine = new Map();
+  for (const item of inlineResults) {
+    const line = Number(item.line);
+    if (Number.isFinite(line) && line >= 1 && line <= model.getLineCount()) {
+      byLine.set(line, item);
+    }
+  }
+
+  const sorted = Array.from(byLine.values()).sort((a, b) => a.line - b.line);
+
+  for (let idx = 0; idx < sorted.length; idx++) {
+    const item = sorted[idx];
+    const line = item.line;
+    const col = model.getLineMaxColumn(line);
+    const raw = String(item.value ?? '');
+    const value = raw.length > 80 ? raw.slice(0, 77) + '…' : raw;
+    const isError = item.type === 'error' || raw.startsWith('⚠');
+    
+    const historyCount = item.history ? item.history.length : 0;
+    const hasHistory = historyCount > 1;
+
+    const node = document.createElement('span');
+    node.className = `inline-result-ghost ${isError ? 'error' : 'value'}`;
+    node.dataset.line = line;
+    node.dataset.itemId = item.id || `${line}-${idx}`;
+    
+    const prefix = isError ? '⚠ ' : '// ';
+    const historyBadge = hasHistory ? ` (${historyCount}×)` : '';
+    node.innerHTML = `<span class="ghost-prefix">${prefix}</span><span class="ghost-value">${escapeHtml(value)}</span>${hasHistory ? `<span class="ghost-history">${historyBadge}</span>` : ''}`;
+    
+    node.style.cssText = `
+      display: inline-flex;
+      align-items: center;
+      gap: 0;
+      margin-left: 24px;
+      font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', Consolas, monospace;
+      font-size: 12px;
+      font-weight: 400;
+      white-space: nowrap;
+      pointer-events: ${hasHistory ? 'auto' : 'none'};
+      cursor: ${hasHistory ? 'pointer' : 'default'};
+      opacity: 1;
+      animation: ghostFadeIn 0.2s ease;
+      color: ${isError ? '#ef4444' : '#6b7280'};
+      background: transparent;
+      border: none;
+    `;
+    
+    if (hasHistory) {
+      node.addEventListener('click', (e) => {
+        e.stopPropagation();
+        showValueHistoryPopover(node, item.history, line);
+      });
+      node.addEventListener('mouseenter', () => {
+        node.style.color = isError ? '#f87171' : '#9ca3af';
+      });
+      node.addEventListener('mouseleave', () => {
+        node.style.color = isError ? '#ef4444' : '#6b7280';
+      });
+    }
+
+    const widgetId = `blueprint-inline-${item.id || line}-${idx}`;
+    const widget = {
+      getId: () => widgetId,
+      getDomNode: () => node,
+      getPosition: () => ({
+        position: { lineNumber: line, column: col },
+        preference: [monacoInstance.editor.ContentWidgetPositionPreference.EXACT],
+      }),
+    };
+
+    blueprintCodeMonacoEditor.addContentWidget(widget);
+    blueprintInlineWidgets.push(widget);
+  }
+
+  return blueprintInlineWidgets.length;
 }
 
 // Pro Console: Format value with collapsible tree for objects/arrays
@@ -5211,6 +5313,120 @@ function initPlaygroundResizer() {
   document.addEventListener('touchend', endDrag);
 }
 
+// Blueprint Editor Layout Toggle
+function updateBlueprintLayout() {
+  if (!blueprintSplit) return;
+  
+  if (isBlueprintHorizontalLayout) {
+    blueprintSplit.classList.add('horizontal');
+    const savedWidth = localStorage.getItem('blueprintOutputWidth');
+    if (blueprintOutputPanel) {
+      blueprintOutputPanel.style.height = '';
+      blueprintOutputPanel.style.width = savedWidth || '300px';
+    }
+    if (blueprintLayoutIconVertical) blueprintLayoutIconVertical.style.display = 'none';
+    if (blueprintLayoutIconHorizontal) blueprintLayoutIconHorizontal.style.display = 'block';
+    if (toggleBlueprintLayoutBtn) toggleBlueprintLayoutBtn.title = 'Switch to Stacked Layout';
+  } else {
+    blueprintSplit.classList.remove('horizontal');
+    const savedHeight = localStorage.getItem('blueprintOutputHeight');
+    if (blueprintOutputPanel) {
+      blueprintOutputPanel.style.width = '';
+      blueprintOutputPanel.style.height = savedHeight || '180px';
+    }
+    if (blueprintLayoutIconVertical) blueprintLayoutIconVertical.style.display = 'block';
+    if (blueprintLayoutIconHorizontal) blueprintLayoutIconHorizontal.style.display = 'none';
+    if (toggleBlueprintLayoutBtn) toggleBlueprintLayoutBtn.title = 'Switch to Side by Side Layout';
+  }
+  
+  // Trigger Monaco layout refresh
+  if (blueprintCodeMonacoEditor) {
+    setTimeout(() => blueprintCodeMonacoEditor.layout(), 50);
+  }
+}
+
+// Blueprint Resizer
+function initBlueprintResizer() {
+  if (!blueprintResizer || !blueprintSplit || !blueprintOutputPanel) return;
+  
+  let isDragging = false;
+  let startPos = 0;
+  let startSize = 0;
+  
+  const startDrag = (e) => {
+    isDragging = true;
+    blueprintResizer.classList.add('dragging');
+    document.body.style.cursor = isBlueprintHorizontalLayout ? 'ew-resize' : 'ns-resize';
+    document.body.style.userSelect = 'none';
+    
+    if (e.type === 'touchstart') {
+      startPos = isBlueprintHorizontalLayout ? e.touches[0].clientX : e.touches[0].clientY;
+    } else {
+      startPos = isBlueprintHorizontalLayout ? e.clientX : e.clientY;
+    }
+    
+    startSize = isBlueprintHorizontalLayout ? blueprintOutputPanel.offsetWidth : blueprintOutputPanel.offsetHeight;
+    e.preventDefault();
+  };
+  
+  const doDrag = (e) => {
+    if (!isDragging) return;
+    
+    let currentPos;
+    if (e.type === 'touchmove') {
+      currentPos = isBlueprintHorizontalLayout ? e.touches[0].clientX : e.touches[0].clientY;
+    } else {
+      currentPos = isBlueprintHorizontalLayout ? e.clientX : e.clientY;
+    }
+    
+    const delta = startPos - currentPos;
+    let newSize = startSize + delta;
+    
+    const minSize = 60;
+    const containerSize = isBlueprintHorizontalLayout ? blueprintSplit.offsetWidth : blueprintSplit.offsetHeight;
+    const maxSize = containerSize - 150;
+    
+    newSize = Math.max(minSize, Math.min(maxSize, newSize));
+    
+    if (isBlueprintHorizontalLayout) {
+      blueprintOutputPanel.style.width = newSize + 'px';
+    } else {
+      blueprintOutputPanel.style.height = newSize + 'px';
+    }
+    
+    if (blueprintCodeMonacoEditor) {
+      blueprintCodeMonacoEditor.layout();
+    }
+  };
+  
+  const endDrag = () => {
+    if (!isDragging) return;
+    
+    isDragging = false;
+    blueprintResizer.classList.remove('dragging');
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+    
+    if (isBlueprintHorizontalLayout) {
+      localStorage.setItem('blueprintOutputWidth', blueprintOutputPanel.style.width);
+    } else {
+      localStorage.setItem('blueprintOutputHeight', blueprintOutputPanel.style.height);
+    }
+    
+    if (blueprintCodeMonacoEditor) {
+      blueprintCodeMonacoEditor.layout();
+    }
+  };
+  
+  blueprintResizer.addEventListener('mousedown', startDrag);
+  document.addEventListener('mousemove', doDrag);
+  document.addEventListener('mouseup', endDrag);
+  
+  blueprintResizer.addEventListener('touchstart', startDrag, { passive: false });
+  document.addEventListener('touchmove', doDrag, { passive: false });
+  document.addEventListener('touchend', endDrag);
+}
+
 async function runCode() {
   if (!monacoEditor || !codeOutput) return Promise.resolve();
   
@@ -6376,6 +6592,13 @@ const editorSaveStatus = document.getElementById('editorSaveStatus');
 const runEditorBtn = document.getElementById('runEditorBtn');
 const clearEditorOutputBtn = document.getElementById('clearEditorOutputBtn');
 const editorOutput = document.getElementById('editorOutput');
+const toggleBlueprintLayoutBtn = document.getElementById('toggleBlueprintLayoutBtn');
+const blueprintSplit = document.getElementById('blueprintSplit');
+const blueprintResizer = document.getElementById('blueprintResizer');
+const blueprintOutputPanel = document.getElementById('blueprintOutputPanel');
+const blueprintLayoutIconVertical = document.getElementById('blueprintLayoutIconVertical');
+const blueprintLayoutIconHorizontal = document.getElementById('blueprintLayoutIconHorizontal');
+const blueprintExecutionTime = document.getElementById('blueprintExecutionTime');
 
 // Kanban View
 const kanbanBoard = document.getElementById('kanbanBoard');
@@ -6441,6 +6664,8 @@ let blueprintGoalMonacoEditor = null;
 
 // Blueprint Editor Live Editor (Monaco)
 let blueprintCodeMonacoEditor = null;
+let blueprintInlineWidgets = [];
+let blueprintInlineDecorations = [];
 
 function getBlueprintGoalValue() {
   // Prefer structured editor state when available (ProseMirror).
@@ -6614,15 +6839,32 @@ async function ensureBlueprintGoalMonacoEditor() {
   }
 }
 
-function appendEditorOutputLine(line) {
+function appendEditorOutputLine(line, type = 'log') {
   if (!editorOutput) return;
   const text = typeof line === 'string' ? line : String(line);
-  editorOutput.textContent = (editorOutput.textContent ? editorOutput.textContent + '\n' : '') + text;
+  
+  // Remove empty state if present
+  const emptyEl = editorOutput.querySelector('.console-empty');
+  if (emptyEl) emptyEl.remove();
+  
+  // Create Pro console entry
+  const entry = document.createElement('div');
+  entry.className = `console-entry ${type === 'error' ? 'error' : type === 'warn' ? 'warn' : ''}`;
+  
+  const content = document.createElement('div');
+  content.className = 'console-entry-content';
+  content.textContent = text;
+  entry.appendChild(content);
+  
+  editorOutput.appendChild(entry);
   editorOutput.scrollTop = editorOutput.scrollHeight;
 }
 
 function clearEditorOutput() {
-  if (editorOutput) editorOutput.textContent = '';
+  if (editorOutput) {
+    editorOutput.innerHTML = '<div class="console-empty">Ready to execute...</div>';
+  }
+  clearBlueprintInlineWidgets();
 }
 
 function getBlueprintEditorValue() {
@@ -6697,7 +6939,10 @@ async function ensureBlueprintCodeMonacoEditor() {
     // Auto-save debounce
     blueprintCodeMonacoEditor.onDidChangeModelContent(() => {
       clearTimeout(editorSaveTimeout);
-      if (editorSaveStatus) editorSaveStatus.textContent = 'Unsaved changes...';
+      if (editorSaveStatus) {
+        editorSaveStatus.innerHTML = '<span class="status-dot" style="background:#f59e0b;"></span><span class="status-text">Editing</span>';
+        editorSaveStatus.classList.remove('active');
+      }
       editorSaveTimeout = setTimeout(saveEditorContent, 1000);
     });
 
@@ -7558,7 +7803,9 @@ async function loadEditorContent() {
 async function saveEditorContent() {
   if (!selectedModule || !blueprintProjectPath) return;
 
-  if (editorSaveStatus) editorSaveStatus.textContent = 'Saving...';
+  if (editorSaveStatus) {
+    editorSaveStatus.innerHTML = '<span class="status-dot" style="animation:none;"></span><span class="status-text">Saving</span>';
+  }
 
   try {
     const result = await window.electronAPI.saveModuleEditor(
@@ -7568,16 +7815,27 @@ async function saveEditorContent() {
     );
 
     if (result.success) {
-      if (editorSaveStatus) editorSaveStatus.textContent = 'Saved';
+      if (editorSaveStatus) {
+        editorSaveStatus.innerHTML = '<span class="status-dot"></span><span class="status-text">Saved</span>';
+        editorSaveStatus.classList.add('active');
+      }
       setTimeout(() => {
-        if (editorSaveStatus) editorSaveStatus.textContent = 'Auto-saved';
+        if (editorSaveStatus) {
+          editorSaveStatus.innerHTML = '<span class="status-dot"></span><span class="status-text">Saved</span>';
+        }
       }, 1500);
     } else {
-      if (editorSaveStatus) editorSaveStatus.textContent = 'Error saving';
+      if (editorSaveStatus) {
+        editorSaveStatus.innerHTML = '<span class="status-dot" style="background:#ef4444;"></span><span class="status-text">Error</span>';
+        editorSaveStatus.classList.remove('active');
+      }
     }
   } catch (err) {
     console.error('Error saving editor:', err);
-    if (editorSaveStatus) editorSaveStatus.textContent = 'Error saving';
+    if (editorSaveStatus) {
+      editorSaveStatus.innerHTML = '<span class="status-dot" style="background:#ef4444;"></span><span class="status-text">Error</span>';
+      editorSaveStatus.classList.remove('active');
+    }
   }
 }
 
@@ -7585,27 +7843,61 @@ async function runEditorCode() {
   const code = getBlueprintEditorValue();
   if (!code || !code.trim()) return;
 
-  appendEditorOutputLine('> Running...');
+  // Clear and show running state
+  clearEditorOutput();
+  clearBlueprintInlineWidgets();
+  const startTime = performance.now();
 
   try {
     const result = await window.electronAPI.executeJS(code);
+    const duration = Math.round(performance.now() - startTime);
+    
+    // Update execution time
+    if (blueprintExecutionTime) {
+      blueprintExecutionTime.textContent = `${duration}ms`;
+    }
+    
+    // Clear the "Ready" message
+    if (editorOutput) {
+      editorOutput.innerHTML = '';
+    }
+    
     if (!result.success) {
-      appendEditorOutputLine(`Error: ${result.error || 'Unknown error'}`);
+      // Show error inline if we have line info
+      if (result.errorLine && result.errorLine > 0) {
+        applyBlueprintInlineResults([{
+          id: 'error',
+          line: result.errorLine,
+          value: result.error,
+          type: 'error',
+        }]);
+      }
+      appendEditorOutputLine(result.error || 'Unknown error', 'error');
       return;
     }
 
-    if (Array.isArray(result.logs)) {
+    // Apply inline results (Ghost Text)
+    let inlineCount = 0;
+    if (Array.isArray(result.inlineResults) && result.inlineResults.length > 0) {
+      inlineCount = applyBlueprintInlineResults(result.inlineResults);
+    }
+
+    if (Array.isArray(result.logs) && result.logs.length > 0) {
       for (const l of result.logs) {
-        const prefix = l?.type ? `[${l.type}] ` : '';
-        appendEditorOutputLine(prefix + (l?.message ?? ''));
+        appendEditorOutputLine(l?.message ?? '', l?.type || 'log');
       }
     }
 
-    if (result.result !== undefined) {
-      appendEditorOutputLine(`Result: ${result.result}`);
+    if (inlineCount > 0 && (!result.logs || result.logs.length === 0)) {
+      appendEditorOutputLine(`✓ ${inlineCount} inline result${inlineCount > 1 ? 's' : ''}`, 'info');
+    }
+
+    if ((!result.logs || result.logs.length === 0) && inlineCount === 0) {
+      appendEditorOutputLine('No output', 'info');
     }
   } catch (err) {
-    appendEditorOutputLine(`Error: ${err?.message || err}`);
+    clearBlueprintInlineWidgets();
+    appendEditorOutputLine(err?.message || String(err), 'error');
   }
 }
 
@@ -8774,6 +9066,26 @@ function initBlueprintListeners() {
   // Editor actions
   if (runEditorBtn) runEditorBtn.addEventListener('click', runEditorCode);
   if (clearEditorOutputBtn) clearEditorOutputBtn.addEventListener('click', clearEditorOutput);
+  
+  // Blueprint Editor Layout Toggle
+  if (toggleBlueprintLayoutBtn && blueprintSplit) {
+    updateBlueprintLayout();
+    initBlueprintResizer();
+    
+    toggleBlueprintLayoutBtn.addEventListener('click', () => {
+      isBlueprintHorizontalLayout = !isBlueprintHorizontalLayout;
+      localStorage.setItem('blueprintLayout', isBlueprintHorizontalLayout ? 'horizontal' : 'vertical');
+      updateBlueprintLayout();
+      
+      setTimeout(() => {
+        if (blueprintCodeMonacoEditor) {
+          blueprintCodeMonacoEditor.layout();
+        }
+      }, 100);
+      
+      showNotification(isBlueprintHorizontalLayout ? 'Side by side layout' : 'Stacked layout', 'info');
+    });
+  }
 
   // Initialize goal editor with live preview
   initGoalEditor();
@@ -8799,7 +9111,10 @@ function initBlueprintListeners() {
     blueprintEditorTextarea.addEventListener('input', () => {
       if (blueprintCodeMonacoEditor) return;
       clearTimeout(editorSaveTimeout);
-      if (editorSaveStatus) editorSaveStatus.textContent = 'Unsaved changes...';
+      if (editorSaveStatus) {
+        editorSaveStatus.innerHTML = '<span class="status-dot" style="background:#f59e0b;"></span><span class="status-text">Editing</span>';
+        editorSaveStatus.classList.remove('active');
+      }
       editorSaveTimeout = setTimeout(saveEditorContent, 1000);
     });
 
@@ -10091,4 +10406,5 @@ window.checkSnippetLimit = checkSnippetLimit;
 window.checkLanguageLimit = checkLanguageLimit;
 window.checkExportLimit = checkExportLimit;
 window.updateTierBadge = updateTierBadge;
+
 
