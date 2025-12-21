@@ -34,8 +34,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   checkPortProcess: (port) => ipcRenderer.invoke('check-port-process', port),
   killExternalProcess: (pid) => ipcRenderer.invoke('kill-external-process', pid),
 
-  // ~~~~~~~~~~~~~~ JavaScript Playground ~~~~~~~~~~~~~~
-  executeJS: (code) => ipcRenderer.invoke('execute-js', code),
+  // ~~~~~~~~~~~~~~ Code Playground (JS/TS/Python) ~~~~~~~~~~~~~~
+  executeJS: (code, language = 'javascript') => ipcRenderer.invoke('execute-js', code, language),
 
   // ~~~~~~~~~~~~~~ SSH Module ~~~~~~~~~~~~~~
   selectSSHKeyFile: () => ipcRenderer.invoke('select-ssh-key-file'),

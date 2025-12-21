@@ -50,6 +50,7 @@ const clearOutputBtn = document.getElementById("clearOutputBtn");
 const saveSnippetBtn = document.getElementById("saveSnippetBtn");
 const toggleAutoRunBtn = document.getElementById("toggleAutoRunBtn");
 const toggleLayoutBtn = document.getElementById("toggleLayoutBtn");
+const playgroundLanguage = document.getElementById("playgroundLanguage");
 const playgroundSplit = document.getElementById("playgroundSplit");
 const playgroundResizer = document.getElementById("playgroundResizer");
 const outputPanel = document.getElementById("outputPanel");
@@ -244,6 +245,8 @@ let monacoInstance = null;
 let isAutoRunEnabled = true;
 let isHorizontalLayout = localStorage.getItem('playgroundLayout') === 'horizontal';
 let isBlueprintHorizontalLayout = localStorage.getItem('blueprintLayout') === 'horizontal';
+let currentPlaygroundLanguage = localStorage.getItem('playgroundLanguage') || 'javascript';
+let currentBlueprintLanguage = localStorage.getItem('blueprintLanguage') || 'javascript';
 let autoRunTimeout = null;
 let autoSaveTimeout = null;
 let lastRunTime = 0;
@@ -5001,6 +5004,25 @@ console.log('Ready to code!')
       });
     }
 
+    // Language selector
+    if (playgroundLanguage) {
+      // Restore saved language
+      playgroundLanguage.value = currentPlaygroundLanguage;
+      updateMonacoLanguage(monacoEditor, currentPlaygroundLanguage);
+      
+      playgroundLanguage.addEventListener('change', (e) => {
+        currentPlaygroundLanguage = e.target.value;
+        localStorage.setItem('playgroundLanguage', currentPlaygroundLanguage);
+        updateMonacoLanguage(monacoEditor, currentPlaygroundLanguage);
+        showNotification(`Switched to ${getLanguageDisplayName(currentPlaygroundLanguage)}`, 'info');
+        
+        // Re-run if auto-run is enabled
+        if (isAutoRunEnabled) {
+          runCode();
+        }
+      });
+    }
+
     // Toggle layout button (vertical/horizontal)
     if (toggleLayoutBtn && playgroundSplit) {
       // Apply saved layout on init
@@ -5204,6 +5226,34 @@ function updateAutoRunStatus() {
   } else {
     autoRunStatus.innerHTML = '<span class="status-dot"></span><span class="status-text">Manual</span>';
     autoRunStatus.classList.remove('active');
+  }
+}
+
+// Language helpers
+function getLanguageDisplayName(lang) {
+  const names = {
+    javascript: 'JavaScript',
+    typescript: 'TypeScript',
+    python: 'Python',
+  };
+  return names[lang] || lang;
+}
+
+function getMonacoLanguage(lang) {
+  const monacoLangs = {
+    javascript: 'javascript',
+    typescript: 'typescript',
+    python: 'python',
+  };
+  return monacoLangs[lang] || 'javascript';
+}
+
+function updateMonacoLanguage(editor, lang) {
+  if (!editor || !monacoInstance) return;
+  
+  const model = editor.getModel();
+  if (model) {
+    monacoInstance.editor.setModelLanguage(model, getMonacoLanguage(lang));
   }
 }
 
@@ -5489,7 +5539,7 @@ async function runCode() {
   }
 
   try {
-    const result = await window.electronAPI.executeJS(code);
+    const result = await window.electronAPI.executeJS(code, currentPlaygroundLanguage);
     
     // Discard if this is a stale execution
     if (thisVersion !== executionVersion) {
@@ -5628,7 +5678,7 @@ async function runCodeFallback() {
   const startTime = performance.now();
   codeOutput.innerHTML = '<p class="log" style="color: #a78bfa;">⚡ Running...</p>';
   try {
-    const result = await window.electronAPI.executeJS(code);
+    const result = await window.electronAPI.executeJS(code, currentPlaygroundLanguage);
     const duration = (performance.now() - startTime).toFixed(1);
     if (executionTimeEl) executionTimeEl.textContent = `${duration}ms`;
     if (result.success) {
@@ -6616,6 +6666,7 @@ const editorOutput = document.getElementById('editorOutput');
 const toggleBlueprintLayoutBtn = document.getElementById('toggleBlueprintLayoutBtn');
 const toggleBlueprintAutoRunBtn = document.getElementById('toggleBlueprintAutoRunBtn');
 const blueprintAutoRunStatus = document.getElementById('blueprintAutoRunStatus');
+const blueprintLanguage = document.getElementById('blueprintLanguage');
 const blueprintSplit = document.getElementById('blueprintSplit');
 const blueprintResizer = document.getElementById('blueprintResizer');
 const blueprintOutputPanel = document.getElementById('blueprintOutputPanel');
@@ -7881,7 +7932,7 @@ async function runEditorCode() {
   const startTime = performance.now();
 
   try {
-    const result = await window.electronAPI.executeJS(code);
+    const result = await window.electronAPI.executeJS(code, currentBlueprintLanguage);
     const duration = Math.round(performance.now() - startTime);
     
     // Update execution time
@@ -9142,6 +9193,29 @@ function initBlueprintListeners() {
       localStorage.setItem('blueprintAutoRun', isBlueprintAutoRunEnabled ? 'true' : 'false');
       updateBlueprintAutoRunStatus();
       showNotification(isBlueprintAutoRunEnabled ? 'Auto-run enabled' : 'Auto-run disabled', 'info');
+    });
+  }
+  
+  // Blueprint Language selector
+  if (blueprintLanguage) {
+    // Restore saved language
+    blueprintLanguage.value = currentBlueprintLanguage;
+    
+    blueprintLanguage.addEventListener('change', (e) => {
+      currentBlueprintLanguage = e.target.value;
+      localStorage.setItem('blueprintLanguage', currentBlueprintLanguage);
+      
+      // Update Monaco language if available
+      if (blueprintCodeMonacoEditor) {
+        updateMonacoLanguage(blueprintCodeMonacoEditor, currentBlueprintLanguage);
+      }
+      
+      showNotification(`Switched to ${getLanguageDisplayName(currentBlueprintLanguage)}`, 'info');
+      
+      // Re-run if auto-run is enabled
+      if (isBlueprintAutoRunEnabled) {
+        runEditorCode();
+      }
     });
   }
 

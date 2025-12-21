@@ -1772,17 +1772,40 @@ function extractExpressions(code) {
   return expressions;
 }
 
-ipcMain.handle('execute-js', async (_event, code) => {
+ipcMain.handle('execute-js', async (_event, code, language = 'javascript') => {
   try {
+    // Handle different languages
+    if (language === 'python') {
+      return await runPythonCode(code);
+    }
+    
+    let jsCode = code;
+    
+    // TypeScript: Transpile to JavaScript
+    if (language === 'typescript') {
+      try {
+        jsCode = await transpileTypeScript(code);
+      } catch (tsErr) {
+        return {
+          success: false,
+          error: `TypeScript Error: ${tsErr.message}`,
+          logs: [],
+          inlineResults: [],
+          errors: [{ line: 1, message: tsErr.message, type: 'TypeScriptError' }],
+          executionTime: 0,
+        };
+      }
+    }
+    
     // Extract expressions for inline results
-    const expressions = extractExpressions(code);
+    const expressions = extractExpressions(jsCode);
     
     // Build instrumented code with expression capture
     const captureCode = expressions.map(e => 
       `try { __capture("${e.id}", ${e.line}, ${e.expr}); } catch(e) { __captureError("${e.id}", ${e.line}, e.message); }`
     ).join('\n');
     
-    const result = await runPlaygroundInWorker(code, captureCode, 2000);
+    const result = await runPlaygroundInWorker(jsCode, captureCode, 2000);
     return result;
   } catch (err) {
     return { 
@@ -1795,6 +1818,191 @@ ipcMain.handle('execute-js', async (_event, code) => {
     };
   }
 });
+
+// TypeScript transpilation
+async function transpileTypeScript(code) {
+  // Use esbuild for fast TypeScript transpilation
+  const esbuild = require('esbuild');
+  
+  const result = await esbuild.transform(code, {
+    loader: 'ts',
+    target: 'es2020',
+    format: 'cjs',
+  });
+  
+  return result.code;
+}
+
+// Python execution with inline results
+async function runPythonCode(code) {
+  const { spawn } = require('child_process');
+  const startTime = Date.now();
+  
+  // Instrument Python code to capture inline results
+  const instrumentedCode = instrumentPythonCode(code);
+  
+  return new Promise((resolve) => {
+    const logs = [];
+    const inlineResults = [];
+    let stdout = '';
+    let stderr = '';
+    
+    // Try python3 first, then python
+    const pythonCmd = process.platform === 'win32' ? 'python' : 'python3';
+    
+    const pythonProcess = spawn(pythonCmd, ['-u', '-c', instrumentedCode], {
+      timeout: 5000,
+      env: { ...process.env, PYTHONUNBUFFERED: '1' },
+    });
+    
+    pythonProcess.stdout.on('data', (data) => {
+      const lines = data.toString().split('\n').filter(l => l.trim());
+      lines.forEach(line => {
+        stdout += line + '\n';
+        
+        // Check for inline result marker
+        const inlineMatch = line.match(/^__INLINE__:(\d+):(.*)$/);
+        if (inlineMatch) {
+          inlineResults.push({
+            id: `py-${inlineMatch[1]}`,
+            line: parseInt(inlineMatch[1]),
+            value: inlineMatch[2],
+            type: 'value',
+          });
+        } else {
+          logs.push({ type: 'log', message: line });
+        }
+      });
+    });
+    
+    pythonProcess.stderr.on('data', (data) => {
+      stderr += data.toString();
+    });
+    
+    pythonProcess.on('close', (exitCode) => {
+      const executionTime = Date.now() - startTime;
+      
+      if (exitCode !== 0 || stderr) {
+        // Parse Python error for line number
+        const lineMatch = stderr.match(/line (\d+)/i);
+        const errorLine = lineMatch ? parseInt(lineMatch[1]) : 1;
+        
+        resolve({
+          success: false,
+          error: stderr.trim() || `Process exited with code ${exitCode}`,
+          errorLine,
+          logs,
+          inlineResults,
+          errors: [{ line: errorLine, message: stderr.trim(), type: 'PythonError' }],
+          executionTime,
+        });
+      } else {
+        resolve({
+          success: true,
+          logs,
+          inlineResults,
+          errors: [],
+          executionTime,
+        });
+      }
+    });
+    
+    pythonProcess.on('error', (err) => {
+      resolve({
+        success: false,
+        error: `Python not found. Please install Python and add it to PATH.\n${err.message}`,
+        logs: [],
+        inlineResults: [],
+        errors: [{ line: 1, message: err.message, type: 'PythonError' }],
+        executionTime: Date.now() - startTime,
+      });
+    });
+    
+    // Timeout after 5 seconds
+    setTimeout(() => {
+      pythonProcess.kill();
+      resolve({
+        success: false,
+        error: 'Execution timed out (5s)',
+        logs,
+        inlineResults,
+        errors: [{ line: 1, message: 'Timeout', type: 'TimeoutError' }],
+        executionTime: 5000,
+      });
+    }, 5000);
+  });
+}
+
+// Instrument Python code to capture expression values
+function instrumentPythonCode(code) {
+  const lines = code.split('\n');
+  const instrumentedLines = [];
+  
+  // Add helper function
+  instrumentedLines.push(`
+def __capture__(line, val):
+    print(f"__INLINE__:{line}:{repr(val)}")
+    return val
+`);
+  
+  lines.forEach((line, idx) => {
+    const lineNum = idx + 1;
+    const trimmed = line.trim();
+    const indent = line.match(/^(\s*)/)[1];
+    
+    // Skip empty lines, comments, imports, function/class defs, control structures
+    if (!trimmed || 
+        trimmed.startsWith('#') || 
+        trimmed.startsWith('import ') || 
+        trimmed.startsWith('from ') ||
+        trimmed.startsWith('def ') || 
+        trimmed.startsWith('class ') ||
+        trimmed.startsWith('if ') || 
+        trimmed.startsWith('elif ') ||
+        trimmed.startsWith('else:') ||
+        trimmed.startsWith('for ') || 
+        trimmed.startsWith('while ') ||
+        trimmed.startsWith('try:') ||
+        trimmed.startsWith('except') ||
+        trimmed.startsWith('finally:') ||
+        trimmed.startsWith('with ') ||
+        trimmed.startsWith('return ') ||
+        trimmed.startsWith('raise ') ||
+        trimmed.startsWith('pass') ||
+        trimmed.startsWith('break') ||
+        trimmed.startsWith('continue') ||
+        trimmed.endsWith(':') ||
+        trimmed.startsWith('@')) {
+      instrumentedLines.push(line);
+      return;
+    }
+    
+    // Variable assignment: capture the value
+    const assignMatch = trimmed.match(/^(\w+)\s*=\s*(.+)$/);
+    if (assignMatch && !trimmed.includes('==')) {
+      const varName = assignMatch[1];
+      instrumentedLines.push(line);
+      instrumentedLines.push(`${indent}__capture__(${lineNum}, ${varName})`);
+      return;
+    }
+    
+    // print() statement: just pass through (already outputs)
+    if (trimmed.startsWith('print(')) {
+      instrumentedLines.push(line);
+      return;
+    }
+    
+    // Standalone expression: wrap to capture and display
+    if (!trimmed.includes('=') || trimmed.includes('==') || trimmed.includes('!=')) {
+      instrumentedLines.push(`${indent}__capture__(${lineNum}, ${trimmed})`);
+      return;
+    }
+    
+    instrumentedLines.push(line);
+  });
+  
+  return instrumentedLines.join('\n');
+}
 
 async function runPlaygroundInWorker(code, captureCode, timeoutMs = 2000) {
   return new Promise((resolve) => {
