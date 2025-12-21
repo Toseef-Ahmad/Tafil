@@ -1398,52 +1398,52 @@
       </div>
       <div class="modal-body" style="padding: 16px; max-height: 70vh; overflow-y: auto;">
         <!-- Theme Selector Section -->
-        <div class="settings-section" style="margin-bottom: 20px;">
-          <div class="settings-section-header" style="margin-bottom: 8px;">
-            <h4 style="font-size: 13px; font-weight: 600; color: var(--text-primary); margin: 0;">Theme</h4>
+        <div class="settings-section">
+          <div class="settings-section-header">
+            <h4>Theme</h4>
           </div>
-          <div id="themeSelectorContainer" style="background: var(--bg-secondary, rgba(255,255,255,0.02)); border: 1px solid var(--border-subtle, rgba(255,255,255,0.06)); border-radius: 8px; padding: 8px;">
+          <div id="themeSelectorContainer">
             <!-- Theme options will be inserted here by JavaScript -->
           </div>
         </div>
 
         <!-- Default IDE Section -->
-        <div class="settings-section" style="margin-bottom: 20px;">
-          <div class="settings-section-header" style="margin-bottom: 8px;">
-            <h4 style="font-size: 13px; font-weight: 600; color: var(--text-primary); margin: 0;">Default Editor</h4>
+        <div class="settings-section">
+          <div class="settings-section-header">
+            <h4>Default Editor</h4>
           </div>
-          <div id="defaultIdeList" class="settings-list" style="background: var(--bg-secondary, rgba(255,255,255,0.02)); border: 1px solid var(--border-subtle, rgba(255,255,255,0.06)); border-radius: 8px; padding: 4px;">
+          <div id="defaultIdeList" class="settings-list">
             <!-- IDE options will be inserted here -->
           </div>
-          <p id="noIdeMessage" class="hidden" style="font-size: 12px; color: #f59e0b; margin-top: 8px; padding-left: 4px;">No IDEs detected</p>
+          <p id="noIdeMessage" class="hidden" style="font-size: 12px; color: #f59e0b; margin-top: 8px;">No IDEs detected</p>
         </div>
 
         <!-- Default Terminal Section -->
-        <div class="settings-section" style="margin-bottom: 20px;">
-          <div class="settings-section-header" style="margin-bottom: 8px;">
-            <h4 style="font-size: 13px; font-weight: 600; color: var(--text-primary); margin: 0;">Default Terminal</h4>
+        <div class="settings-section">
+          <div class="settings-section-header">
+            <h4>Default Terminal</h4>
           </div>
-          <div id="defaultTerminalList" class="settings-list" style="background: var(--bg-secondary, rgba(255,255,255,0.02)); border: 1px solid var(--border-subtle, rgba(255,255,255,0.06)); border-radius: 8px; padding: 4px;">
+          <div id="defaultTerminalList" class="settings-list">
             <!-- Terminal options will be inserted here -->
           </div>
         </div>
 
         <!-- License Details Section -->
         <div class="settings-section" id="licenseSection">
-          <div class="settings-section-header" style="margin-bottom: 8px;">
-            <h4 style="font-size: 13px; font-weight: 600; color: var(--text-primary); margin: 0;">License</h4>
+          <div class="settings-section-header">
+            <h4>License</h4>
           </div>
-          <div id="licenseDetailsContainer" style="background: var(--bg-secondary, rgba(255,255,255,0.02)); border: 1px solid var(--border-subtle, rgba(255,255,255,0.06)); border-radius: 8px; padding: 12px;">
+          <div id="licenseDetailsContainer" style="padding: 8px 0;">
             <!-- License info will be inserted here by JavaScript -->
-            <div id="licenseLoading" style="text-align: center; color: var(--text-tertiary); font-size: 13px; padding: 8px 0;">
+            <div id="licenseLoading" style="color: var(--text-tertiary); font-size: 13px;">
               <span>Loading...</span>
             </div>
           </div>
         </div>
       </div>
-      <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--border-subtle, rgba(255,255,255,0.06)); background: var(--bg-secondary, rgba(0,0,0,0.1));">
-        <button id="cancelSettingsBtn" style="padding: 8px 16px; border-radius: 6px; font-size: 13px; font-weight: 500; background: transparent; border: 1px solid var(--border-subtle, rgba(255,255,255,0.1)); color: var(--text-secondary, #a1a1aa); cursor: pointer; transition: background 0.1s ease;">Cancel</button>
-        <button id="saveSettingsBtn" style="padding: 8px 16px; border-radius: 6px; font-size: 13px; font-weight: 500; background: var(--accent-primary, #8b5cf6); border: none; color: white; cursor: pointer; transition: opacity 0.1s ease;">Save</button>
+      <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 8px; padding: 16px; border-top: 1px solid var(--border-subtle, rgba(255,255,255,0.06));">
+        <button id="cancelSettingsBtn" style="padding: 7px 14px; border-radius: 5px; font-size: 13px; font-weight: 400; background: transparent; border: 1px solid var(--border-subtle, rgba(255,255,255,0.15)); color: var(--text-secondary, #a1a1aa); cursor: pointer;">Cancel</button>
+        <button id="saveSettingsBtn" style="padding: 7px 14px; border-radius: 5px; font-size: 13px; font-weight: 500; background: var(--accent-primary, #8b5cf6); border: none; color: white; cursor: pointer;">Save</button>
       </div>
     </div>
   </div>

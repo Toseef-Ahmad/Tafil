@@ -2,7 +2,7 @@
   "version": 1,
   "projectPath": "/Users/sodaclick/Desktop/projects/Own Projects/node-project-manager/electron-node-manager",
   "createdAt": "2025-12-16T04:40:55.447Z",
-  "updatedAt": "2025-12-21T08:25:30.969Z",
+  "updatedAt": "2025-12-21T09:59:38.234Z",
   "modules": [
     {
       "id": "1765863327853_2da6535b1077",
@@ -10,7 +10,7 @@
       "description": "",
       "order": 0,
       "createdAt": "2025-12-16T05:35:27.853Z",
-      "updatedAt": "2025-12-21T08:25:30.969Z",
+      "updatedAt": "2025-12-21T09:58:36.491Z",
       "color": "#8b5cf6",
       "icon": "📦"
     },
@@ -20,7 +20,7 @@
       "description": "",
       "order": 1,
       "createdAt": "2025-12-18T14:07:38.597Z",
-      "updatedAt": "2025-12-21T08:24:39.977Z",
+      "updatedAt": "2025-12-21T09:59:38.233Z",
       "color": "#8b5cf6",
       "icon": "📦"
     }

@@ -1673,94 +1673,97 @@ body[data-theme] .framework-badge {
 
 /* New Theme Card Styles */
 /* =====================================================
-   RunJS-Style Settings UI - Calm, intentional, professional
+   RunJS-Style Settings UI - STRICT (Zero cards, zero hover)
    ===================================================== */
 
 .theme-grid-new {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  margin-bottom: 8px;
+  gap: 0;
+  margin-bottom: 0;
 }
 
 .theme-card {
   position: relative;
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 8px 10px;
-  border-radius: 6px;
-  border: 1px solid transparent;
+  gap: 12px;
+  padding: 10px 0;
+  border: none;
   background: transparent;
   cursor: pointer;
-  transition: background 0.1s ease;
+  border-bottom: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.04));
   text-align: left;
   width: 100%;
 }
 
-/* Subtle hover - no layout shift, just background */
+.theme-card:last-child {
+  border-bottom: none;
+}
+
+/* ZERO hover effects - RunJS style */
 .theme-card:hover {
-  background: var(--bg-hover, rgba(255, 255, 255, 0.04));
+  background: transparent;
 }
 
-/* Active state - clear but calm */
+/* Active state - ONLY text color change */
 .theme-card.active {
-  background: var(--accent-primary-muted, rgba(139, 92, 246, 0.08));
+  background: transparent;
 }
 
-/* Theme color dot - small, static indicator */
+/* Remove theme preview dot */
 .theme-card-preview {
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  flex-shrink: 0;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  display: none;
 }
 
-/* No icon needed in RunJS style */
+/* No icon */
 .theme-card-icon {
   display: none;
 }
 
+/* Info spans inline */
 .theme-card-info {
   flex: 1;
   min-width: 0;
   display: flex;
-  align-items: center;
+  align-items: baseline;
   gap: 8px;
 }
 
+/* Theme name - normal weight */
 .theme-card-name {
   font-size: 13px;
-  font-weight: 500;
-  color: var(--text-primary, #fafafa);
+  font-weight: 400;
+  color: var(--text-primary, #e4e4e7);
 }
 
+/* Description inline with dash */
 .theme-card-desc {
-  font-size: 12px;
-  color: var(--text-muted, #52525b);
+  font-size: 13px;
+  color: var(--text-muted, #71717a);
 }
 
-/* Active name gets accent color */
+/* Active: ONLY name gets accent */
 .theme-card.active .theme-card-name {
+  font-weight: 500;
   color: var(--accent-primary, #8b5cf6);
 }
 
+/* Description stays muted even when active */
 .theme-card.active .theme-card-desc {
-  color: var(--text-tertiary, #71717a);
+  color: var(--text-muted, #71717a);
 }
 
-/* Radio indicator - always visible */
+/* Radio - minimal style */
 .theme-card-radio {
-  width: 16px;
-  height: 16px;
+  width: 14px;
+  height: 14px;
   border-radius: 50%;
-  border: 2px solid var(--border-default, rgba(255, 255, 255, 0.15));
+  border: 1.5px solid var(--border-default, rgba(255, 255, 255, 0.2));
   flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: border-color 0.1s ease;
 }
 
 .theme-card.active .theme-card-radio {
@@ -1768,18 +1771,15 @@ body[data-theme] .framework-badge {
 }
 
 .theme-card-radio-inner {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
   background: var(--accent-primary, #8b5cf6);
   opacity: 0;
-  transform: scale(0);
-  transition: all 0.1s ease;
 }
 
 .theme-card.active .theme-card-radio-inner {
   opacity: 1;
-  transform: scale(1);
 }
 
 /* Hide old checkmark */
@@ -1787,65 +1787,74 @@ body[data-theme] .framework-badge {
   display: none;
 }
 
-/* Section titles - subtle */
+/* Section dividers */
 .theme-section-title {
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 500;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: var(--text-muted, #52525b);
-  margin-bottom: 6px;
-  margin-top: 12px;
-  padding-left: 2px;
+  letter-spacing: 0.3px;
+  color: var(--text-muted, #71717a);
+  margin-bottom: 8px;
+  margin-top: 16px;
+  padding: 0;
 }
 
 .theme-section-title:first-child {
-  margin-top: 0;
+  margin-top: 8px;
 }
 
-/* Settings row - RunJS list style */
+/* Settings row - STRICT no hover */
 .settings-row {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 8px 10px;
-  border-radius: 6px;
+  gap: 12px;
+  padding: 10px 0;
   cursor: pointer;
-  transition: background 0.1s ease;
-  border: 1px solid transparent;
+  border: none;
+  background: transparent;
+  border-bottom: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.04));
 }
 
+.settings-row:last-child {
+  border-bottom: none;
+}
+
+/* NO hover effect */
 .settings-row:hover {
-  background: var(--bg-hover, rgba(255, 255, 255, 0.04));
+  background: transparent;
 }
 
+/* NO active background */
 .settings-row.active {
-  background: var(--accent-primary-muted, rgba(139, 92, 246, 0.08));
+  background: transparent;
 }
 
 .settings-row-icon {
-  font-size: 16px;
-  width: 20px;
+  font-size: 15px;
+  width: 18px;
   text-align: center;
   flex-shrink: 0;
+  opacity: 0.6;
 }
 
 .settings-row-label {
   flex: 1;
   font-size: 13px;
-  font-weight: 500;
-  color: var(--text-primary, #fafafa);
+  font-weight: 400;
+  color: var(--text-primary, #e4e4e7);
 }
 
+/* Active: only label weight and color */
 .settings-row.active .settings-row-label {
+  font-weight: 500;
   color: var(--accent-primary, #8b5cf6);
 }
 
 .settings-row-radio {
-  width: 16px;
-  height: 16px;
+  width: 14px;
+  height: 14px;
   border-radius: 50%;
-  border: 2px solid var(--border-default, rgba(255, 255, 255, 0.15));
+  border: 1.5px solid var(--border-default, rgba(255, 255, 255, 0.2));
   flex-shrink: 0;
   display: flex;
   align-items: center;
@@ -1857,25 +1866,43 @@ body[data-theme] .framework-badge {
 }
 
 .settings-row-radio-inner {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
   background: var(--accent-primary, #8b5cf6);
   opacity: 0;
-  transform: scale(0);
-  transition: all 0.1s ease;
 }
 
 .settings-row.active .settings-row-radio-inner {
   opacity: 1;
-  transform: scale(1);
 }
 
-/* Settings list container */
+/* Settings list - no gap */
 .settings-list {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 0;
+}
+
+/* Settings sections */
+.settings-section {
+  margin-bottom: 24px;
+}
+
+.settings-section:last-child {
+  margin-bottom: 0;
+}
+
+.settings-section-header {
+  margin-bottom: 12px;
+}
+
+.settings-section-header h4 {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted, #71717a);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
 }
 
 /* Light theme adjustments for specific elements */

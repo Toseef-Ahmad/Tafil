@@ -2956,7 +2956,7 @@ async function loadLicenseDetails() {
     const status = await window.electronAPI.license.getStatus();
     
     if (status.isPro) {
-      // Pro license - show details (calm, list-based)
+      // Pro license - minimal list
       const licenseKey = status.licenseKey || 'N/A';
       const email = status.email || 'N/A';
       const activatedAt = status.activatedAt ? new Date(status.activatedAt).toLocaleDateString() : 'N/A';
@@ -2964,33 +2964,31 @@ async function loadLicenseDetails() {
       const maxDevices = status.maxDevices || 3;
       
       container.innerHTML = `
-        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid var(--border-subtle, rgba(255,255,255,0.06));">
-          <div style="width: 10px; height: 10px; border-radius: 50%; background: #22c55e; flex-shrink: 0;"></div>
-          <span style="font-size: 13px; font-weight: 500; color: var(--text-primary);">TAFIL Pro</span>
-          <span style="font-size: 12px; color: #22c55e; margin-left: auto;">Active</span>
-        </div>
-        
-        <div style="display: flex; flex-direction: column; gap: 6px; font-size: 13px;">
+        <div style="display: flex; flex-direction: column; gap: 10px; font-size: 13px; padding-bottom: 12px; border-bottom: 1px solid var(--border-subtle, rgba(255,255,255,0.04));">
           <div style="display: flex; justify-content: space-between; align-items: center;">
-            <span style="color: var(--text-muted);">Key</span>
-            <span style="color: var(--text-secondary); font-family: ui-monospace, monospace; font-size: 11px;">${licenseKey}</span>
+            <span style="color: var(--text-muted, #71717a);">Status</span>
+            <span style="color: #22c55e; font-size: 12px;">Pro — Active</span>
           </div>
           <div style="display: flex; justify-content: space-between; align-items: center;">
-            <span style="color: var(--text-muted);">Email</span>
-            <span style="color: var(--text-secondary); font-size: 12px;">${email}</span>
+            <span style="color: var(--text-muted, #71717a);">Key</span>
+            <span style="color: var(--text-secondary, #a1a1aa); font-family: ui-monospace, monospace; font-size: 11px;">${licenseKey}</span>
           </div>
           <div style="display: flex; justify-content: space-between; align-items: center;">
-            <span style="color: var(--text-muted);">Activated</span>
-            <span style="color: var(--text-secondary);">${activatedAt}</span>
+            <span style="color: var(--text-muted, #71717a);">Email</span>
+            <span style="color: var(--text-secondary, #a1a1aa); font-size: 12px;">${email}</span>
           </div>
           <div style="display: flex; justify-content: space-between; align-items: center;">
-            <span style="color: var(--text-muted);">Devices</span>
-            <span style="color: var(--text-secondary);">${devicesUsed} of ${maxDevices}</span>
+            <span style="color: var(--text-muted, #71717a);">Activated</span>
+            <span style="color: var(--text-secondary, #a1a1aa); font-size: 12px;">${activatedAt}</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span style="color: var(--text-muted, #71717a);">Devices</span>
+            <span style="color: var(--text-secondary, #a1a1aa); font-size: 12px;">${devicesUsed} of ${maxDevices}</span>
           </div>
         </div>
         
-        <button id="deactivateLicenseBtn" style="margin-top: 12px; width: 100%; padding: 8px; background: transparent; border: 1px solid var(--border-subtle, rgba(255,255,255,0.1)); border-radius: 6px; color: var(--text-muted); font-size: 12px; cursor: pointer; transition: all 0.1s ease;">
-          Deactivate this device
+        <button id="deactivateLicenseBtn" style="margin-top: 12px; padding: 7px 0; background: transparent; border: none; color: var(--text-muted, #71717a); font-size: 12px; cursor: pointer; text-align: left;">
+          → Deactivate this device
         </button>
       `;
       
@@ -3010,23 +3008,24 @@ async function loadLicenseDetails() {
         });
       }
     } else {
-      // Free version (calm, minimal)
+      // Free version - minimal
       container.innerHTML = `
-        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid var(--border-subtle, rgba(255,255,255,0.06));">
-          <div style="width: 10px; height: 10px; border-radius: 50%; background: var(--text-muted, #52525b); flex-shrink: 0;"></div>
-          <span style="font-size: 13px; font-weight: 500; color: var(--text-primary);">TAFIL Free</span>
-          <span style="font-size: 12px; color: var(--text-muted); margin-left: auto;">Limited</span>
+        <div style="display: flex; flex-direction: column; gap: 10px; font-size: 13px; padding-bottom: 12px; border-bottom: 1px solid var(--border-subtle, rgba(255,255,255,0.04));">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span style="color: var(--text-muted, #71717a);">Status</span>
+            <span style="color: var(--text-muted, #71717a); font-size: 12px;">Free — Limited</span>
+          </div>
         </div>
         
-        <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px; line-height: 1.5;">
+        <p style="font-size: 12px; color: var(--text-muted, #71717a); margin: 12px 0; line-height: 1.5;">
           Unlock unlimited projects, canvas, and all Pro features.
         </p>
         
-        <div style="display: flex; gap: 8px;">
-          <button id="upgradeLicenseBtn" style="flex: 1; padding: 8px 12px; background: var(--accent-primary, #8b5cf6); border: none; border-radius: 6px; color: white; font-size: 12px; font-weight: 500; cursor: pointer; transition: opacity 0.1s ease;">
+        <div style="display: flex; gap: 8px; margin-top: 12px;">
+          <button id="upgradeLicenseBtn" style="padding: 7px 14px; background: var(--accent-primary, #8b5cf6); border: none; border-radius: 5px; color: white; font-size: 12px; font-weight: 400; cursor: pointer;">
             Upgrade to Pro
           </button>
-          <button id="enterLicenseKeyBtn" style="padding: 8px 12px; background: transparent; border: 1px solid var(--border-subtle, rgba(255,255,255,0.1)); border-radius: 6px; color: var(--text-secondary); font-size: 12px; cursor: pointer; transition: background 0.1s ease;">
+          <button id="enterLicenseKeyBtn" style="padding: 7px 14px; background: transparent; border: 1px solid var(--border-subtle, rgba(255,255,255,0.15)); border-radius: 5px; color: var(--text-secondary, #a1a1aa); font-size: 12px; cursor: pointer;">
             Enter Key
           </button>
         </div>
@@ -3219,17 +3218,9 @@ function createThemeSelector() {
   const darkThemes = Object.entries(THEMES).filter(([_, t]) => t.type === 'dark');
   const lightThemes = Object.entries(THEMES).filter(([_, t]) => t.type === 'light');
   
-  // Theme accent colors for the dot preview
-  const themeAccents = {
-    midnight: '#8b5cf6', dracula: '#bd93f9', 'tokyo-night': '#7aa2f7', nord: '#88c0d0',
-    catppuccin: '#cba6f7', 'one-dark': '#61afef', synthwave: '#f97583', 'ayu-dark': '#ffb454',
-    'github-dark': '#58a6ff', 'rose-pine': '#ebbcba', monokai: '#a6e22e', vesper: '#ffa657',
-    light: '#0969da', 'github-light': '#0969da', 'catppuccin-latte': '#8839ef', 'solarized-light': '#268bd2'
-  };
-  
+  // Pure list - no decorations, just text + radio
   const createThemeRow = (id, theme) => `
     <button class="theme-card ${currentTheme === id ? 'active' : ''}" data-theme="${id}" type="button">
-      <div class="theme-card-preview" style="background: ${themeAccents[id] || '#8b5cf6'};"></div>
       <div class="theme-card-info">
         <span class="theme-card-name">${theme.name}</span>
         <span class="theme-card-desc">— ${theme.description}</span>
@@ -3241,11 +3232,11 @@ function createThemeSelector() {
   `;
   
   return `
-    <div class="theme-section-title">Dark</div>
+    <div class="theme-section-title">DARK</div>
     <div class="theme-grid-new">
       ${darkThemes.map(([id, theme]) => createThemeRow(id, theme)).join('')}
     </div>
-    <div class="theme-section-title">Light</div>
+    <div class="theme-section-title">LIGHT</div>
     <div class="theme-grid-new">
       ${lightThemes.map(([id, theme]) => createThemeRow(id, theme)).join('')}
     </div>
