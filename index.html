@@ -18,123 +18,354 @@
   <style>
     body { opacity: 1 !important; visibility: visible !important; }
     
-    /* Sidebar (cross-platform safe sizing; avoids subpixel flex jitter on macOS) */
+    /* =============================================
+       SIDEBAR - BASE STYLES
+       ============================================= */
     .sidebar { 
       width: 240px; 
       min-width: 240px; 
       flex: 0 0 240px;
-      transition: width 0.2s ease, min-width 0.2s ease, flex-basis 0.2s ease;
-    }
-    .sidebar.collapsed { 
-      width: 60px; 
-      min-width: 60px; 
-      flex-basis: 60px;
-    }
-    /* Smooth text fade-out on collapse (better UX than instant hide) */
-    .sidebar-text {
-      transition: opacity 0.2s ease, visibility 0.2s ease;
-    }
-    .sidebar.collapsed .sidebar-text { 
-      opacity: 0;
-      visibility: hidden;
-      width: 0;
-      overflow: hidden;
-    }
-    .sidebar.collapsed .sidebar-section-title { 
-      opacity: 0;
-      visibility: hidden;
-      height: 0;
-      overflow: hidden;
-    }
-    .sidebar.collapsed .collection-count { 
-      display: none; 
+      transition: width 0.2s cubic-bezier(0.4, 0, 0.2, 1), 
+                  min-width 0.2s cubic-bezier(0.4, 0, 0.2, 1), 
+                  flex-basis 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      display: flex;
+      flex-direction: column;
     }
     
-    /* Sidebar scrolling: stop horizontal scrollbar + improve Safari/macOS scroll behavior */
+    /* Sidebar scrolling */
     .sidebar nav {
-      min-height: 0; /* critical for flex + overflow on WebKit */
+      min-height: 0;
       overflow-x: hidden;
+      overflow-y: auto;
       -webkit-overflow-scrolling: touch;
       overscroll-behavior: contain;
     }
     
-    /* Sidebar items - professional collapse behavior */
-    .sidebar-item { 
-      display: flex; align-items: center; gap: 10px; padding: 8px 12px; 
-      border-radius: 6px; cursor: pointer; transition: all 0.2s ease;
-      color: #a1a1aa; font-size: 13px; font-weight: 500;
-      position: relative; /* for tooltip positioning */
-      white-space: nowrap; /* prevent text wrapping */
+    /* Text elements */
+    .sidebar-text {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      transition: opacity 0.15s ease;
     }
-    .sidebar-item:hover { background: rgba(255,255,255,0.05); color: #fafafa; }
-    .sidebar-item.active { background: rgba(139, 92, 246, 0.15); color: #a78bfa; }
+    
+    /* Section titles */
+    .sidebar-section-title {
+      transition: opacity 0.15s ease;
+    }
+    
+    /* Sidebar items */
+    .sidebar-item { 
+      display: flex; 
+      align-items: center; 
+      gap: 10px; 
+      padding: 8px 10px; 
+      margin: 1px 0;
+      border-radius: 7px; 
+      cursor: pointer; 
+      transition: all 0.12s ease;
+      color: var(--text-secondary, #a1a1aa); 
+      font-size: 13px; 
+      font-weight: 500;
+      position: relative;
+      white-space: nowrap;
+    }
+    .sidebar-item svg {
+      flex-shrink: 0;
+      width: 16px;
+      height: 16px;
+    }
+    .sidebar-item:hover { 
+      background: var(--bg-hover, rgba(255,255,255,0.06)); 
+      color: var(--text-primary, #fafafa); 
+    }
+    .sidebar-item.active { 
+      background: rgba(139, 92, 246, 0.15); 
+      color: #a78bfa; 
+    }
     .sidebar-item.active svg { stroke: #a78bfa; }
     
-    /* Collapsed sidebar: center icons, hide text smoothly */
-    .sidebar.collapsed .sidebar-item {
-      justify-content: center; /* center icons */
-      padding: 10px; /* equal padding all around */
-      gap: 0;
+    /* Collection items */
+    .collection-item {
+      display: flex; 
+      align-items: center; 
+      gap: 8px;
+      padding: 7px 12px; 
+      margin: 1px 0;
+      border-radius: 8px; 
+      cursor: pointer;
+      transition: all 0.12s ease; 
+      color: var(--text-secondary, #a1a1aa); 
+      font-size: 13px;
+      position: relative;
+      white-space: nowrap;
     }
-    .sidebar.collapsed .sidebar-item svg {
-      margin: 0; /* remove any margins */
-      flex-shrink: 0; /* prevent icon shrinking */
+    .collection-item .collection-icon {
+      flex-shrink: 0;
+      font-size: 16px;
+      width: 18px;
+      text-align: center;
+    }
+    .collection-item .collection-name {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .collection-item:hover { 
+      background: var(--bg-hover, rgba(255,255,255,0.06)); 
+      color: var(--text-primary, #fafafa); 
+    }
+    .collection-item.active { 
+      background: rgba(139, 92, 246, 0.15); 
+      color: #a78bfa; 
+    }
+    .collection-item.drag-over { 
+      background: rgba(139, 92, 246, 0.25); 
+      outline: 2px dashed #a78bfa;
+      outline-offset: -2px;
     }
     
-    /* Tooltip for collapsed sidebar items */
-    .sidebar.collapsed .sidebar-item::after {
+    /* Collection count badge */
+    .collection-count {
+      font-size: 11px; 
+      color: #71717a; 
+      background: rgba(255,255,255,0.06);
+      padding: 2px 7px; 
+      border-radius: 10px; 
+      font-weight: 500;
+      margin-left: auto;
+    }
+    
+    /* =============================================
+       SIDEBAR - COLLAPSED STATE
+       ============================================= */
+    .sidebar.collapsed { 
+      width: 54px; 
+      min-width: 54px; 
+      flex-basis: 54px;
+    }
+    
+    /* Hide text content when collapsed */
+    .sidebar.collapsed .sidebar-text { 
+      opacity: 0;
+      width: 0;
+      display: none;
+    }
+    .sidebar.collapsed .sidebar-section-title { 
+      opacity: 0;
+      height: 0;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+    }
+    .sidebar.collapsed .collection-count,
+    .sidebar.collapsed .running-badge { 
+      display: none; 
+    }
+    
+    /* Hide add buttons and section headers */
+    .sidebar.collapsed #addCollectionBtn {
+      display: none;
+    }
+    .sidebar.collapsed .saved-section-header {
+      display: none;
+    }
+    .sidebar.collapsed .empty-state-text {
+      display: none;
+    }
+    
+    /* Adjust header when collapsed */
+    .sidebar.collapsed .flex.items-center.justify-between.p-3 {
+      padding: 10px 8px;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .sidebar.collapsed .flex.items-center.gap-2 {
+      gap: 0;
+    }
+    .sidebar.collapsed #toggleSidebar {
+      position: static;
+      margin-top: 4px;
+    }
+    
+    /* Nav padding when collapsed */
+    .sidebar.collapsed nav {
+      padding: 4px;
+      overflow-x: hidden;
+      overflow-y: auto;
+    }
+    
+    /* Prevent any horizontal overflow in collapsed state */
+    .sidebar.collapsed * {
+      overflow-x: hidden;
+    }
+    
+    /* Module tabs - vertical stack when collapsed */
+    .sidebar.collapsed .module-tabs {
+      flex-direction: column;
+      gap: 2px;
+      padding: 4px;
+      background: transparent !important;
+      margin: 0 2px;
+    }
+    .sidebar.collapsed .module-tab {
+      width: 38px;
+      height: 38px;
+      padding: 0;
+      border-radius: 10px;
+      flex: none;
+      margin: 0 auto;
+    }
+    .sidebar.collapsed .module-tab svg {
+      width: 18px;
+      height: 18px;
+    }
+    
+    /* Sidebar items when collapsed */
+    .sidebar.collapsed .sidebar-item {
+      width: 38px;
+      height: 38px;
+      padding: 0;
+      margin: 2px auto;
+      justify-content: center;
+      gap: 0;
+      border-radius: 10px;
+    }
+    .sidebar.collapsed .sidebar-item svg {
+      width: 16px;
+      height: 16px;
+    }
+    
+    /* Collection items when collapsed */
+    .sidebar.collapsed .collection-item {
+      width: 38px;
+      height: 38px;
+      padding: 0;
+      margin: 2px auto;
+      justify-content: center;
+      gap: 0;
+      border-radius: 10px;
+    }
+    .sidebar.collapsed .collection-item .collection-name {
+      display: none;
+    }
+    .sidebar.collapsed .collection-item .collection-icon {
+      font-size: 16px;
+    }
+    
+    /* Section dividers when collapsed */
+    .sidebar.collapsed .border-t {
+      border: none;
+      padding-top: 4px;
+    }
+    .sidebar.collapsed .mb-4 {
+      margin-bottom: 4px;
+    }
+    .sidebar.collapsed .px-1 {
+      padding-left: 0;
+      padding-right: 0;
+    }
+    
+    /* Footer when collapsed */
+    .sidebar.collapsed .p-2.border-t {
+      padding: 4px;
+      border: none;
+    }
+    .sidebar.collapsed #settingsBtn {
+      width: 38px;
+      height: 38px;
+      margin: 0 auto;
+    }
+    
+    /* Hide snippets section when collapsed */
+    .sidebar.collapsed #playgroundNav .saved-section {
+      display: none !important;
+    }
+    .sidebar.collapsed #snippetHistoryList {
+      display: none !important;
+    }
+    
+    /* SSH sessions - keep visible when collapsed! */
+    .sidebar.collapsed #sshNav .saved-section {
+      display: block !important;
+      border: none !important;
+      padding-top: 4px !important;
+      margin-top: 4px !important;
+    }
+    .sidebar.collapsed #sshNav .saved-section-header {
+      display: none;
+    }
+    .sidebar.collapsed #activeSessionsList {
+      display: block !important;
+      overflow: hidden;
+    }
+    /* Style SSH session items as compact icons when collapsed */
+    .sidebar.collapsed #activeSessionsList > * {
+      width: 38px !important;
+      height: 38px !important;
+      padding: 0 !important;
+      margin: 2px auto !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      border-radius: 10px !important;
+      overflow: hidden !important;
+    }
+    .sidebar.collapsed #activeSessionsList > *:hover {
+      background: rgba(255,255,255,0.06);
+    }
+    /* Hide text in session items, show only status dot */
+    .sidebar.collapsed #activeSessionsList .session-name,
+    .sidebar.collapsed #activeSessionsList .session-text,
+    .sidebar.collapsed #activeSessionsList span:not(.session-dot) {
+      display: none !important;
+    }
+    /* Show green dot for active sessions */
+    .sidebar.collapsed #activeSessionsList .session-dot,
+    .sidebar.collapsed #activeSessionsList .dot {
+      display: block !important;
+      width: 10px !important;
+      height: 10px !important;
+      background: #10b981 !important;
+      border-radius: 50% !important;
+      animation: pulse 2s infinite;
+    }
+    
+    /* =============================================
+       TOOLTIPS - Only visible when collapsed
+       ============================================= */
+    .sidebar [data-tooltip] {
+      position: relative;
+    }
+    .sidebar [data-tooltip]::after {
       content: attr(data-tooltip);
       position: absolute;
-      left: 100%;
+      left: calc(100% + 10px);
       top: 50%;
       transform: translateY(-50%);
-      margin-left: 12px;
-      padding: 6px 10px;
-      background: #18181b;
-      color: #fafafa;
+      padding: 8px 12px;
+      background: #1a1a1c;
+      color: #fff;
       font-size: 12px;
       font-weight: 500;
       white-space: nowrap;
-      border-radius: 6px;
+      border-radius: 8px;
       border: 1px solid rgba(255,255,255,0.1);
-      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.4);
       opacity: 0;
+      visibility: hidden;
       pointer-events: none;
-      transition: opacity 0.2s ease;
-      z-index: 1000;
+      transition: opacity 0.15s ease, visibility 0.15s ease;
+      z-index: 9999;
     }
-    .sidebar.collapsed .sidebar-item:hover::after {
+    /* Only show tooltips when collapsed */
+    .sidebar:not(.collapsed) [data-tooltip]::after {
+      display: none;
+    }
+    .sidebar.collapsed [data-tooltip]:hover::after {
       opacity: 1;
+      visibility: visible;
     }
-    
-    /* Collection items - collapse-friendly */
-    .collection-item {
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 6px 12px; border-radius: 6px; cursor: pointer;
-      transition: all 0.2s ease; color: #a1a1aa; font-size: 13px;
-      position: relative; /* for tooltip */
-      white-space: nowrap;
-    }
-    .collection-item:hover { background: rgba(255,255,255,0.05); color: #fafafa; }
-    .collection-item.active { background: rgba(139, 92, 246, 0.15); color: #a78bfa; }
-    .collection-item.drag-over { background: rgba(139, 92, 246, 0.25); border: 1px dashed #a78bfa; }
-    
-    /* Collapsed: center collection icons */
-    .sidebar.collapsed .collection-item {
-      justify-content: center;
-      padding: 10px;
-    }
-    .sidebar.collapsed .collection-item::after {
-      content: attr(data-tooltip);
-      position: absolute;
-      left: 100%;
-      top: 50%;
-      transform: translateY(-50%);
-      margin-left: 12px;
-      padding: 6px 10px;
-      background: #18181b;
-      color: #fafafa;
-      font-size: 12px;
       white-space: nowrap;
       border-radius: 6px;
       border: 1px solid rgba(255,255,255,0.1);
@@ -300,117 +531,52 @@
     .action-btn.stop { color: #f43f5e; }
     .action-btn.stop:hover { background: rgba(244, 63, 94, 0.15); }
     
-    /* Module Tabs */
-    .module-tab {
-      flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
-      padding: 12px 8px; border-radius: 8px; cursor: pointer;
-      color: #71717a; font-size: 10px; font-weight: 500; text-align: center;
-      transition: all 0.2s ease; border: none; background: transparent;
-      pointer-events: auto !important;
-      z-index: 10;
-    }
-    .module-tab svg { width: 18px; height: 18px; transition: all 0.2s ease; }
-    .module-tab:hover { color: #a1a1aa; background: rgba(255,255,255,0.06); transform: translateY(-1px); }
-    .module-tab.active { 
-      background: #8b5cf6;
-      color: white; font-weight: 600;
-    }
-    .module-tab.active svg { stroke: white; transform: scale(1.05); }
-
-    /* Module tabs container (Projects / Playground / SSH) */
+    /* Module Tabs Container */
     .module-tabs {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 8px;
-      padding: 8px;
-      border-radius: 12px;
-      overflow: visible; /* allow flyout to extend */
-      box-sizing: border-box;
-    }
-
-    /* Base tab sizing (prevents label overflow + DPI weirdness) */
-    .module-tab { min-width: 0; }
-
-    /* Collapsed: compact icon dock centered in the 60px sidebar */
-    .sidebar.collapsed .module-tabs {
-      grid-template-columns: 1fr;
-      width: 44px;
-      margin: 0 auto;
-      padding: 6px;
-      gap: 8px;
-    }
-    .sidebar.collapsed .module-tab {
-      width: 44px;
-      height: 44px;
-      min-height: 44px;
-      padding: 0;
-      gap: 0;
-      flex-direction: row;
-      align-items: center;
-      justify-content: center;
-      border-radius: 12px;
-    }
-    .sidebar.collapsed .module-tab:hover { transform: none; }
-    .sidebar.collapsed .module-tab svg { transform: none !important; }
-
-    /* Collapsed flyout: on hover/focus, expand to a wider dropdown so nothing ever pinches */
-    .sidebar.collapsed .module-tabs:hover,
-    .sidebar.collapsed .module-tabs:focus-within {
-      width: 228px;
-      margin: 0;
-      padding: 8px;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      background: rgba(255,255,255,0.04);
-      border: 1px solid rgba(255,255,255,0.08);
-      box-shadow: 0 18px 40px rgba(0,0,0,0.45);
-      position: relative;
-      z-index: 60;
-    }
-    .sidebar.collapsed .module-tabs:hover .module-tab,
-    .sidebar.collapsed .module-tabs:focus-within .module-tab {
-      width: auto;
-      height: 56px;
-      min-height: 56px;
-      padding: 12px 8px;
+      display: flex;
       gap: 4px;
-      flex-direction: column;
-      justify-content: center;
-      border-radius: 12px;
-    }
-    .sidebar.collapsed .module-tabs:hover .sidebar-text,
-    .sidebar.collapsed .module-tabs:focus-within .sidebar-text {
-      opacity: 1 !important;
-      visibility: visible !important;
-      width: auto !important;
+      padding: 6px;
+      border-radius: 10px;
+      background: rgba(255,255,255,0.03);
     }
     
-    /* Tooltip for collapsed module tabs (when not hovering the container) */
-    .sidebar.collapsed .module-tab {
+    /* Module Tab */
+    .module-tab {
+      display: flex; 
+      flex-direction: column; 
+      align-items: center; 
+      justify-content: center; 
+      gap: 4px;
+      padding: 8px 6px; 
+      border-radius: 8px; 
+      cursor: pointer;
+      color: var(--text-muted, #71717a); 
+      font-size: 9px; 
+      font-weight: 500; 
+      text-align: center;
+      transition: all 0.12s ease; 
+      border: none; 
+      background: transparent;
       position: relative;
+      flex: 1;
+      min-width: 0;
     }
-    .sidebar.collapsed .module-tab::after {
-      content: attr(data-tooltip);
-      position: absolute;
-      left: 100%;
-      top: 50%;
-      transform: translateY(-50%);
-      margin-left: 12px;
-      padding: 6px 10px;
-      background: #18181b;
-      color: #fafafa;
-      font-size: 12px;
-      font-weight: 500;
-      white-space: nowrap;
-      border-radius: 6px;
-      border: 1px solid rgba(255,255,255,0.1);
-      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity 0.2s ease;
-      z-index: 1000;
+    .module-tab svg { 
+      width: 16px; 
+      height: 16px; 
+      flex-shrink: 0;
     }
-    .sidebar.collapsed .module-tabs:not(:hover):not(:focus-within) .module-tab:hover::after {
-      opacity: 1;
+    .module-tab:hover { 
+      color: var(--text-secondary, #a1a1aa); 
+      background: rgba(255,255,255,0.06); 
+    }
+    .module-tab.active { 
+      background: var(--accent-violet, #8b5cf6);
+      color: white; 
+      font-weight: 600;
+    }
+    .module-tab.active svg { 
+      stroke: white; 
     }
     
     /* Module Panels */
@@ -996,11 +1162,11 @@
       
       <!-- Scan Actions -->
       <div class="border-t pt-3" style="border-color: rgba(255,255,255,0.06);">
-        <div class="sidebar-item" id="scanHomeBtn" data-tooltip="Scan Home Directory">
+        <div class="sidebar-item" id="scanHomeBtn" data-tooltip="Scan Home">
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
           <span class="sidebar-text">Scan Home</span>
         </div>
-        <div class="sidebar-item" id="scanFolderBtn" data-tooltip="Scan Custom Folder">
+        <div class="sidebar-item" id="scanFolderBtn" data-tooltip="Scan Folder">
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/><path d="M12 10v6"/><path d="m9 13 3-3 3 3"/></svg>
           <span class="sidebar-text">Scan Folder</span>
         </div>
@@ -1010,27 +1176,27 @@
       <!-- Playground Module Navigation -->
       <div id="playgroundNav" class="module-nav hidden">
         <div class="mb-4">
-          <div class="sidebar-item active" id="navNewSnippet">
+          <div class="sidebar-item active" id="navNewSnippet" data-tooltip="New Snippet">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
             <span class="sidebar-text">New Snippet</span>
           </div>
-          <div class="sidebar-item" id="navSaveSnippet">
+          <div class="sidebar-item" id="navSaveSnippet" data-tooltip="Save Snippet">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
             <span class="sidebar-text">Save Snippet</span>
           </div>
         </div>
         
         <!-- Saved Snippets Section -->
-        <div class="mt-4 pt-4" style="border-top: 1px solid rgba(255,255,255,0.06);">
-          <div class="px-2 mb-2">
+        <div class="saved-section mt-4 pt-4" style="border-top: 1px solid rgba(255,255,255,0.06);">
+          <div class="saved-section-header px-2 mb-2 sidebar-text">
             <div class="flex items-center justify-between">
               <span class="text-xs font-semibold" style="color: #71717a;">Saved Snippets</span>
               <span id="snippetCount" class="text-xs px-1.5 py-0.5 rounded" style="background: rgba(139, 92, 246, 0.15); color: #a78bfa;">0</span>
             </div>
           </div>
-          <div id="snippetHistoryList" style="max-height: 400px; overflow-y: auto;">
+          <div id="snippetHistoryList" style="max-height: 300px; overflow-y: auto;">
             <!-- Saved snippets will be rendered here -->
-            <div class="px-2 py-4 text-center" style="color: #52525b; font-size: 11px;">
+            <div class="px-2 py-4 text-center sidebar-text empty-state-text" style="color: #52525b; font-size: 11px;">
               No saved snippets yet.<br>Click "Save Snippet" to save your code.
             </div>
           </div>
@@ -1040,20 +1206,20 @@
       <!-- SSH Module Navigation -->
       <div id="sshNav" class="module-nav hidden">
         <div class="mb-4">
-          <div class="sidebar-item active" id="navAllHosts">
+          <div class="sidebar-item active" id="navAllHosts" data-tooltip="All Hosts">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="8" x="2" y="2" rx="2" ry="2"/><rect width="20" height="8" x="2" y="14" rx="2" ry="2"/><line x1="6" x2="6.01" y1="6" y2="6"/><line x1="6" x2="6.01" y1="18" y2="18"/></svg>
             <span class="sidebar-text">All Hosts</span>
             <span class="collection-count" id="sshHostCount">0</span>
           </div>
-          <div class="sidebar-item" id="navAddHost">
+          <div class="sidebar-item" id="navAddHost" data-tooltip="Add Host">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
             <span class="sidebar-text">Add Host</span>
           </div>
         </div>
         
         <!-- Active Sessions Section -->
-        <div class="mt-4 pt-4" style="border-top: 1px solid rgba(255,255,255,0.06);">
-          <div class="px-2 mb-2">
+        <div class="saved-section mt-4 pt-4" style="border-top: 1px solid rgba(255,255,255,0.06);">
+          <div class="saved-section-header px-2 mb-2 sidebar-text">
             <div class="flex items-center justify-between">
               <span class="text-xs font-semibold" style="color: #71717a;">Active Sessions</span>
               <span id="activeSessionsCount" class="text-xs px-1.5 py-0.5 rounded" style="background: rgba(16, 185, 129, 0.15); color: #10b981;">0</span>
@@ -1446,7 +1612,7 @@
                   <option value="solarized-light">Solarized Light</option>
                   <option value="gruvbox">Gruvbox</option>
                 </select>
-              </div>
+          </div>
             </div>
             
             <div class="settings-divider"></div>
@@ -1455,9 +1621,9 @@
               <label class="settings-row-label">Font Size</label>
               <div class="settings-row-control">
                 <input type="number" id="fontSizeInput" class="settings-input-number" value="13" min="10" max="24">
-              </div>
-            </div>
-            
+          </div>
+        </div>
+
             <div class="settings-row">
               <label class="settings-row-label">Line Numbers</label>
               <div class="settings-row-control">
@@ -1466,8 +1632,8 @@
                   <span class="checkmark"></span>
                   <span class="checkbox-label">Show line numbers</span>
                 </label>
-              </div>
-            </div>
+          </div>
+          </div>
             
             <div class="settings-row">
               <label class="settings-row-label">Minimap</label>
@@ -1481,7 +1647,7 @@
             </div>
           </div>
         </div>
-        
+
         <!-- Editor Panel -->
         <div class="settings-panel" data-panel="editor">
           <div class="settings-form">
@@ -1492,7 +1658,7 @@
                   <option value="">Always ask</option>
                   <!-- Options will be populated by JS -->
                 </select>
-              </div>
+          </div>
             </div>
             
             <div class="settings-divider"></div>
@@ -1505,9 +1671,9 @@
                   <span class="checkmark"></span>
                   <span class="checkbox-label">Wrap long lines</span>
                 </label>
-              </div>
-            </div>
-            
+          </div>
+        </div>
+
             <div class="settings-row">
               <label class="settings-row-label">Auto Save</label>
               <div class="settings-row-control">
@@ -1516,7 +1682,7 @@
                   <span class="checkmark"></span>
                   <span class="checkbox-label">Auto-save on change</span>
                 </label>
-              </div>
+          </div>
             </div>
             
             <div class="settings-row">
@@ -1527,9 +1693,9 @@
                   <span class="checkmark"></span>
                   <span class="checkbox-label">Auto-close brackets</span>
                 </label>
-              </div>
-            </div>
           </div>
+        </div>
+      </div>
           
           <!-- Hidden list for compatibility -->
           <div id="defaultIdeList" style="display:none;"></div>
@@ -2313,11 +2479,11 @@
               <!-- Editor + Output Split -->
               <div id="blueprintSplit" class="flex-1 flex flex-col playground-split" style="overflow: hidden; height: 100%;">
                 <div id="blueprintEditorContainer" class="playground-editor-panel" style="flex: 1; min-height: 100px; overflow: hidden; position: relative;">
-                  <!-- Monaco Editor container -->
-                  <div id="blueprintMonacoEditor" style="position: absolute; inset: 0; width: 100%; height: 100%; display: none;"></div>
-                  <!-- Fallback textarea -->
+                <!-- Monaco Editor container -->
+                <div id="blueprintMonacoEditor" style="position: absolute; inset: 0; width: 100%; height: 100%; display: none;"></div>
+                <!-- Fallback textarea -->
                   <textarea id="blueprintEditorTextarea" placeholder="// Module code scratchpad&#10;// ⌘/Ctrl+S to save, ⌘/Ctrl+Enter to run&#10;&#10;console.log('hello from Blueprint editor');" style="position: absolute; inset: 0; width: 100%; height: 100%; padding: 16px; background: transparent; border: none; color: #e4e4e7; font-family: 'JetBrains Mono', monospace; font-size: 13px; line-height: 1.7; resize: none; outline: none;"></textarea>
-                </div>
+              </div>
                 
                 <!-- Resizer -->
                 <div id="blueprintResizer" class="playground-resizer"></div>
