@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <title>Preference UI Test</title>
+  <link rel="stylesheet" href="./dist/output.css" />
+  <style>
+    body { background: #18181b; color: #fafafa; font-family: 'Inter', sans-serif; }
+    .modal-backdrop {
+      position: fixed; inset: 0; background: rgba(0, 0, 0, 0.7); z-index: 100;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .modal {
+      background: #18181b; border: 1px solid rgba(255, 255, 255, 0.08); color: #fafafa;
+      border-radius: 8px; width: 800px; max-width: 95vw; max-height: 90vh;
+      display: flex; flex-direction: column;
+    }
+    .preferences-sidebar {
+      width: 200px; border-right: 1px solid rgba(255,255,255,0.06); padding: 16px 0;
+      background: #1a1a1f;
+    }
+    .preference-nav-item {
+      width: 100%; padding: 10px 20px; text-align: left;
+      background: none; border: none; color: #a1a1aa; font-size: 13px; font-weight: 500;
+      cursor: pointer; border-left: 3px solid transparent;
+    }
+    .preference-nav-item.active {
+      color: #fafafa; border-left-color: #8b5cf6;
+    }
+    .preferences-content {
+      flex: 1; padding: 20px;
+    }
+    .preference-group {
+      margin-bottom: 24px;
+    }
+    .preference-group label {
+      display: block; font-size: 13px; font-weight: 500; color: #fafafa; margin-bottom: 8px;
+    }
+    .preference-group input[type="checkbox"],
+    .preference-group input[type="radio"] {
+      margin-right: 8px;
+    }
+    .preference-group select {
+      width: 100%; padding: 8px 12px; background: #1a1a1f; border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 4px; color: #fafafa; font-size: 13px;
+    }
+  </style>
+</head>
+<body>
+  <div id="settingsModal" class="modal-backdrop">
+    <div class="modal">
+      <div class="modal-header" style="display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid rgba(255,255,255,0.06);">
+        <h3 class="modal-title" style="font-size: 16px; font-weight: 600; color: #fafafa; margin: 0;">
+          Preferences
+        </h3>
+        <button id="closeSettingsBtn" style="background: none; border: none; color: #a1a1aa; cursor: pointer; padding: 4px;">
+          ✕
+        </button>
+      </div>
+
+      <div class="modal-body" style="flex: 1; overflow-y: auto; padding: 0;">
+        <form id="preferencesForm" style="display: flex; height: 100%;">
+
+          <!-- Sidebar Navigation -->
+          <div class="preferences-sidebar">
+            <nav style="display: flex; flex-direction: column;">
+              <button type="button" class="preference-nav-item active" data-section="appearance">
+                Appearance
+              </button>
+              <button type="button" class="preference-nav-item" data-section="editor">
+                Editor
+              </button>
+              <button type="button" class="preference-nav-item" data-section="terminal">
+                Terminal
+              </button>
+              <button type="button" class="preference-nav-item" data-section="projects">
+                Projects
+              </button>
+              <button type="button" class="preference-nav-item" data-section="development">
+                Development
+              </button>
+              <button type="button" class="preference-nav-item" data-section="notifications">
+                Notifications
+              </button>
+            </nav>
+          </div>
+
+          <!-- Main Content Area -->
+          <div class="preferences-content">
+
+            <!-- Appearance Section -->
+            <div class="preference-section active" data-section="appearance">
+              <h4 style="font-size: 14px; font-weight: 600; color: #fafafa; margin: 0 0 16px 0;">Appearance</h4>
+
+              <div class="preference-group">
+                <label>Theme</label>
+                <div style="display: flex; gap: 16px;">
+                  <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                    <input type="radio" name="theme" value="dark" checked>
+                    <span>Dark</span>
+                  </label>
+                  <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                    <input type="radio" name="theme" value="light">
+                    <span>Light</span>
+                  </label>
+                </div>
+              </div>
+
+              <div class="preference-group">
+                <label>Interface</label>
+                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; margin-bottom: 8px;">
+                  <input type="checkbox" name="sidebarCollapsed">
+                  <span>Start with sidebar collapsed</span>
+                </label>
+                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                  <input type="checkbox" name="showHiddenFiles">
+                  <span>Show hidden files in project lists</span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Editor Section -->
+            <div class="preference-section" data-section="editor" style="display: none;">
+              <h4 style="font-size: 14px; font-weight: 600; color: #fafafa; margin: 0 0 16px 0;">Editor</h4>
+
+              <div class="preference-group">
+                <label>Default IDE</label>
+                <select name="defaultIde">
+                  <option value="">Auto-detect</option>
+                  <option value="vscode">Visual Studio Code</option>
+                  <option value="cursor">Cursor</option>
+                  <option value="webstorm">WebStorm</option>
+                  <option value="intellij">IntelliJ IDEA</option>
+                  <option value="sublime">Sublime Text</option>
+                  <option value="atom">Atom</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Terminal Section -->
+            <div class="preference-section" data-section="terminal" style="display: none;">
+              <h4 style="font-size: 14px; font-weight: 600; color: #fafafa; margin: 0 0 16px 0;">Terminal</h4>
+
+              <div class="preference-group">
+                <label>Default Terminal</label>
+                <select name="defaultTerminal">
+                  <option value="">Auto-detect</option>
+                  <option value="terminal">Terminal.app</option>
+                  <option value="iterm">iTerm</option>
+                  <option value="hyper">Hyper</option>
+                  <option value="warp">Warp</option>
+                  <option value="kitty">Kitty</option>
+                  <option value="alacritty">Alacritty</option>
+                  <option value="powershell">PowerShell</option>
+                  <option value="wt">Windows Terminal</option>
+                  <option value="cmd">Command Prompt</option>
+                  <option value="gnome-terminal">GNOME Terminal</option>
+                  <option value="konsole">Konsole</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Projects Section -->
+            <div class="preference-section" data-section="projects" style="display: none;">
+              <h4 style="font-size: 14px; font-weight: 600; color: #fafafa; margin: 0 0 16px 0;">Projects</h4>
+
+              <div class="preference-group">
+                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; margin-bottom: 8px;">
+                  <input type="checkbox" name="autoScanEnabled" checked>
+                  <span style="font-weight: 500;">Enable automatic project scanning</span>
+                </label>
+                <div style="margin-left: 24px;">
+                  <label style="display: block; color: #a1a1aa; margin-bottom: 4px;">Scan interval (seconds)</label>
+                  <input type="number" name="autoScanInterval" value="3600" min="60" max="86400">
+                </div>
+              </div>
+
+              <div class="preference-group">
+                <label>Excluded directories</label>
+                <textarea name="excludedPaths" rows="3" placeholder="node_modules&#10;.git&#10;dist&#10;build">node_modules&#10;.git&#10;dist&#10;build&#10;.next&#10;.nuxt</textarea>
+                <p style="color: #71717a; margin-top: 4px;">One directory per line</p>
+              </div>
+
+              <div class="preference-group">
+                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                  <input type="checkbox" name="confirmBeforeDelete" checked>
+                  <span>Confirm before deleting projects</span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Development Section -->
+            <div class="preference-section" data-section="development" style="display: none;">
+              <h4 style="font-size: 14px; font-weight: 600; color: #fafafa; margin: 0 0 16px 0;">Development</h4>
+
+              <div class="preference-group">
+                <label>Port range for development servers</label>
+                <div style="display: flex; gap: 8px; align-items: center;">
+                  <input type="number" name="portRangeStart" value="3000" min="1024" max="65535">
+                  <span>to</span>
+                  <input type="number" name="portRangeEnd" value="4000" min="1024" max="65535">
+                </div>
+              </div>
+
+              <div class="preference-group">
+                <label>Default commands</label>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                  <div>
+                    <label style="display: block; color: #a1a1aa; margin-bottom: 4px;">Start command</label>
+                    <input type="text" name="defaultStartCommand" value="npm start">
+                  </div>
+                  <div>
+                    <label style="display: block; color: #a1a1aa; margin-bottom: 4px;">Build command</label>
+                    <input type="text" name="defaultBuildCommand" value="npm run build">
+                  </div>
+                  <div>
+                    <label style="display: block; color: #a1a1aa; margin-bottom: 4px;">Test command</label>
+                    <input type="text" name="defaultTestCommand" value="npm test">
+                  </div>
+                  <div>
+                    <label style="display: block; color: #a1a1aa; margin-bottom: 4px;">Max concurrent processes</label>
+                    <input type="number" name="maxConcurrentProcesses" value="5" min="1" max="20">
+                  </div>
+                </div>
+              </div>
+
+              <div class="preference-group">
+                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                  <input type="checkbox" name="enableCaching" checked>
+                  <span>Enable caching for better performance</span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Notifications Section -->
+            <div class="preference-section" data-section="notifications" style="display: none;">
+              <h4 style="font-size: 14px; font-weight: 600; color: #fafafa; margin: 0 0 16px 0;">Notifications</h4>
+
+              <div class="preference-group">
+                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; margin-bottom: 8px;">
+                  <input type="checkbox" name="showNotifications" checked>
+                  <span style="font-weight: 500;">Show system notifications</span>
+                </label>
+                <div style="margin-left: 24px;">
+                  <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                    <input type="checkbox" name="playSounds">
+                    <span>Play notification sounds</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </form>
+      </div>
+
+      <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 12px; padding: 16px 20px; border-top: 1px solid rgba(255,255,255,0.06);">
+        <button id="resetSettingsBtn">Reset to Defaults</button>
+        <button id="cancelSettingsBtn">Cancel</button>
+        <button id="saveSettingsBtn">Save Preferences</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Simple navigation between sections
+    document.querySelectorAll('.preference-nav-item').forEach(item => {
+      item.addEventListener('click', () => {
+        // Remove active state from all nav items
+        document.querySelectorAll('.preference-nav-item').forEach(nav => {
+          nav.classList.remove('active');
+          nav.style.borderLeftColor = 'transparent';
+          nav.style.color = '#a1a1aa';
+        });
+
+        // Add active state to clicked item
+        item.classList.add('active');
+        item.style.borderLeftColor = '#8b5cf6';
+        item.style.color = '#fafafa';
+
+        // Hide all sections
+        document.querySelectorAll('.preference-section').forEach(section => {
+          section.style.display = 'none';
+        });
+
+        // Show selected section
+        const sectionId = item.getAttribute('data-section');
+        const targetSection = document.querySelector(`.preference-section[data-section="${sectionId}"]`);
+        if (targetSection) {
+          targetSection.style.display = 'block';
+        }
+      });
+    });
+
+    // Close button
+    document.getElementById('closeSettingsBtn').addEventListener('click', () => {
+      alert('Close clicked - preference UI renders correctly!');
+    });
+
+    // Save button
+    document.getElementById('saveSettingsBtn').addEventListener('click', () => {
+      const formData = new FormData(document.getElementById('preferencesForm'));
+      const data = Object.fromEntries(formData.entries());
+      console.log('Form data:', data);
+      alert('Save clicked - form data collected successfully!\nCheck console for details.');
+    });
+
+    // Cancel button
+    document.getElementById('cancelSettingsBtn').addEventListener('click', () => {
+      alert('Cancel clicked');
+    });
+
+    // Reset button
+    document.getElementById('resetSettingsBtn').addEventListener('click', () => {
+      alert('Reset clicked');
+    });
+  </script>
+</body>
+</html>
+

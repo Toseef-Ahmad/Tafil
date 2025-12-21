@@ -165,16 +165,6 @@ body:not(.light-mode) {
   transition: opacity 0.2s ease;
 }
 
-.project-card:hover {
-  background: #18181b;
-  border-color: rgba(255, 255, 255, 0.12);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
-}
-
-.project-card:hover::before {
-  opacity: 1;
-}
 
 .project-card.is-running {
   border-color: rgba(16, 185, 129, 0.3);
@@ -1429,11 +1419,6 @@ body[data-theme] .project-card {
   color: var(--text-primary) !important;
 }
 
-body[data-theme] .project-card:hover {
-  background-color: var(--bg-tertiary) !important;
-  border-color: var(--border-hover) !important;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2), 0 0 0 1px var(--border-hover);
-}
 
 body[data-theme] .project-card h4,
 body[data-theme] .card-title {
