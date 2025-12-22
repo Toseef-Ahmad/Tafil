@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="./logo.svg" alt="TAFIL" width="120" height="120" />
+<img src="./icon.png" alt="TAFIL" width="120" height="120" />
 
 # TAFIL
 
@@ -9,7 +9,7 @@
 Manage projects, write documentation, plan features, and experiment with code — all in one desktop app that works alongside your IDE.
 
 [![Download](https://img.shields.io/badge/Download-Free-FCD34D?style=for-the-badge&logo=download)](https://github.com/Toseef-Ahmad/Tafil/releases)
-[![License](https://img.shields.io/badge/License-MIT-zinc?style=for-the-badge)](./LICENSE)
+
 [![Version](https://img.shields.io/badge/Version-1.0.0-zinc?style=for-the-badge)](https://github.com/Toseef-Ahmad/Tafil/releases)
 
 [Website](https://tafil.app) • [Download](https://github.com/Toseef-Ahmad/Tafil/releases) • [Documentation](https://tafil.app) • [Support](mailto:ahmadtouseef946@gmail.com)
@@ -261,7 +261,7 @@ The free version includes all core features. The Pro version unlocks advanced fe
 
 ## 💬 Support
 
-- **Email:** [ahmadtouseef946@gmail.com](mailto:ahmadtouseef946@gmail.com)
+- **Email:** [tafil.help@gmail.com](mailto:tafil.help@gmail.com)
 - **Issues:** [GitHub Issues](https://github.com/Toseef-Ahmad/Tafil/issues)
 - **Website:** [tafil.app](https://tafil.app)
 
