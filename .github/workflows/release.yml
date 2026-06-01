@@ -1,0 +1,128 @@
+# Build Tafil desktop artifacts and attach them to a GitHub Release on tag push.
+# Push tag from the release repo (Toseef-Ahmad/Tafil) so GITHUB_TOKEN can publish assets.
+#
+# Optional repo secrets for signed + notarized macOS (see docs/MACOS_NOTARIZATION.md):
+#   CSC_LINK, CSC_KEY_PASSWORD, APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD, APPLE_TEAM_ID
+
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-mac:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build macOS universal DMG
+        run: npm run build:mac
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mac-dmg
+          path: release/*.dmg
+          if-no-files-found: error
+
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Linux AppImages
+        run: npm run build:linux
+
+      - name: Alias x86_64 → x64 (landing URL alignment)
+        run: |
+          for f in release/Tafil-*-x86_64.AppImage; do
+            if [ -f "$f" ]; then
+              ver=$(basename "$f" | sed -E 's/Tafil-([0-9.]+)-x86_64.AppImage/\1/')
+              cp -f "$f" "release/Tafil-${ver}-x64.AppImage"
+            fi
+          done
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-appimages
+          path: |
+            release/Tafil-*-x64.AppImage
+            release/Tafil-*-arm64.AppImage
+          if-no-files-found: error
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Windows NSIS installer
+        run: npm run build:win
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-exe
+          path: release/Tafil-Setup-*.exe
+          if-no-files-found: error
+
+  publish-release:
+    needs: [build-mac, build-linux, build-windows]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: List release files
+        run: ls -lh artifacts/
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          generate_release_notes: false
+          body_path: RELEASE_v3.0.1.md
+          files: |
+            artifacts/Tafil-*-darwin-universal.dmg
+            artifacts/Tafil-*-x64.AppImage
+            artifacts/Tafil-*-arm64.AppImage
+            artifacts/Tafil-Setup-*.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
