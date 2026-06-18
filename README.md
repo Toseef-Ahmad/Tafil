@@ -35,7 +35,7 @@ Every project gets a **Blueprint** — a unified workspace with your goal, tasks
 |---------|-------------------|
 | **🧠 The Amnesia Loop** — AI editors forget context every session | Blueprints provide persistent `.tafil/` memory that your AI can always access |
 | **🔀 The Thinking Gap** — Planning tools disconnected from code | Blueprint Modules bundle goal, tasks, canvas, code, and resources in one place |
-| **💸 $531/year for Chaos** — Notion + Linear + Obsidian + Excalidraw + Slack | Tafil replaces all five for **$0/year** (Free) or **$29/year** (Pro) |
+| **💸 Replaces 5 Subscriptions** — Notion + Linear + Obsidian + Excalidraw + Slack | Tafil replaces all five for **$0/year** (Free) or **$39** (Pro Lifetime) |
 
 ---
 
@@ -43,8 +43,8 @@ Every project gets a **Blueprint** — a unified workspace with your goal, tasks
 
 <div align="center">
 
-![Tafil Dashboard](./screenshots/dashboard.png)
-*Your project command center — everything at a glance*
+![Tafil Kanban Board](./screenshots/dashboard.png)
+*Blueprint Kanban board — plan and track tasks side by side with code*
 
 </div>
 
@@ -217,26 +217,26 @@ tafil --mcp
 
 ## 💰 Pricing
 
-| | **Free** | **Pro** |
-|---|---|---|
-| **Price** | **$0/forever** | **$29/year** |
-| Modules/project | 5 | Unlimited |
-| Tasks/module | 25 | Unlimited |
-| Canvas tabs | 1 | Unlimited |
-| AI suggestions/month | 10 | Unlimited |
-| P2P Collaboration | ✅ | ✅ |
-| Real-time chat & cursors | ✅ | ✅ |
-| 16 editor themes | ✅ | ✅ |
-| Marketplace (browse) | ✅ | ✅ |
-| Cloud sync (web ↔ desktop) | ❌ | ✅ |
-| MCP Server (write tools) | ❌ | ✅ |
-| AI Context Export | ❌ | ✅ |
-| SSH config sync | ❌ | ✅ |
-| Publish to Marketplace | ❌ | ✅ |
-| Agent sessions | 1 | Unlimited |
-| Priority support | ❌ | ✅ |
+| Feature | **Free** | **Pro Lifetime** | **Sync Add-on** |
+|---|---|---|---|
+| **Price** | **$0/forever** | **$39 (one-time)** | **$4/month** |
+| Modules/project | 5 | Unlimited | - |
+| Tasks/module | 25 | Unlimited | - |
+| Canvas tabs | 1 | Unlimited | - |
+| AI suggestions/month | 10 | Unlimited | - |
+| P2P Collaboration | ✅ | ✅ | - |
+| Real-time chat & cursors | ✅ | ✅ | - |
+| 16 editor themes | ✅ | ✅ | - |
+| Marketplace (browse) | ✅ | ✅ | - |
+| Cloud sync (web ↔ desktop) | ❌ | ❌ | ✅ |
+| MCP Server (write tools) | ❌ | ✅ | - |
+| AI Context Export | ❌ | ✅ | - |
+| SSH config sync | ❌ | ✅ | - |
+| Publish to Marketplace | ❌ | ✅ | - |
+| Agent sessions | 1 | Unlimited | - |
+| Priority support | ❌ | ✅ | - |
 
-👉 [**Get Pro — $29/year**](https://tafil.gumroad.com/l/tafil-license)
+👉 [**Get Pro Lifetime — $39**](https://tafil.gumroad.com/l/tafil-license)
 
 ---
 
@@ -296,14 +296,14 @@ tafil-desktop/
 ## 🤝 Support
 
 - **Website**: [tafil.app](https://tafil.app)
-- **Email**: [ahmadtouseef946@gmail.com](mailto:ahmadtouseef946@gmail.com)
+- **Email**: [support@tafil.app](mailto:support@tafil.app)
 - **Issues**: [GitHub Issues](https://github.com/Toseef-Ahmad/Tafil/issues)
 
 ---
 
 <div align="center">
 
-**Built with ❤️ by [Toseef Ahmad](https://github.com/Toseef-Ahmad)**
+**Built with ❤️ by [Tafil](https://tafil.app)**
 
 *Stop juggling tools. Start shipping with one blueprint.*
 
